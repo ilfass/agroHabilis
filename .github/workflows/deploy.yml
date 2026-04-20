@@ -16,7 +16,13 @@ jobs:
       - name: Configurar SSH para deploy
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_deploy
+          KEY='${{ secrets.VPS_SSH_KEY }}'
+          if printf '%s' "$KEY" | grep -q '\\n'; then
+            printf '%b' "$KEY" > ~/.ssh/id_deploy
+          else
+            printf '%s' "$KEY" > ~/.ssh/id_deploy
+          fi
+          sed -i 's/\r$//' ~/.ssh/id_deploy
           chmod 600 ~/.ssh/id_deploy
           ssh-keyscan -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts
 
