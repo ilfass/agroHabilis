@@ -27,3 +27,5 @@ AgroHabilis es una plataforma Node.js pensada para centralizar informacion agrop
 2. Completar credenciales y variables requeridas.
 3. Ejecutar `node scripts/setup-db.js` para inicializar base de datos.
 4. Levantar el servidor con `npm start`.
+
+Actualizacion: deploy automatico configurado con GitHub Actions.
