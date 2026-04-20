@@ -83,10 +83,17 @@ CREATE TABLE IF NOT EXISTS envios_whatsapp (
 );
 `;
 
+const seedUsuarioSistemaSQL = `
+INSERT INTO usuarios (nombre, whatsapp)
+VALUES ('Resumen sistema', 'ahbl:sistema')
+ON CONFLICT (whatsapp) DO NOTHING;
+`;
+
 const setupDatabase = async () => {
   try {
     await testConnection();
     await query(createTablesSQL);
+    await query(seedUsuarioSistemaSQL);
     console.log("Tablas creadas/verificadas correctamente.");
   } catch (error) {
     console.error("Error durante setup de base de datos:", error.message);
