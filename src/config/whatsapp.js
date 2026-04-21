@@ -1,14 +1,27 @@
 const qrcode = require("qrcode-terminal");
 const { Client, LocalAuth } = require("whatsapp-web.js");
+const {
+  manejarComandoBot,
+  obtenerEstadoBot,
+  procesarConsulta,
+} = require("../services/consultas");
+const { gestionarOnboarding } = require("../services/onboarding");
 
 const sessionPath = process.env.WHATSAPP_SESSION_PATH || "./.wwebjs_auth";
 
+const puppeteerConfig = {
+  headless: true,
+  args: ["--no-sandbox", "--disable-setuid-sandbox"],
+};
+
+if (process.env.PUPPETEER_EXECUTABLE_PATH?.trim()) {
+  puppeteerConfig.executablePath =
+    process.env.PUPPETEER_EXECUTABLE_PATH.trim();
+}
+
 const client = new Client({
   authStrategy: new LocalAuth({ dataPath: sessionPath }),
-  puppeteer: {
-    headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
-  },
+  puppeteer: puppeteerConfig,
 });
 
 let initialized = false;
@@ -65,6 +78,56 @@ client.on("disconnected", async (reason) => {
   }, 5000);
 });
 
+client.on("message", async (msg) => {
+  try {
+    if (msg.from?.includes("@g.us")) return;
+    if (msg.from?.includes("@broadcast")) return;
+    if (msg.fromMe) return;
+
+    const consulta = String(msg.body || "").trim();
+    if (!consulta) return;
+
+    const respuestaComando = await manejarComandoBot(msg.from, consulta);
+    if (respuestaComando) {
+      await msg.reply(respuestaComando);
+      console.log(`[WhatsApp] Comando bot aplicado para ${msg.from}`);
+      return;
+    }
+
+    const botActivo = await obtenerEstadoBot(msg.from);
+    if (!botActivo) {
+      console.log(
+        `[WhatsApp] Consulta ignorada por bot pausado en chat ${msg.from}`
+      );
+      return;
+    }
+
+    const onboarding = await gestionarOnboarding(msg.from, consulta);
+    if (onboarding.enOnboarding) {
+      await msg.reply(onboarding.respuesta);
+      console.log(`[WhatsApp] Onboarding en curso para ${msg.from}`);
+      return;
+    }
+
+    console.log(`[WhatsApp] Consulta recibida de ${msg.from}: ${consulta}`);
+    const respuesta = await procesarConsulta(msg.from, consulta);
+    await msg.reply(respuesta);
+    console.log(`[WhatsApp] Respuesta enviada a ${msg.from}`);
+  } catch (error) {
+    console.error("[WhatsApp] Error procesando consulta:", error.message);
+    try {
+      await msg.reply(
+        "No pude procesar tu consulta en este momento. Probá nuevamente en unos minutos."
+      );
+    } catch (replyError) {
+      console.error(
+        "[WhatsApp] Error enviando mensaje de fallback:",
+        replyError.message
+      );
+    }
+  }
+});
+
 const sendMessage = async (numero, mensaje) => {
   if (!numero) {
     throw new Error("Numero requerido para sendMessage");
@@ -80,8 +143,12 @@ const sendMessage = async (numero, mensaje) => {
     throw new Error("Cliente de WhatsApp no esta listo aun");
   }
 
-  const chatId = `${numeroLimpio}@c.us`;
-  return client.sendMessage(chatId, String(mensaje));
+  // Algunos numeros resuelven a @lid en lugar de @c.us.
+  const numberId = await client.getNumberId(numeroLimpio);
+  if (!numberId?._serialized) {
+    throw new Error("Numero no registrado en WhatsApp");
+  }
+  return client.sendMessage(numberId._serialized, String(mensaje));
 };
 
 module.exports = {
