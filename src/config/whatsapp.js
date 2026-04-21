@@ -6,6 +6,8 @@ const {
   procesarConsulta,
 } = require("../services/consultas");
 const { gestionarOnboarding } = require("../services/onboarding");
+const { generarResumen } = require("../services/resumen");
+const { buscarPorWhatsapp } = require("../models/usuario");
 
 const sessionPath = process.env.WHATSAPP_SESSION_PATH || "./.wwebjs_auth";
 
@@ -87,10 +89,30 @@ client.on("message", async (msg) => {
     const consulta = String(msg.body || "").trim();
     if (!consulta) return;
 
+    const comando = consulta
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .trim()
+      .toUpperCase();
+
     const respuestaComando = await manejarComandoBot(msg.from, consulta);
     if (respuestaComando) {
       await msg.reply(respuestaComando);
       console.log(`[WhatsApp] Comando bot aplicado para ${msg.from}`);
+      return;
+    }
+
+    if (comando === "MI RESUMEN") {
+      const usuario = await buscarPorWhatsapp(msg.from);
+      if (!usuario) {
+        await msg.reply(
+          "Primero necesitamos completar tu perfil. Responde las preguntas de onboarding para habilitar tu resumen diario."
+        );
+        return;
+      }
+      const generado = await generarResumen(usuario.id);
+      await msg.reply(generado.texto);
+      console.log(`[WhatsApp] Resumen manual enviado a ${msg.from}`);
       return;
     }
 

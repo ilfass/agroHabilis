@@ -9,8 +9,11 @@ const {
   ejecutarRecolectorDiario,
   iniciarCronRecolector,
 } = require("./jobs/recolector");
+const { iniciarCronEnviador } = require("./jobs/enviador");
 const { obtenerDatosUltimoBoletin } = require("./scrapers/bcrBoletin");
 const { generarResumenMercado } = require("./services/gemini");
+const { generarResumen, marcarResumenEnviado } = require("./services/resumen");
+const { buscarPorWhatsapp } = require("./models/usuario");
 const {
   initializeWhatsApp,
   sendMessage,
@@ -178,6 +181,49 @@ app.post("/api/admin/recolectar", async (req, res) => {
   }
 });
 
+app.post("/api/admin/enviar-resumen", async (req, res) => {
+  try {
+    const adminKey = process.env.ADMIN_KEY?.trim();
+    const headerKey = req.header("x-admin-key");
+    if (!adminKey) {
+      return res
+        .status(500)
+        .json({ ok: false, error: "ADMIN_KEY no configurada en servidor" });
+    }
+    if (!headerKey || headerKey !== adminKey) {
+      return res.status(401).json({ ok: false, error: "No autorizado" });
+    }
+
+    const numero = String(req.body?.whatsapp || "").trim();
+    if (!numero) {
+      return res.status(400).json({ ok: false, error: "Falta body.whatsapp" });
+    }
+
+    const usuario = await buscarPorWhatsapp(numero);
+    if (!usuario) {
+      return res
+        .status(404)
+        .json({ ok: false, error: "No existe usuario para ese whatsapp" });
+    }
+
+    const generado = await generarResumen(usuario.id);
+    const envio = await sendMessage(usuario.whatsapp, generado.texto);
+    await marcarResumenEnviado(generado.resumenId);
+
+    return res.json({
+      ok: true,
+      resumenId: generado.resumenId,
+      model: generado.model,
+      tokensUsados: generado.tokensUsados,
+      mensajeId: envio.id?._serialized || null,
+      resumen: generado.texto,
+    });
+  } catch (error) {
+    console.error("Fallo enviar resumen admin:", error.message);
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
 const programarJobs = () => {
   const tz = "America/Argentina/Buenos_Aires";
   cron.schedule(
@@ -205,6 +251,7 @@ const startServer = async () => {
     await testConnection();
     await initializeWhatsApp();
     iniciarCronRecolector();
+    iniciarCronEnviador();
     programarJobs();
     app.listen(PORT, () => {
       console.log(`AgroHabilis escuchando en puerto ${PORT}`);
