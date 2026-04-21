@@ -95,7 +95,20 @@ const obtenerPreciosCultivosUsuario = async (cultivos = []) => {
     const ayer = Number(item.precio_ars_ayer);
     const variacion =
       Number.isFinite(hoy) && Number.isFinite(ayer) ? Number((hoy - ayer).toFixed(2)) : null;
-    return { ...item, variacion_ars: variacion };
+    const tieneDatoPrevio = Number.isFinite(ayer);
+    const variacionTexto = tieneDatoPrevio
+      ? variacion > 0
+        ? `▲ ${variacion}`
+        : variacion < 0
+        ? `▼ ${Math.abs(variacion)}`
+        : "▲ 0"
+      : "▲ sin dato prev.";
+    return {
+      ...item,
+      variacion_ars: variacion,
+      tiene_dato_previo: tieneDatoPrevio,
+      variacion_texto: variacionTexto,
+    };
   });
 
   const variaciones = {};
@@ -234,11 +247,11 @@ Trabajás con ${cultivosTexto} en ${hectareasTotales || "N/D"} hectáreas.
 
 El resumen debe tener este formato exacto:
 
-🌾 *Buenos días ${perfil.nombre}!*
+🌾 *Buenos días, ${perfil.nombre}!*
 📅 Resumen AgroHabilis - ${fecha}
 
 💰 *PRECIOS DEL DÍA*
-(listar cada cultivo con precio ARS y USD, variación respecto a ayer con ▲ o ▼)
+(listar cada cultivo con precio ARS y USD. Si hay dato de ayer, mostrar variación con ▲ o ▼. Si no hay dato previo, mostrar "▲ sin dato prev.")
 
 💵 *TIPO DE CAMBIO*
 (oficial, blue, MEP)

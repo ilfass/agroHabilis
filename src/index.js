@@ -2,7 +2,7 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const cron = require("node-cron");
-const { testConnection } = require("./config/database");
+const { query, testConnection } = require("./config/database");
 const { sincronizarPreciosBoletinBcr } = require("./jobs/syncBcrBoletin");
 const { ejecutarPipelineDiario } = require("./jobs/pipelineDiario");
 const {
@@ -16,6 +16,7 @@ const { generarResumen, marcarResumenEnviado } = require("./services/resumen");
 const { buscarPorWhatsapp } = require("./models/usuario");
 const {
   initializeWhatsApp,
+  obtenerEstadoWhatsapp,
   sendMessage,
 } = require("./config/whatsapp");
 const {
@@ -220,6 +221,48 @@ app.post("/api/admin/enviar-resumen", async (req, res) => {
     });
   } catch (error) {
     console.error("Fallo enviar resumen admin:", error.message);
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+app.get("/api/admin/estado", async (req, res) => {
+  try {
+    const adminKey = process.env.ADMIN_KEY?.trim();
+    const headerKey = req.header("x-admin-key");
+    if (!adminKey) {
+      return res
+        .status(500)
+        .json({ ok: false, error: "ADMIN_KEY no configurada en servidor" });
+    }
+    if (!headerKey || headerKey !== adminKey) {
+      return res.status(401).json({ ok: false, error: "No autorizado" });
+    }
+
+    const ultimaRecoleccion = await query(
+      "SELECT MAX(creado_en) AS ts FROM precios"
+    );
+    const usuariosActivos = await query(
+      "SELECT COUNT(*)::int AS total FROM usuarios WHERE activo = true"
+    );
+    const resumenesHoy = await query(
+      `
+        SELECT COUNT(*)::int AS total
+        FROM resumenes
+        WHERE fecha = CURRENT_DATE
+          AND enviado_wp = true
+      `
+    );
+
+    return res.json({
+      whatsapp: obtenerEstadoWhatsapp(),
+      ultimaRecoleccion: ultimaRecoleccion.rows[0]?.ts || null,
+      usuariosActivos: usuariosActivos.rows[0]?.total || 0,
+      resumenesHoy: resumenesHoy.rows[0]?.total || 0,
+      cronRecolector: "activo",
+      cronEnviador: "activo",
+    });
+  } catch (error) {
+    console.error("Fallo estado admin:", error.message);
     return res.status(500).json({ ok: false, error: error.message });
   }
 });
