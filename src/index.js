@@ -5,6 +5,10 @@ const cron = require("node-cron");
 const { testConnection } = require("./config/database");
 const { sincronizarPreciosBoletinBcr } = require("./jobs/syncBcrBoletin");
 const { ejecutarPipelineDiario } = require("./jobs/pipelineDiario");
+const {
+  ejecutarRecolectorDiario,
+  iniciarCronRecolector,
+} = require("./jobs/recolector");
 const { obtenerDatosUltimoBoletin } = require("./scrapers/bcrBoletin");
 const { generarResumenMercado } = require("./services/gemini");
 const {
@@ -153,6 +157,27 @@ app.post("/ai/resumen-mercado", async (req, res) => {
   }
 });
 
+app.post("/api/admin/recolectar", async (req, res) => {
+  try {
+    const adminKey = process.env.ADMIN_KEY?.trim();
+    const headerKey = req.header("x-admin-key");
+    if (!adminKey) {
+      return res
+        .status(500)
+        .json({ ok: false, error: "ADMIN_KEY no configurada en servidor" });
+    }
+    if (!headerKey || headerKey !== adminKey) {
+      return res.status(401).json({ ok: false, error: "No autorizado" });
+    }
+
+    const resultado = await ejecutarRecolectorDiario();
+    return res.json({ ok: resultado.ok, recolector: resultado });
+  } catch (error) {
+    console.error("Fallo recolector manual:", error.message);
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
 const programarJobs = () => {
   const tz = "America/Argentina/Buenos_Aires";
   cron.schedule(
@@ -171,7 +196,7 @@ const programarJobs = () => {
     { timezone: tz }
   );
   console.log(
-    "Cron configurado: pipeline diario BCR + resumen + WhatsApp (09:00 AR; resumen si hay GEMINI; WhatsApp si hay credenciales Cloud)."
+    "Cron configurado: pipeline diario BCR + resumen + WhatsApp (09:00 AR; IA con Gemini/OpenRouter; WhatsApp con whatsapp-web.js)."
   );
 };
 
@@ -179,6 +204,7 @@ const startServer = async () => {
   try {
     await testConnection();
     await initializeWhatsApp();
+    iniciarCronRecolector();
     programarJobs();
     app.listen(PORT, () => {
       console.log(`AgroHabilis escuchando en puerto ${PORT}`);
