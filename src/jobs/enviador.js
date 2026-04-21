@@ -1,6 +1,6 @@
 const cron = require("node-cron");
 const { query } = require("../config/database");
-const { sendMessage } = require("../config/whatsapp");
+const { estaListo, esperarClienteListo, sendMessage } = require("../config/whatsapp");
 const { generarResumen, marcarResumenEnviado } = require("../services/resumen");
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -37,6 +37,24 @@ const yaEnviadoHoy = async (usuarioId) => {
   return Boolean(result.rows[0]);
 };
 
+const esperarWhatsappEnviador = async () => {
+  const maxEsperaMs = 120_000;
+  const intervaloMs = 15_000;
+  const inicio = Date.now();
+
+  while (Date.now() - inicio < maxEsperaMs) {
+    if (estaListo()) return true;
+    try {
+      await esperarClienteListo(Math.min(intervaloMs, maxEsperaMs - (Date.now() - inicio)));
+      if (estaListo()) return true;
+    } catch (_error) {
+      // reintenta hasta completar ventana total
+    }
+    await sleep(intervaloMs);
+  }
+  return estaListo();
+};
+
 const ejecutarEnviadorDiario = async () => {
   const resumen = {
     ok: true,
@@ -44,8 +62,20 @@ const ejecutarEnviadorDiario = async () => {
     generados: 0,
     enviados: 0,
     omitidosYaEnviados: 0,
+    abortadoPorWhatsapp: false,
     errores: [],
   };
+
+  const whatsappListo = await esperarWhatsappEnviador();
+  if (!whatsappListo) {
+    resumen.ok = false;
+    resumen.abortadoPorWhatsapp = true;
+    resumen.errores.push(
+      "WhatsApp no estuvo listo dentro de 2 minutos. Se aborta el envío del día."
+    );
+    console.error("[Enviador] Abortado: WhatsApp no listo tras 2 minutos.");
+    return resumen;
+  }
 
   const usuarios = await obtenerUsuariosObjetivo();
   resumen.usuariosObjetivo = usuarios.length;
