@@ -4,6 +4,9 @@ const { obtenerPreciosMAGYPFOB } = require("../scrapers/granos_magyp_fob");
 const { obtenerPreciosCAC } = require("../scrapers/granos_cac");
 const { obtenerTipoCambio } = require("../scrapers/dolar");
 const { obtenerClima } = require("../scrapers/clima");
+const { obtenerPreciosHacienda } = require("../scrapers/hacienda");
+const { obtenerPreciosInsumos } = require("../scrapers/insumos");
+const { verificarAlertas } = require("../services/alertas");
 
 const insertPrecio = async (item) => {
   const precioArs = Number(item.precio_ars);
@@ -77,6 +80,56 @@ const insertClima = async (item) => {
   return result.rowCount || 0;
 };
 
+const insertHacienda = async (item) => {
+  if (!item?.categoria || !item?.fecha) return 0;
+  const result = await query(
+    `
+      INSERT INTO precios_hacienda (categoria, precio_promedio, precio_max, precio_min, unidad, fecha)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      ON CONFLICT (categoria, fecha) DO UPDATE SET
+        precio_promedio = EXCLUDED.precio_promedio,
+        precio_max = EXCLUDED.precio_max,
+        precio_min = EXCLUDED.precio_min,
+        unidad = EXCLUDED.unidad
+    `,
+    [
+      item.categoria,
+      item.precio_promedio,
+      item.precio_max,
+      item.precio_min,
+      item.unidad || "kg",
+      item.fecha,
+    ]
+  );
+  return result.rowCount || 0;
+};
+
+const insertInsumo = async (item) => {
+  if (!item?.producto || !item?.fecha || !Number.isFinite(Number(item.precio))) return 0;
+  const result = await query(
+    `
+      INSERT INTO precios_insumos (categoria, producto, precio, unidad, moneda, fuente, fecha)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      ON CONFLICT (producto, fecha) DO UPDATE SET
+        categoria = EXCLUDED.categoria,
+        precio = EXCLUDED.precio,
+        unidad = EXCLUDED.unidad,
+        moneda = EXCLUDED.moneda,
+        fuente = EXCLUDED.fuente
+    `,
+    [
+      item.categoria || "otro",
+      item.producto,
+      item.precio,
+      item.unidad || "unidad",
+      item.moneda || "ARS",
+      item.fuente || null,
+      item.fecha,
+    ]
+  );
+  return result.rowCount || 0;
+};
+
 const obtenerZonasUsuarios = async () => {
   const result = await query(
     `
@@ -106,6 +159,21 @@ const ejecutarRecolectorDiario = async () => {
     clima: {
       zonas: 0,
       registrosFuente: 0,
+      insertados: 0,
+      errores: [],
+    },
+    alertas: {
+      evaluadas: 0,
+      disparadas: 0,
+      errores: [],
+    },
+    hacienda: {
+      totalFuente: 0,
+      insertados: 0,
+      errores: [],
+    },
+    insumos: {
+      totalFuente: 0,
       insertados: 0,
       errores: [],
     },
@@ -184,10 +252,44 @@ const ejecutarRecolectorDiario = async () => {
     resumen.clima.errores.push(`Zonas usuarios: ${error.message}`);
   }
 
+  try {
+    const items = await obtenerPreciosHacienda();
+    resumen.hacienda.totalFuente = items.length;
+    for (const item of items) {
+      resumen.hacienda.insertados += await insertHacienda(item);
+    }
+  } catch (error) {
+    resumen.hacienda.errores.push(error.message);
+  }
+
+  try {
+    const items = await obtenerPreciosInsumos();
+    resumen.insumos.totalFuente = items.length;
+    for (const item of items) {
+      resumen.insumos.insertados += await insertInsumo(item);
+    }
+  } catch (error) {
+    resumen.insumos.errores.push(error.message);
+  }
+
+  try {
+    const rAlertas = await verificarAlertas();
+    resumen.alertas.evaluadas = rAlertas.totalEvaluadas;
+    resumen.alertas.disparadas = rAlertas.disparadas;
+    console.log(
+      `[Recolector] Alertas evaluadas=${rAlertas.totalEvaluadas}, disparadas=${rAlertas.disparadas}`
+    );
+  } catch (error) {
+    resumen.alertas.errores.push(error.message);
+  }
+
   const totalErrores =
     resumen.precios.errores.length +
     resumen.tipo_cambio.errores.length +
-    resumen.clima.errores.length;
+    resumen.clima.errores.length +
+    resumen.alertas.errores.length +
+    resumen.hacienda.errores.length +
+    resumen.insumos.errores.length;
 
   if (totalErrores > 0) {
     resumen.ok = false;

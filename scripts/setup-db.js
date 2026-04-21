@@ -107,6 +107,108 @@ CREATE TABLE IF NOT EXISTS onboarding_estado (
   creado_en TIMESTAMP DEFAULT NOW(),
   actualizado_en TIMESTAMP DEFAULT NOW()
 );
+
+CREATE TABLE IF NOT EXISTS alertas (
+  id SERIAL PRIMARY KEY,
+  usuario_id INTEGER REFERENCES usuarios(id) ON DELETE CASCADE,
+  cultivo VARCHAR(50) NOT NULL,
+  tipo VARCHAR(20) NOT NULL,
+  valor_objetivo DECIMAL(12,2) NOT NULL,
+  activa BOOLEAN DEFAULT true,
+  disparada BOOLEAN DEFAULT false,
+  disparada_en TIMESTAMP,
+  creado_en TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS perfil_productivo (
+  id SERIAL PRIMARY KEY,
+  usuario_id INTEGER REFERENCES usuarios(id) ON DELETE CASCADE,
+  tipo VARCHAR(20) NOT NULL,
+  activo BOOLEAN DEFAULT true,
+  creado_en TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS campanas_agricolas (
+  id SERIAL PRIMARY KEY,
+  usuario_id INTEGER REFERENCES usuarios(id) ON DELETE CASCADE,
+  nombre VARCHAR(100),
+  fecha_inicio DATE,
+  fecha_fin DATE,
+  activa BOOLEAN DEFAULT true,
+  creado_en TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS lotes (
+  id SERIAL PRIMARY KEY,
+  usuario_id INTEGER REFERENCES usuarios(id) ON DELETE CASCADE,
+  campana_id INTEGER REFERENCES campanas_agricolas(id),
+  nombre VARCHAR(100),
+  hectareas DECIMAL(10,2),
+  cultivo VARCHAR(50),
+  arrendado BOOLEAN DEFAULT false,
+  creado_en TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS stock_ganadero (
+  id SERIAL PRIMARY KEY,
+  usuario_id INTEGER REFERENCES usuarios(id) ON DELETE CASCADE,
+  categoria VARCHAR(50),
+  cantidad INTEGER,
+  fecha DATE NOT NULL,
+  creado_en TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS gastos (
+  id SERIAL PRIMARY KEY,
+  usuario_id INTEGER REFERENCES usuarios(id) ON DELETE CASCADE,
+  perfil VARCHAR(20) NOT NULL,
+  categoria VARCHAR(50),
+  descripcion TEXT,
+  monto DECIMAL(12,2) NOT NULL,
+  moneda VARCHAR(5) DEFAULT 'ARS',
+  fecha DATE NOT NULL,
+  lote_id INTEGER REFERENCES lotes(id),
+  creado_en TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS ventas (
+  id SERIAL PRIMARY KEY,
+  usuario_id INTEGER REFERENCES usuarios(id) ON DELETE CASCADE,
+  perfil VARCHAR(20) NOT NULL,
+  producto VARCHAR(50),
+  cantidad DECIMAL(12,2),
+  unidad VARCHAR(20),
+  precio_unitario DECIMAL(12,2),
+  monto_total DECIMAL(12,2),
+  moneda VARCHAR(5) DEFAULT 'ARS',
+  fecha DATE NOT NULL,
+  creado_en TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS precios_insumos (
+  id SERIAL PRIMARY KEY,
+  categoria VARCHAR(50) NOT NULL,
+  producto VARCHAR(100) NOT NULL,
+  precio DECIMAL(12,2) NOT NULL,
+  unidad VARCHAR(20),
+  moneda VARCHAR(5) DEFAULT 'ARS',
+  fuente VARCHAR(100),
+  fecha DATE NOT NULL,
+  creado_en TIMESTAMP DEFAULT NOW(),
+  UNIQUE(producto, fecha)
+);
+
+CREATE TABLE IF NOT EXISTS precios_hacienda (
+  id SERIAL PRIMARY KEY,
+  categoria VARCHAR(50) NOT NULL,
+  precio_promedio DECIMAL(10,2),
+  precio_max DECIMAL(10,2),
+  precio_min DECIMAL(10,2),
+  unidad VARCHAR(10) DEFAULT 'kg',
+  fecha DATE NOT NULL,
+  creado_en TIMESTAMP DEFAULT NOW(),
+  UNIQUE(categoria, fecha)
+);
 `;
 
 const seedUsuarioSistemaSQL = `

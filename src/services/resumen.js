@@ -2,6 +2,7 @@ const axios = require("axios");
 const { query } = require("../config/database");
 const { generarConPromptLibre } = require("./gemini");
 const { actualizarUsuario, obtenerPerfil, normalizarWhatsapp } = require("../models/usuario");
+const { obtenerResumenFinanciero } = require("./gastos");
 
 const toISODate = (d) => new Date(d).toISOString().slice(0, 10);
 
@@ -234,7 +235,22 @@ const obtenerPerfilPorId = async (usuarioId) => {
     [usuarioId]
   );
 
-  return { ...usuario, cultivos: cultivosResult.rows };
+  const perfilResult = await query(
+    `
+      SELECT tipo
+      FROM perfil_productivo
+      WHERE usuario_id = $1 AND activo = true
+      ORDER BY id DESC
+      LIMIT 1
+    `,
+    [usuarioId]
+  );
+
+  return {
+    ...usuario,
+    cultivos: cultivosResult.rows,
+    perfil_productivo: perfilResult.rows[0]?.tipo || "agricultura",
+  };
 };
 
 const armarPromptResumen = ({ perfil, fecha, cultivos, precios, tipoCambio, clima }) => {
@@ -291,6 +307,120 @@ Usá lenguaje simple y directo. Máximo 300 palabras.`;
   return { system, user };
 };
 
+const formatearMoneda = (valor, moneda = "ARS") => {
+  const n = Number(valor);
+  if (!Number.isFinite(n)) return "s/d";
+  return new Intl.NumberFormat("es-AR", {
+    style: "currency",
+    currency: moneda,
+    maximumFractionDigits: moneda === "USD" ? 2 : 0,
+  }).format(n);
+};
+
+const construirResumenFallback = ({ perfil, fecha, metricas, tipoCambio, clima }) => {
+  const preciosTxt = (metricas || [])
+    .map((m) => {
+      const varTxt =
+        typeof m.variacion_ars === "number"
+          ? m.variacion_ars > 0
+            ? `▲ ${m.variacion_ars}`
+            : m.variacion_ars < 0
+            ? `▼ ${Math.abs(m.variacion_ars)}`
+            : "▲ 0"
+          : "▲ sin dato prev.";
+      return `- ${m.cultivo}: ${formatearMoneda(m.precio_ars, "ARS")} | ${formatearMoneda(m.precio_usd, "USD")} (${varTxt})`;
+    })
+    .join("\n");
+
+  const tcTxt = (tipoCambio?.items || [])
+    .filter((t) => ["oficial", "blue", "bolsa", "ccl", "mep"].includes(String(t.tipo).toLowerCase()))
+    .map((t) => `- ${t.tipo}: ${formatearMoneda(t.valor, "ARS")}`)
+    .join("\n");
+
+  const climaTxt = (clima || [])
+    .slice(0, 3)
+    .map(
+      (c) =>
+        `- ${String(c.fecha).slice(0, 10)}: ${c.descripcion || "s/d"} (${c.temp_min}°/${c.temp_max}°)${
+          c.helada ? " - Alerta helada" : ""
+        }`
+    )
+    .join("\n");
+
+  return [
+    `🌾 *Buenos días, ${perfil.nombre || "productor"}!*`,
+    `📅 Resumen AgroHabilis - ${fecha}`,
+    "",
+    "💰 *PRECIOS DEL DÍA*",
+    preciosTxt || "- Sin datos de precios para tus cultivos.",
+    "",
+    "💵 *TIPO DE CAMBIO*",
+    tcTxt || "- Sin datos de tipo de cambio.",
+    "",
+    `🌤️ *CLIMA EN ${perfil.partido || "tu zona"}*`,
+    climaTxt || "- Sin datos de clima.",
+    "",
+    "📊 *TU SITUACIÓN*",
+    "Hoy te conviene priorizar decisiones con los precios vigentes y revisar costos por cultivo.",
+    "",
+    "💡 *CONSEJO DEL DÍA*",
+    "Si hay riesgo de helada en tu zona, adelantá tareas sensibles de implantación.",
+  ].join("\n");
+};
+
+const construirSeccionPerfilProductivo = async ({ perfil, usuarioId, hectareasTotales }) => {
+  const perfilTipo = perfil.perfil_productivo || "agricultura";
+  const financiero = await obtenerResumenFinanciero(usuarioId);
+  const byPerfil = new Map(financiero.porPerfil.map((p) => [p.perfil, p]));
+
+  const secciones = [];
+  if (perfilTipo === "agricultura" || perfilTipo === "mixto") {
+    const a = byPerfil.get("agricultura") || { gastos: 0, ventas: 0, margen: 0 };
+    const margenHa =
+      Number(hectareasTotales) > 0
+        ? Number((a.margen / Number(hectareasTotales)).toFixed(2))
+        : a.margen;
+    secciones.push([
+      "💰 *TU CAMPAÑA*",
+      `Gastos registrados este mes: ${formatearMoneda(a.gastos, "ARS")}`,
+      `Ventas registradas: ${formatearMoneda(a.ventas, "ARS")}`,
+      `Margen actual: ${formatearMoneda(margenHa, "ARS")}/ha`,
+    ].join("\n"));
+  }
+
+  if (perfilTipo === "ganaderia" || perfilTipo === "mixto") {
+    const precioNovilloResult = await query(
+      `
+        SELECT precio_promedio, fecha
+        FROM precios_hacienda
+        WHERE categoria = 'novillo'
+        ORDER BY fecha DESC
+        LIMIT 1
+      `
+    );
+    const stockResult = await query(
+      `
+        SELECT COALESCE(SUM(cantidad), 0)::int AS total
+        FROM stock_ganadero
+        WHERE usuario_id = $1
+          AND fecha = (SELECT MAX(fecha) FROM stock_ganadero WHERE usuario_id = $1)
+      `,
+      [usuarioId]
+    );
+    const precioNovillo = Number(precioNovilloResult.rows[0]?.precio_promedio) || 0;
+    const stockTotal = Number(stockResult.rows[0]?.total) || 0;
+    const valorRodeo = precioNovillo > 0 && stockTotal > 0 ? precioNovillo * stockTotal * 300 : 0;
+    secciones.push([
+      "🐄 *TU HACIENDA*",
+      `Precio novillo hoy: ${formatearMoneda(precioNovillo, "ARS")}/kg`,
+      `Tu stock: ${stockTotal} cabezas`,
+      `Valor estimado del rodeo: ${formatearMoneda(valorRodeo, "ARS")}`,
+    ].join("\n"));
+  }
+
+  return secciones.join("\n\n");
+};
+
 const generarResumen = async (usuarioOrId) => {
   let perfil = null;
   if (typeof usuarioOrId === "object" && usuarioOrId?.id) {
@@ -311,6 +441,12 @@ const generarResumen = async (usuarioOrId) => {
   const tipoCambio = await obtenerTipoCambioDia();
   const clima = await obtenerClimaZona(perfilGeo);
   const metricas = calcularMetricaCultivos(cultivos, precios.items);
+  const hectareasTotales = cultivos.reduce((acc, c) => acc + (Number(c.hectareas) || 0), 0);
+  const seccionPerfil = await construirSeccionPerfilProductivo({
+    perfil: perfilGeo,
+    usuarioId: perfilGeo.id,
+    hectareasTotales,
+  });
   const fechaResumen = toISODate(new Date());
   const { system, user } = armarPromptResumen({
     perfil: perfilGeo,
@@ -321,7 +457,29 @@ const generarResumen = async (usuarioOrId) => {
     clima,
   });
 
-  const ia = await generarConPromptLibre({ system, user });
+  let ia;
+  try {
+    ia = await generarConPromptLibre({ system, user });
+    if (seccionPerfil) {
+      ia.texto = `${ia.texto}\n\n${seccionPerfil}`;
+    }
+  } catch (error) {
+    console.error("[Resumen] Fallaron todos los proveedores IA:", error.message);
+    ia = {
+      texto: construirResumenFallback({
+        perfil: perfilGeo,
+        fecha: fechaResumen,
+        metricas,
+        tipoCambio,
+        clima,
+      }),
+      tokensUsados: null,
+      model: "fallback-local",
+    };
+    if (seccionPerfil) {
+      ia.texto = `${ia.texto}\n\n${seccionPerfil}`;
+    }
+  }
   const guardado = await guardarResumen({
     usuarioId: perfilGeo.id,
     texto: ia.texto,
