@@ -81,6 +81,32 @@ CREATE TABLE IF NOT EXISTS envios_whatsapp (
   error_msg TEXT,
   creado_en TIMESTAMP DEFAULT NOW()
 );
+
+CREATE TABLE IF NOT EXISTS historial_consultas (
+  id SERIAL PRIMARY KEY,
+  usuario_id INTEGER REFERENCES usuarios(id),
+  whatsapp VARCHAR(20),
+  pregunta TEXT NOT NULL,
+  respuesta TEXT NOT NULL,
+  tokens_usados INTEGER,
+  creado_en TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS whatsapp_bot_control (
+  whatsapp VARCHAR(20) PRIMARY KEY,
+  bot_activo BOOLEAN DEFAULT true,
+  actualizado_en TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS onboarding_estado (
+  id SERIAL PRIMARY KEY,
+  whatsapp VARCHAR(20) NOT NULL UNIQUE,
+  paso_actual INTEGER DEFAULT 1,
+  datos_temporales JSONB DEFAULT '{}'::jsonb,
+  completado BOOLEAN DEFAULT false,
+  creado_en TIMESTAMP DEFAULT NOW(),
+  actualizado_en TIMESTAMP DEFAULT NOW()
+);
 `;
 
 const seedUsuarioSistemaSQL = `
