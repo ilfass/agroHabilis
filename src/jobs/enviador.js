@@ -1,21 +1,23 @@
 const cron = require("node-cron");
 const { query } = require("../config/database");
 const { estaListo, esperarClienteListo, sendMessage } = require("../config/whatsapp");
-const { generarResumen, marcarResumenEnviado } = require("../services/resumen");
+const { marcarResumenEnviado } = require("../services/resumen");
+const { renderTemplate } = require("../templates");
+const {
+  resolverPlanEfectivo,
+  puedeRecibirResumenDiario,
+  puedeRecibirResumenSemanal,
+} = require("../services/planes");
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const obtenerUsuariosObjetivo = async () => {
   const result = await query(
     `
-      SELECT id, nombre, whatsapp, provincia, partido, plan, activo, plan_activo_hasta
+      SELECT id, nombre, whatsapp, provincia, partido, plan, activo, plan_activo_hasta, creado_en
       FROM usuarios
       WHERE activo = true
         AND whatsapp <> 'ahbl:sistema'
-        AND (
-          COALESCE(plan, 'gratis') <> 'gratis'
-          OR (plan_activo_hasta IS NOT NULL AND plan_activo_hasta >= NOW())
-        )
       ORDER BY id
     `
   );
@@ -35,6 +37,48 @@ const yaEnviadoHoy = async (usuarioId) => {
     [usuarioId]
   );
   return Boolean(result.rows[0]);
+};
+
+const fechaAR = () => {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Argentina/Buenos_Aires",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const byType = Object.fromEntries(parts.map((p) => [p.type, p.value]));
+  return `${byType.year}-${byType.month}-${byType.day}`;
+};
+
+const esLunesOJuevesAR = () => {
+  const wd = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Argentina/Buenos_Aires",
+    weekday: "short",
+  })
+    .format(new Date())
+    .toLowerCase();
+  return wd === "mon" || wd === "thu";
+};
+
+const esDiaSiguienteRegistroAR = (creadoEn) => {
+  if (!creadoEn) return false;
+  const hoy = new Date(`${fechaAR()}T00:00:00`);
+  const ayer = new Date(hoy);
+  ayer.setDate(hoy.getDate() - 1);
+  const reg = new Date(creadoEn);
+  const regAR = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Argentina/Buenos_Aires",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(reg);
+  const ayerAR = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Argentina/Buenos_Aires",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(ayer);
+  return regAR === ayerAR;
 };
 
 const esperarWhatsappEnviador = async () => {
@@ -82,16 +126,33 @@ const ejecutarEnviadorDiario = async () => {
 
   for (const usuario of usuarios) {
     try {
-      if (await yaEnviadoHoy(usuario.id)) {
+      const planEfectivo = resolverPlanEfectivo({
+        plan: usuario.plan,
+        planActivoHasta: usuario.plan_activo_hasta,
+      });
+
+      if (puedeRecibirResumenDiario(planEfectivo) && (await yaEnviadoHoy(usuario.id))) {
         resumen.omitidosYaEnviados += 1;
         continue;
       }
+      if (puedeRecibirResumenSemanal(planEfectivo)) {
+        // Gratis: día siguiente del registro + lunes y jueves.
+        const tocaPorRegistro = esDiaSiguienteRegistroAR(usuario.creado_en);
+        const tocaPorCalendario = esLunesOJuevesAR();
+        if (!tocaPorRegistro && !tocaPorCalendario) continue;
+        if (await yaEnviadoHoy(usuario.id)) {
+          resumen.omitidosYaEnviados += 1;
+          continue;
+        }
+      }
 
-      const generado = await generarResumen(usuario.id);
+      const generado = await renderTemplate("resumen_diario", usuario);
       resumen.generados += 1;
 
-      await sendMessage(usuario.whatsapp, generado.texto);
-      await marcarResumenEnviado(generado.resumenId);
+      await sendMessage(usuario.whatsapp, generado.mensaje);
+      if (generado.meta?.resumenId) {
+        await marcarResumenEnviado(generado.meta.resumenId);
+      }
       resumen.enviados += 1;
 
       await sleep(2000);
