@@ -1,6 +1,7 @@
 const { query } = require("../config/database");
 const { generarConPromptLibre } = require("./gemini");
 const { calcularCostoPorHa } = require("./calculadora_costos");
+const { calcularFlete } = require("./fletes");
 
 const RETENCIONES = {
   soja: 0.33,
@@ -235,9 +236,19 @@ const analizarConvenienciaVentaRaw = async (usuario, cultivo) => {
   const precioHace30 = Number(mercado.tendencia30[mercado.tendencia30.length - 1]?.precio);
   const precioHoySerie = Number(mercado.tendencia30[0]?.precio);
 
-  const precioNetoUsd = Number.isFinite(precioDisponibleUsd)
-    ? Number((precioDisponibleUsd * (1 - retencion) * 0.98).toFixed(2))
-    : null;
+  const destinoFlete = /bahia/i.test(mercado.precioDisponible?.mercado || "")
+    ? "Puerto Bahia Blanca"
+    : "Puerto Rosario";
+  const origenFlete = usuario?.partido || usuario?.provincia || "Tandil";
+  const flete = await calcularFlete(origenFlete, destinoFlete, "granos", 1);
+  const fleteUsdTn = Number(flete?.costo_usd_tn);
+
+  const precioNetoUsd =
+    Number.isFinite(precioDisponibleUsd) && Number.isFinite(fleteUsdTn)
+      ? Number((precioDisponibleUsd - fleteUsdTn - precioDisponibleUsd * retencion - precioDisponibleUsd * 0.02).toFixed(2))
+      : Number.isFinite(precioDisponibleUsd)
+      ? Number((precioDisponibleUsd * (1 - retencion) * 0.98).toFixed(2))
+      : null;
   const rendimientoTnHa = Number((rendimiento.rendimiento_qq_ha / 10).toFixed(2));
   const ingresoPorHa = Number.isFinite(precioNetoUsd)
     ? Number((precioNetoUsd * rendimientoTnHa).toFixed(2))
@@ -305,6 +316,8 @@ const analizarConvenienciaVentaRaw = async (usuario, cultivo) => {
     estacionalidad_mes_promedio: mercado.estacionalidadMes,
     retencion,
     gastos_comercializacion: 0.02,
+    flete_usd_tn: Number.isFinite(fleteUsdTn) ? fleteUsdTn : null,
+    flete_detalle: flete?.error ? null : flete,
     rendimiento_qq_ha: rendimiento.rendimiento_qq_ha,
     rendimiento_estimado: rendimiento.es_estimado,
     costo_por_ha: costoPorHa,
@@ -365,6 +378,18 @@ const analizarConvenienciaVentaRaw = async (usuario, cultivo) => {
       mercado.chicago ? `${fmt(mercado.chicago.precio)} ${mercado.chicago.moneda || ""}` : "s/d"
     }`,
     `Clima zona: ${riesgoClimatico ? "riesgo moderado/alto" : "sin alertas fuertes"}`,
+    "",
+    "🚚 *FLETE Y PRECIO NETO EN CAMPO*",
+    `Precio pizarra: USD ${fmt(precioDisponibleUsd)}/tn`,
+    `Flete desde ${origenFlete} a ${destinoFlete}: - USD ${fmt(fleteUsdTn)}/tn`,
+    `Retención ${(retencion * 100).toFixed(0)}%: - USD ${fmt(
+      Number.isFinite(precioDisponibleUsd) ? precioDisponibleUsd * retencion : null
+    )}/tn`,
+    `Gastos comerc. 2%: - USD ${fmt(
+      Number.isFinite(precioDisponibleUsd) ? precioDisponibleUsd * 0.02 : null
+    )}/tn`,
+    "━━━━━━━━━━━━━━━━━━━━━━━━",
+    `Precio neto en campo: USD ${fmt(precioNetoUsd)}/tn`,
     "",
     "🧮 *TU SITUACIÓN*",
     `Costo por ha: USD ${fmt(costoPorHa)}${costo.es_estimado ? " (estimado)" : ""}`,
