@@ -39,6 +39,7 @@ const {
   puedeUsarFinanzas,
 } = require("../services/planes");
 const { resumenFuentesWhatsapp } = require("../services/fuentes_monitor");
+const { calcularFlete } = require("../services/fletes");
 const COMANDOS = require("./comandos");
 
 const normalizarTexto = (texto = "") =>
@@ -68,6 +69,7 @@ const parseZonas = (texto = "") =>
 const inferirComandoNatural = (texto = "") => {
   const t = normalizarTexto(texto);
   if (!t) return null;
+  if (/(ver|mostrar|consultar).*(insumos)|\binsumos\b/.test(t)) return "__INSUMOS__";
   if (/pasar.*plan pro|cambiar.*plan pro|plan pro/.test(t)) return "QUIERO PLAN PRO";
   if (/pasar.*plan basico|cambiar.*plan basico|plan basico|plan básico/.test(t)) return "QUIERO PLAN BASICO";
   if (/pasar.*plan gratis|cambiar.*plan gratis|plan gratis/.test(t)) return "QUIERO PLAN GRATIS";
@@ -115,6 +117,12 @@ const parseCategoriasGanaderas = (texto = "") =>
     .split(",")
     .map((x) => x.trim().toLowerCase())
     .filter(Boolean);
+
+const parseComandoFlete = (texto = "") => {
+  const m = String(texto || "").match(/^FLETE\s+(.+?)\s+A\s+(.+)$/i);
+  if (!m) return null;
+  return { origen: m[1].trim(), destino: m[2].trim() };
+};
 
 const ESPECIES_GANADERAS = [
   { especie: "vacuno", keys: ["vacuno", "bovino", "novillo", "ternero", "vaca", "vaquillona", "toro"] },
@@ -662,6 +670,19 @@ client.on("message", async (msg) => {
     const planCtx = await obtenerContextoPlanPorWhatsapp(msg.from);
     const comandoNatural = inferirComandoNatural(consulta);
 
+    // Onboarding debe tener prioridad absoluta para evitar caer en IA libre
+    // cuando el usuario todavía está completando alta.
+    if (!esAdminWhatsapp(msg.from)) {
+      const onboarding = await gestionarOnboarding(msg.from, consulta);
+      if (onboarding.enOnboarding) {
+        if (onboarding.respuesta) {
+          await msg.reply(onboarding.respuesta);
+        }
+        console.log(`[WhatsApp] Onboarding en curso para ${msg.from}`);
+        return;
+      }
+    }
+
     if (comando === "MI PLAN") {
       if (!planCtx.usuario?.id) {
         await msg.reply("Todavía no estás registrado. Escribime cualquier mensaje y te guío con el onboarding.");
@@ -729,6 +750,12 @@ client.on("message", async (msg) => {
         [planCtx.usuario.id, Math.max(1, Math.min(15, Math.round(n)))]
       );
       await msg.reply(`✅ Listo. Voy a mostrar *${Math.max(1, Math.min(15, Math.round(n)))}* noticias destacadas.`);
+      return;
+    }
+
+    if (comandoNatural === "__INSUMOS__") {
+      const respuesta = await procesarConsulta(msg.from, consulta);
+      await msg.reply(respuesta);
       return;
     }
 
@@ -1122,6 +1149,27 @@ client.on("message", async (msg) => {
       return;
     }
 
+    const cmdFlete = parseComandoFlete(comando);
+    if (cmdFlete) {
+      const data = await calcularFlete(cmdFlete.origen, cmdFlete.destino, "granos", 28);
+      if (data?.error) {
+        await msg.reply(`No pude calcular ese flete: ${data.error}`);
+        return;
+      }
+      await msg.reply(
+        [
+          `📦 Flete ${cmdFlete.origen} → ${cmdFlete.destino}`,
+          `Distancia: ${data.distancia_km || "s/d"} km`,
+          `Tarifa actual: USD ${Number(data.tarifa_usd_km_tn || 0).toFixed(5)}/km/tn`,
+          `Costo flete: USD ${Number(data.costo_usd_tn || 0).toFixed(2)}/tn`,
+          `Costo total (28 tn): USD ${Number(data.costo_total_usd || 0).toFixed(2)}`,
+          `Peajes estimados: $${Number(data.peajes_ars || 0).toLocaleString("es-AR")}`,
+          `(Ajustado por gasoil actual $${Number(data.gasoil_actual_ars || 0).toLocaleString("es-AR")}/lt)`,
+        ].join("\n")
+      );
+      return;
+    }
+
     // Modo estricto: si parece intención de comando, NO pasar a IA libre.
     const sugerencia = sugerirComandoPorTexto(consulta);
     if (sugerencia || comandoNatural) {
@@ -1137,15 +1185,6 @@ client.on("message", async (msg) => {
       console.log(
         `[WhatsApp] Consulta ignorada por bot pausado en chat ${msg.from}`
       );
-      return;
-    }
-
-    const onboarding = await gestionarOnboarding(msg.from, consulta);
-    if (onboarding.enOnboarding) {
-      if (onboarding.respuesta) {
-        await msg.reply(onboarding.respuesta);
-      }
-      console.log(`[WhatsApp] Onboarding en curso para ${msg.from}`);
       return;
     }
 

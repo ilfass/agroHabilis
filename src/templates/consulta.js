@@ -6,6 +6,8 @@ const {
   obtenerNoticiasFrescas,
   formatearPrecio,
 } = require("./base");
+const { aplicarLayout } = require("./layouts");
+const { obtenerSnapshotParaIA } = require("../services/snapshot");
 
 const normalizar = (t = "") =>
   String(t)
@@ -48,6 +50,7 @@ module.exports = {
       datos.clima = await obtenerClimaFresco(usuario.lat, usuario.lng, 3);
     }
     datos.noticias = await obtenerNoticiasFrescas([cultivo, ...temas].filter(Boolean), 3);
+    datos.snapshot = await obtenerSnapshotParaIA(usuario);
     return datos;
   },
 
@@ -59,14 +62,24 @@ module.exports = {
     };
     try {
       const ia = await generarConPromptLibre({
-        system: "Respondé como asesor agro argentino. Claro, concreto, sin inventar datos.",
+        system:
+          "Respondé en español rioplatense, breve y técnico. " +
+          "NO inventes nombre de asistente, empresa, saludo comercial ni datos faltantes. " +
+          "Usá exclusivamente los datos del payload. Si falta un dato, decí 'sin datos en base' y ofrecé el comando exacto para obtenerlo.",
         user: JSON.stringify(payload, null, 2),
       });
-      return { mensaje: String(ia.texto || "").trim(), meta: { temas: datos.temas } };
+      return {
+        mensaje: aplicarLayout("consulta", usuario, { mensaje: String(ia.texto || "").trim() }),
+        meta: { temas: datos.temas },
+      };
     } catch (_e) {
       const precio = datos.precio ? `Precio ${datos.cultivo}: ${formatearPrecio(datos.precio.precio)}` : null;
       return {
-        mensaje: [precio, "No pude usar IA en este momento; te respondo con datos directos."].filter(Boolean).join("\n"),
+        mensaje: aplicarLayout("consulta", usuario, {
+          mensaje: [precio, "No pude usar IA en este momento; te respondo con datos directos."]
+            .filter(Boolean)
+            .join("\n"),
+        }),
         meta: { temas: datos.temas },
       };
     }
