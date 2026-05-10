@@ -7,7 +7,8 @@ AgroHabilis es una plataforma Node.js pensada para centralizar informacion agrop
 | Ruta | Contenido |
 |------|-----------|
 | `src/` | Backend (Express, jobs, servicios, scrapers, plantillas). |
-| `scripts/` | Subcarpetas: `deploy/`, `db/` (setup + migraciones), `backup/`, `whatsapp/`, `qa/`, `tools/`, `deprecated/`. Los `npm run` apuntan a estas rutas. |
+| `scripts/` | Subcarpetas: `deploy/`, `db/` (setup + migraciones), `backup/`, `whatsapp/`, `qa/`, `tools/`. Los `npm run` apuntan a estas rutas. |
+| `obsoletos/` | Código y scripts fuera del flujo activo (historial); ver `obsoletos/README.md`. |
 | `docs/` | Producto, operación, roadmap, contexto para IA y fuentes. |
 | `GLOBAL-VPS-MULTISITIO.md` | Puntero a repo y rutas del multisitio (health check, `/opt/vps-multisitio`). |
 | `frontend/public/` | HTML estáticos del panel y páginas públicas. |

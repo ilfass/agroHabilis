@@ -287,7 +287,7 @@ const resolverComandoAlias = (comando = "") => {
 
 /** Evita tomar como saludo mensajes que ya piden mercado, clima, finanzas, etc. */
 const tieneTemaOperativoSaludo = (tNorm = "") =>
-  /\b(soja|ma[ií]z|trigo|girasol|sorgo|cebada|precio|precios|cotiz|mercado|flete|fletes|d[oó]lar|blue|mep|ccl|matba|rofex|fob|disponible|futuro|futuros|cotizaci[oó]n|usd\s*\/\s*t|tn\b|\bqq\b|tonelad|hect[aá]rea|\bha\b|venta|vend[ií]|vendi|clima|lluvia|helada|pron[oó]stico|hacienda|novillo|terner|invernada|ganado|sembr|siembra|barbecho|rinde|rindes|u\$s|\b(usd|ars)\b|cultivo|insumo|glifosato|urea|fertiliz|log[ií]stica|acopio|silobolsa)\b/.test(
+  /\b(soja|ma[ií]z|trigo|girasol|sorgo|cebada|precio|precios|cotiz|mercado|flete|fletes|d[oó]lar|blue|mep|ccl|matba|rofex|fob|disponible|futuro|futuros|cotizaci[oó]n|usd\s*\/\s*t|tn\b|\bqq\b|tonelad|hect[aá]rea|\bha\b|venta|vend[ií]|vendi|clima|lluvia|helada|pron[oó]stico|hacienda|novillo|terner|invernada|ganado|sembr|siembra|barbecho|rinde|rindes|u\$s|\b(usd|ars)\b|cultivo|insumo|glifosato|urea|fertiliz|log[ií]stica|acopio|silobolsa|vacas?|cabezas?|puse|pusimos|agregu|sum[eé]|met[ií]|ingres[eé]|cargu[eé]|lote|parcela|campo)\b/.test(
     tNorm
   );
 
@@ -578,6 +578,7 @@ module.exports = {
   sugerirComandoPorTexto,
   resolverComandoAlias,
   detectarIntencionIA,
+  tieneTemaOperativoSaludo,
   esSaludoSocialCorto,
   textoParaClasificacionSaludo,
   esConsultaMercadoExcluyeRegistroVenta,

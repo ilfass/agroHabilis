@@ -6,6 +6,10 @@ set -euo pipefail
 #   VPS_HOST, VPS_USER, VPS_PATH, APP_NAME, HEALTH_HOST_HEADER
 #
 # Antes de SYNC_ENV=1 se muestra un aviso y el diff contra el .env remoto; ver scripts/deploy/diff-env-vps.sh
+#
+# Orden crítico en el bloque ssh remoto: rsync ya subió el código, pero el proceso viejo sigue hasta PM2.
+# Siempre: setup-db.js → npm run db:migrate → verificación esquema precios → recién entonces pm2 restart.
+# Así los INSERT/ON CONFLICT del recolector (fuente, actualizado_en) no corren contra un esquema viejo.
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
@@ -81,6 +85,8 @@ ssh "${VPS_USER}@${VPS_HOST}" "\
   node scripts/db/setup-db.js && \
   echo '==> Ejecutando migraciones versionadas (db:migrate)' && \
   npm run db:migrate && \
+  echo '==> Verificando esquema precios (UPSERT fuente / actualizado_en)' && \
+  node scripts/db/verify-precios-upsert-schema.js && \
   echo '==> Verificando tabla usuario_ganaderia_perfil' && \
   node -e \"require('dotenv').config(); const { pool, query } = require('./src/config/database'); (async () => { const r = await query(\\\"SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='usuario_ganaderia_perfil') AS ok\\\"); const ok = !!r.rows?.[0]?.ok; if (!ok) { throw new Error('Falta tabla usuario_ganaderia_perfil'); } console.log('OK tabla usuario_ganaderia_perfil'); await pool.end(); })().catch(async (e) => { console.error(e.message || e); try { await pool.end(); } catch (_) {} process.exit(1); });\" && \
   pm2 restart '${APP_NAME}' --update-env || pm2 start src/index.js --name '${APP_NAME}' && \

@@ -1,0 +1,134 @@
+"use strict";
+
+const { query } = require("../../config/database");
+const H = require("../consultas/legacy_helpers");
+
+let recolectarPreciosCACFresco;
+try {
+  ({ recolectarPreciosCACFresco } = require("../../jobs/recolector"));
+} catch (_e) {
+  recolectarPreciosCACFresco = null;
+}
+
+async function precioRecienteSuficiente(cultivo) {
+  const c = String(cultivo || "").trim();
+  if (!c) return false;
+  const r = await query(
+    `
+      SELECT MAX(creado_en) AS t
+      FROM precios
+      WHERE LOWER(TRIM(cultivo)) = LOWER($1)
+    `,
+    [c]
+  );
+  const t = r.rows[0]?.t;
+  if (!t) return false;
+  const ageMs = Date.now() - new Date(t).getTime();
+  return ageMs < 4 * 60 * 60 * 1000;
+}
+
+function pedidoTipoCambioSinCultivo(clasificacion, mensaje = "") {
+  if (clasificacion?.variante_precio === "dolar") return true;
+  if (/\binsumo|hacienda\b/i.test(String(clasificacion?.producto || ""))) return false;
+  if (clasificacion?.cultivo && String(clasificacion.cultivo).trim()) return false;
+  const t = String(mensaje || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+  const mencionaGranoOCultivo = /\b(soja|ma[ií]z|trigo|girasol|cebada|sorgo|papa|patata|tonel|qq\b|grano)\b/.test(
+    t
+  );
+  return H.esConsultaDolar(mensaje) && !mencionaGranoOCultivo;
+}
+
+const rutaPrecio = async ({ clasificacion, mensaje, usuario }) => {
+  const cultivos = usuario?.cultivos || [];
+  let cultivo =
+    clasificacion?.cultivo ||
+    (clasificacion?.producto && !/insumo|hacienda/i.test(String(clasificacion.producto))
+      ? clasificacion.producto
+      : null) ||
+    H.detectarCultivoConsulta(mensaje, cultivos) ||
+    H.detectarCultivoEnTexto(mensaje);
+  cultivo = cultivo ? H.parseCultivo(String(cultivo)) : null;
+
+  const nivel = H.detectarNivelUsuarioConsulta(mensaje);
+  const nivelPrecio = nivel === "SIMPLE" ? "INTERMEDIO" : nivel;
+
+  const esDolar = pedidoTipoCambioSinCultivo(clasificacion, mensaje);
+  if (esDolar) {
+    const base = await H.responderDolarActual();
+    let salida = base;
+    if (nivel !== "SIMPLE") {
+      const human = await H.humanizarRespuestaPrecioConIA({
+        pregunta: mensaje,
+        textoBase: base,
+        usuario,
+      });
+      salida = H.limpiarMarcadoresRespuestaPrecio(human);
+    } else {
+      salida = H.compactarRespuestaSimple(H.sanitizarPlaceholders(salida), 10);
+    }
+    return H.enriquecerConGroundingAgroSiHaceFalta({
+      pregunta: mensaje,
+      textoBase: salida,
+    });
+  }
+
+  const esInsumo =
+    /\binsumo/i.test(String(clasificacion?.producto || "")) || H.esConsultaInsumos(mensaje);
+  if (esInsumo) {
+    const base = await H.responderInsumos({
+      pregunta: mensaje,
+      usuario,
+      nivel: nivelPrecio,
+    });
+    const salida =
+      nivel === "SIMPLE"
+        ? H.compactarRespuestaSimple(H.sanitizarPlaceholders(String(base || "")), 8)
+        : H.sanitizarPlaceholders(String(base || ""));
+    return H.enriquecerConGroundingAgroSiHaceFalta({
+      pregunta: mensaje,
+      textoBase: salida,
+    });
+  }
+
+  const esHacienda =
+    /hacienda/i.test(String(clasificacion?.producto || "")) || H.esConsultaHaciendaVenta(mensaje);
+  if (esHacienda) {
+    const base = await H.responderHaciendaSimple(mensaje, nivelPrecio);
+    const salida =
+      nivel === "SIMPLE"
+        ? H.compactarRespuestaSimple(H.sanitizarPlaceholders(String(base || "")), 10)
+        : H.sanitizarPlaceholders(String(base || ""));
+    return H.enriquecerConGroundingAgroSiHaceFalta({
+      pregunta: mensaje,
+      textoBase: salida,
+    });
+  }
+
+  if (!cultivo) cultivo = "soja";
+
+  const ok = await precioRecienteSuficiente(cultivo);
+  if (!ok && typeof recolectarPreciosCACFresco === "function") {
+    try {
+      await recolectarPreciosCACFresco();
+    } catch (_e) {
+      /* BD existente */
+    }
+  }
+
+  const base = await H.responderDatosCultivo(cultivo, nivelPrecio);
+  const human = await H.humanizarRespuestaPrecioConIA({
+    pregunta: mensaje,
+    textoBase: base,
+    usuario,
+  });
+  const humanLimpio = H.limpiarMarcadoresRespuestaPrecio(human);
+  return H.enriquecerConGroundingAgroSiHaceFalta({
+    pregunta: mensaje,
+    textoBase: humanLimpio,
+  });
+};
+
+module.exports = { rutaPrecio };

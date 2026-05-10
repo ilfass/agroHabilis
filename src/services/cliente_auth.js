@@ -9,6 +9,20 @@ const CLIENT_TEMP_PASSWORD_LENGTH = Number(process.env.CLIENT_TEMP_PASSWORD_LENG
 const BCRYPT_ROUNDS = Number(process.env.CLIENT_PASSWORD_BCRYPT_ROUNDS || 10);
 
 const normalizarTelefono = (value = "") => String(value || "").replace(/\D/g, "");
+const ultimosDigitosTelefono = (value = "", n = 10) => {
+  const t = normalizarTelefono(value);
+  if (!t) return "";
+  return t.slice(-Math.max(1, n));
+};
+const variantesTelefono = (value = "") => {
+  const base = normalizarTelefono(value);
+  if (!base) return [];
+  const out = new Set([base]);
+  if (base.startsWith("549") && base.length > 3) out.add(`54${base.slice(3)}`);
+  if (base.startsWith("54") && !base.startsWith("549") && base.length > 2) out.add(`549${base.slice(2)}`);
+  if (base.startsWith("0") && base.length > 1) out.add(base.replace(/^0+/, ""));
+  return Array.from(out).filter(Boolean);
+};
 
 const generarPasswordTemporal = (length = CLIENT_TEMP_PASSWORD_LENGTH) => {
   const safeLength = Math.max(8, Math.min(24, Number(length) || 10));
@@ -84,8 +98,9 @@ const limpiarSesionesExpiradas = async () => {
 };
 
 const buscarCredencialesPorTelefono = async (telefonoRaw) => {
-  const telefono = normalizarTelefono(telefonoRaw);
-  if (!telefono) return null;
+  const candidatos = variantesTelefono(telefonoRaw);
+  if (!candidatos.length) return null;
+  const ult10 = ultimosDigitosTelefono(candidatos[0], 10);
   const r = await query(
     `
       SELECT
@@ -98,12 +113,15 @@ const buscarCredencialesPorTelefono = async (telefonoRaw) => {
         c.must_change_password
       FROM usuarios u
       JOIN cliente_auth_credentials c ON c.usuario_id = u.id
-      WHERE regexp_replace(COALESCE(u.whatsapp, ''), '\\D', '', 'g') = $1
-         OR regexp_replace(COALESCE(u.whatsapp_real, ''), '\\D', '', 'g') = $1
-         OR regexp_replace(COALESCE(u.whatsapp_jid, ''), '\\D', '', 'g') = $1
+      WHERE regexp_replace(COALESCE(u.whatsapp, ''), '\\D', '', 'g') = ANY($1::text[])
+         OR regexp_replace(COALESCE(u.whatsapp_real, ''), '\\D', '', 'g') = ANY($1::text[])
+         OR regexp_replace(COALESCE(u.whatsapp_jid, ''), '\\D', '', 'g') = ANY($1::text[])
+         OR (length($2::text) >= 8 AND RIGHT(regexp_replace(COALESCE(u.whatsapp, ''), '\\D', '', 'g'), 10) = $2::text)
+         OR (length($2::text) >= 8 AND RIGHT(regexp_replace(COALESCE(u.whatsapp_real, ''), '\\D', '', 'g'), 10) = $2::text)
+         OR (length($2::text) >= 8 AND RIGHT(regexp_replace(COALESCE(u.whatsapp_jid, ''), '\\D', '', 'g'), 10) = $2::text)
       LIMIT 1
     `,
-    [telefono]
+    [candidatos, ult10]
   );
   return r.rows[0] || null;
 };
@@ -242,20 +260,24 @@ const buildTextoCredencialCliente = ({
 };
 
 const buscarUsuarioPorTelefonoNormalizado = async (telefonoNorm) => {
-  const t = normalizarTelefono(telefonoNorm);
-  if (!t) return null;
+  const candidatos = variantesTelefono(telefonoNorm);
+  if (!candidatos.length) return null;
+  const ult10 = ultimosDigitosTelefono(candidatos[0], 10);
   const r = await query(
     `
       SELECT
         u.id,
         COALESCE(NULLIF(u.whatsapp_real, ''), u.whatsapp) AS whatsapp
       FROM usuarios u
-      WHERE regexp_replace(COALESCE(u.whatsapp, ''), '\\D', '', 'g') = $1
-         OR regexp_replace(COALESCE(u.whatsapp_real, ''), '\\D', '', 'g') = $1
-         OR regexp_replace(COALESCE(u.whatsapp_jid, ''), '\\D', '', 'g') = $1
+      WHERE regexp_replace(COALESCE(u.whatsapp, ''), '\\D', '', 'g') = ANY($1::text[])
+         OR regexp_replace(COALESCE(u.whatsapp_real, ''), '\\D', '', 'g') = ANY($1::text[])
+         OR regexp_replace(COALESCE(u.whatsapp_jid, ''), '\\D', '', 'g') = ANY($1::text[])
+         OR (length($2::text) >= 8 AND RIGHT(regexp_replace(COALESCE(u.whatsapp, ''), '\\D', '', 'g'), 10) = $2::text)
+         OR (length($2::text) >= 8 AND RIGHT(regexp_replace(COALESCE(u.whatsapp_real, ''), '\\D', '', 'g'), 10) = $2::text)
+         OR (length($2::text) >= 8 AND RIGHT(regexp_replace(COALESCE(u.whatsapp_jid, ''), '\\D', '', 'g'), 10) = $2::text)
       LIMIT 1
     `,
-    [t]
+    [candidatos, ult10]
   );
   return r.rows[0] || null;
 };
@@ -275,12 +297,13 @@ const ejecutarReenvioPasswordPanelCliente = async ({ telefonoRaw }) => {
   const plain = generarPasswordTemporal();
   const { sendMessage } = require("../config/whatsapp");
   const msg = buildTextoCredencialCliente({
-    telefonoMuestra: telefonoNorm,
+    telefonoMuestra: normalizarTelefono(usuario.whatsapp || telefonoNorm),
     passwordTemporal: plain,
     variant: "reenvio",
   });
-  await sendMessage(telefonoNorm, msg);
-  await persistirPasswordTemporalCliente({ usuarioId: usuario.id, telefonoNorm, plain });
+  const destino = normalizarTelefono(usuario.whatsapp || telefonoNorm);
+  await sendMessage(destino, msg);
+  await persistirPasswordTemporalCliente({ usuarioId: usuario.id, telefonoNorm: destino, plain });
   return { ok: true, encontrado: true };
 };
 

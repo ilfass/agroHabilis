@@ -512,6 +512,16 @@ const generarRespuestaConsulta = async ({ contextoDatos, pregunta }) => {
   });
 };
 
+/** Respuesta corta (p. ej. JSON de clasificación); Flash con techo de tokens. */
+const generarTextoClasificadorRapido = async (prompt) => {
+  const p = String(prompt || "").trim();
+  if (!p) throw new Error("Falta prompt");
+  return generarTextoConReintentos(p, "IA.clasificador", {
+    maxOutputTokens: Number(process.env.CLASIFICADOR_MAX_OUT || 128),
+    temperature: 0,
+  });
+};
+
 module.exports = {
   generarConPromptLibre,
   generarClasificacionIntencion,
@@ -519,4 +529,5 @@ module.exports = {
   generarRespuestaConsulta,
   generarConGroundingGoogleSearch,
   getGroundingMaxChars,
+  generarTextoClasificadorRapido,
 };

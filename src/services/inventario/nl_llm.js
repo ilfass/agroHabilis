@@ -38,8 +38,10 @@ const permiteIntentarLlmTrasFalloHeuristica = (texto = "") => {
   );
 };
 
-async function borradorRegistroDesdeLlm(textoUsuario, { lotes = [], campanas = [] } = {}) {
-  if (!inventarioLlmHabilitado()) return null;
+async function borradorRegistroDesdeLlm(textoUsuario, { lotes = [], campanas = [], forzarCapaUsuario = false } = {}) {
+  const llmOk =
+    inventarioLlmHabilitado() || (Boolean(forzarCapaUsuario) && Boolean(process.env.GEMINI_API_KEY?.trim()));
+  if (!llmOk) return null;
   const fechaHoy = fechaISOArgentina();
   const lotesBrief = lotes.slice(0, 30).map((l) => ({ id: l.id, nombre: l.nombre }));
   const campBrief = campanas.slice(0, 20).map((c) => ({ id: c.id, nombre: c.nombre }));

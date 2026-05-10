@@ -10,6 +10,6 @@ Los comandos habituales están en `package.json` (`npm run`). Las rutas están a
 | `whatsapp/` | QR en terminal y diagnóstico de estado de chat |
 | `qa/` | Casos y runner `qa-whatsapp.js` |
 | `tools/` | Backfills, export, simulaciones, scores, pruebas puntuales |
-| `deprecated/` | Herramientas viejas conservadas por historial; no forman parte del flujo estándar |
+| *(obsoletos)* | `obsoletos/scripts-deprecated/` en la raíz del repo; ver `obsoletos/README.md` |
 
 Los artefactos de deploy (capturas de `nginx -t`, etc.) van en `.deploy-backups/` en local (ignorado por git).

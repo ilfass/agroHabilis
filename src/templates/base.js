@@ -9,6 +9,7 @@ const { persistirTiposCambioDesdeScraper } = require("../services/tipo_cambio");
 let _tieneCompraTipoCambio = null;
 let _tieneFuenteTipoCambio = null;
 let _tieneFuentePrecios = null;
+let _tieneActualizadoEnPrecios = null;
 
 const tieneCompraTipoCambio = async () => {
   if (_tieneCompraTipoCambio !== null) return _tieneCompraTipoCambio;
@@ -57,6 +58,28 @@ const tieneFuentePrecios = async () => {
   _tieneFuentePrecios = Boolean(r.rows[0]);
   return _tieneFuentePrecios;
 };
+
+const tieneActualizadoEnPrecios = async () => {
+  if (_tieneActualizadoEnPrecios !== null) return _tieneActualizadoEnPrecios;
+  const r = await query(
+    `
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'precios'
+        AND column_name = 'actualizado_en'
+      LIMIT 1
+    `
+  );
+  _tieneActualizadoEnPrecios = Boolean(r.rows[0]);
+  return _tieneActualizadoEnPrecios;
+};
+
+/** Ordenar por última ingesta cuando exista columna actualizado_en (misma migración que fuente granular). */
+const sqlOrdenRecenciaPrecios = async () =>
+  (await tieneActualizadoEnPrecios())
+    ? "COALESCE(actualizado_en, creado_en) DESC NULLS LAST"
+    : "creado_en DESC NULLS LAST";
 
 const formatearPrecio = (numero) => {
   const n = Number(numero);
@@ -152,7 +175,24 @@ const clasificarTipoFuentePrecio = (row = {}) => {
 const fuenteLegibleParaPrecio = (row = {}) => {
   const fRaw = String(row?.fuente || "").trim();
   if (/^vivo_cac$/i.test(fRaw)) return "CAC Rosario (consulta en tiempo real)";
-  if (fRaw && !/^(bd|bd_stale|bd_ultimo)$/i.test(fRaw)) return fRaw;
+  const mapa = {
+    cac_bcr: "Cámara de Cereales — BCR (pizarra Rosario)",
+    magyp_fob: "MAGYP — precios FOB exportación",
+    afa_scl: "AFA San Cristóbal — mercados en línea",
+    sio_granos: "SIO Granos — operaciones (MAGYP)",
+    matba_rofex: "MATBA-Rofex — futuros",
+    mercados_web: "Referencia web de mercados",
+    ingesta: "Ingesta automática AgroHabilis",
+    precios_norm: "Tabla normalizada de mercado",
+    bcr_boletin: "Boletín BCR (mínimos)",
+    seed_bcr_gix: "Semilla de referencia BCR (arranque)",
+    seed_lncampo: "Semilla LN Campo (arranque)",
+    legacy: "Dato histórico en base",
+  };
+  const fLow = fRaw.toLowerCase();
+  if (mapa[fLow]) return mapa[fLow];
+  if (/^reuso_/i.test(fRaw)) return "Reuso de última cotización válida";
+  if (fRaw && !/^(bd|bd_stale|bd_ultimo)$/i.test(fRaw)) return fRaw.replace(/_/g, " ").replace(/\s+/g, " ").trim();
   const m = String(row?.mercado || "").trim();
   if (m) return m.replace(/_/g, " ").replace(/\s+/g, " ").trim();
   return "Base Agrohabilis";
@@ -210,6 +250,7 @@ const CULTIVOS_PRECIO_DESDE_CAC = new Set(["soja", "maiz", "trigo", "girasol", "
 
 const obtenerPrecioFresco = async (cultivo, maxHoras = 4) => {
   const cultivoNorm = normalizar(cultivo);
+  const ordRec = await sqlOrdenRecenciaPrecios();
   const hf = await tieneFuentePrecios();
   const ordenPrioridad = hf
     ? `
@@ -237,7 +278,7 @@ const obtenerPrecioFresco = async (cultivo, maxHoras = 4) => {
           WHEN LOWER(COALESCE(tipo_precio, '')) IN ('operacion_real', 'oferta') THEN 0
           ELSE 1
         END,
-        creado_en DESC NULLS LAST
+        ${ordRec}
       LIMIT 15
     `,
     [cultivoNorm]
@@ -264,9 +305,13 @@ const obtenerPrecioFresco = async (cultivo, maxHoras = 4) => {
   const moneda = Number.isFinite(Number(hit.precio_ars)) ? "ARS" : "USD";
   await query(
     `
-      INSERT INTO precios (cultivo, mercado, precio, moneda, fecha)
-      VALUES ($1, $2, $3, $4, $5)
-      ON CONFLICT (cultivo, mercado, fecha) DO NOTHING
+      INSERT INTO precios (cultivo, mercado, precio, moneda, fecha, fuente)
+      VALUES ($1, $2, $3, $4, $5, 'vivo_cac')
+      ON CONFLICT (cultivo, mercado, fecha, fuente)
+      DO UPDATE SET
+        precio = EXCLUDED.precio,
+        moneda = EXCLUDED.moneda,
+        actualizado_en = NOW()
     `,
     [hit.cultivo, hit.mercado || "rosario_cac", precio, moneda, hit.fecha]
   );
@@ -286,6 +331,7 @@ const obtenerPrecioFresco = async (cultivo, maxHoras = 4) => {
  */
 const obtenerUltimoPrecioCultivoDesdeBd = async (cultivo) => {
   const cultivoNorm = normalizar(cultivo);
+  const ordRec = await sqlOrdenRecenciaPrecios();
   const hf = await tieneFuentePrecios();
   const ordenPrioridad = hf
     ? `
@@ -313,7 +359,7 @@ const obtenerUltimoPrecioCultivoDesdeBd = async (cultivo) => {
           WHEN LOWER(COALESCE(tipo_precio, '')) IN ('operacion_real', 'oferta') THEN 0
           ELSE 1
         END,
-        creado_en DESC NULLS LAST
+        ${ordRec}
       LIMIT 15
     `,
     [cultivoNorm]
@@ -342,13 +388,14 @@ const obtenerPrecioComplementarioFob = async (cultivo, precioPrincipal = null) =
   }
 
   const hf = await tieneFuentePrecios();
+  const ordRec = await sqlOrdenRecenciaPrecios();
   const selFuente = hf ? "fuente" : "NULL::text AS fuente";
   const local = await query(
     `
       SELECT cultivo, mercado, precio, moneda, fecha, tipo_precio, ${selFuente}
       FROM precios
       WHERE LOWER(cultivo) = $1
-      ORDER BY fecha DESC, creado_en DESC NULLS LAST
+      ORDER BY fecha DESC, ${ordRec}
       LIMIT 48
     `,
     [cultivoNorm]
@@ -548,6 +595,51 @@ const aplicarLayoutPlanEstricto = (mensaje = "", usuario = {}) => {
   return out.replace(/\n{3,}/g, "\n\n").trim();
 };
 
+/**
+ * Filas granulares (plaza / condición / tipo_registro) desde `precios_normalizados`.
+ * Vacío si falta la tabla o la migración; no interrumpe el flujo del bot.
+ */
+const listarPreciosNormalizadosParaCultivo = async (cultivo, fechaDesdeIso, maxItems = 20) => {
+  const c = normalizar(cultivo);
+  if (!c || !fechaDesdeIso) return [];
+  const lim = Math.min(48, Math.max(4, Number(maxItems) || 20));
+  try {
+    const r = await query(
+      `
+        SELECT producto AS cultivo,
+               precio::float8 AS precio,
+               moneda,
+               fecha_mercado AS fecha,
+               fuente,
+               mercado,
+               plaza,
+               condicion,
+               tipo_registro
+        FROM precios_normalizados
+        WHERE LOWER(producto) = $1
+          AND fecha_mercado >= $2::date
+        ORDER BY fecha_mercado DESC, timestamp_origen DESC NULLS LAST
+        LIMIT $3
+      `,
+      [c, String(fechaDesdeIso).slice(0, 10), lim]
+    );
+    return (r.rows || []).map((row) => {
+      const parts = [row.mercado, row.plaza, row.condicion, row.tipo_registro].filter(Boolean);
+      return {
+        cultivo: row.cultivo,
+        mercado: parts.join(" · ") || row.mercado || "precios_norm",
+        precio: row.precio,
+        moneda: row.moneda,
+        fecha: row.fecha,
+        fuente: row.fuente && String(row.fuente).trim() ? String(row.fuente) : "precios_norm",
+      };
+    });
+  } catch (e) {
+    if (e && e.code === "42P01") return [];
+    throw e;
+  }
+};
+
 const bloquePlanPlantilla = (usuario = {}, extra = "") => {
   const cfg = configPlan(usuario);
   const planTxt = cfg.plan.toUpperCase();
@@ -574,6 +666,8 @@ module.exports = {
   obtenerUltimoPrecioCultivoDesdeBd,
   obtenerPrecioComplementarioFob,
   tieneFuentePrecios,
+  tieneActualizadoEnPrecios,
+  listarPreciosNormalizadosParaCultivo,
   obtenerDolarFresco,
   ordenarItemsTipoCambio,
   formatearItemTipoCambioTexto,

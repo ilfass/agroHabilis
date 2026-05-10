@@ -5,23 +5,27 @@ const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 const getModel = () =>
   process.env.GROQ_MODEL?.trim() || "llama-3.1-8b-instant";
 
-const generarChatGroq = async ({ system, user }) => {
+const generarChatGroq = async ({ system, user, maxTokens = null } = {}) => {
   const apiKey = process.env.GROQ_API_KEY?.trim();
   if (!apiKey) {
     throw new Error("GROQ_API_KEY no configurada");
   }
 
   const model = getModel();
+  const body = {
+    model,
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: user },
+    ],
+  };
+  if (Number.isFinite(Number(maxTokens)) && Number(maxTokens) > 0) {
+    body.max_tokens = Math.floor(Number(maxTokens));
+  }
   try {
     const { data } = await axios.post(
       GROQ_URL,
-      {
-        model,
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: user },
-        ],
-      },
+      body,
       {
         headers: {
           Authorization: `Bearer ${apiKey}`,

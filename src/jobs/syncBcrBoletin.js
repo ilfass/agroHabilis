@@ -13,13 +13,13 @@ const upsertPrecio = async ({
 }) => {
   await query(
     `
-    INSERT INTO precios (cultivo, mercado, precio, moneda, fecha)
-    VALUES ($1, $2, $3, $4, $5::date)
-    ON CONFLICT (cultivo, mercado, fecha)
+    INSERT INTO precios (cultivo, mercado, precio, moneda, fecha, fuente)
+    VALUES ($1, $2, $3, $4, $5::date, 'bcr_boletin')
+    ON CONFLICT (cultivo, mercado, fecha, fuente)
     DO UPDATE SET
       precio = EXCLUDED.precio,
       moneda = EXCLUDED.moneda,
-      creado_en = NOW()
+      actualizado_en = NOW()
     `,
     [cultivo, mercado, precio, moneda, fechaSql]
   );

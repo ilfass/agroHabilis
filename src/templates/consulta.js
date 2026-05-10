@@ -15,6 +15,8 @@ const {
   formatearItemTipoCambioTexto,
   clasificarTipoFuentePrecio,
   fuenteLegibleParaPrecio,
+  enriquecerFilaPrecioChatbot,
+  listarPreciosNormalizadosParaCultivo,
 } = require("./base");
 const { aplicarLayout } = require("./layouts");
 const { obtenerSnapshotParaIA } = require("../services/snapshot");
@@ -30,6 +32,7 @@ const { formatearFuentesGroundingWhatsApp } = require("../utils/urls_legibles");
 const { geocodificarZonaArgentina } = require("../utils/geocodificacion");
 const { actualizarUsuario } = require("../models/usuario");
 const { obtenerClima } = require("../scrapers/clima");
+const { detectarCategoriaHacienda } = require("../services/consultas/hacienda");
 
 const normalizar = (t = "") =>
   String(t)
@@ -68,7 +71,9 @@ const detectarTemas = (pregunta = "") => {
   const pideMontoSinDecirPrecio =
     /(cu[aá]nto|cuanto)\b/.test(t) && /(vale|valen|cuesta|cuestan|cobra|cobran|sale|salen|pag[oó]|pagan)\b/.test(t);
   if (
-    /(precio|cotizacion|cotización|mercado|soja|maiz|trigo|girasol|sorgo|cebada|papa|patata)/.test(t) ||
+    /(precio|cotizacion|cotización|mercado|soja|maiz|trigo|girasol|sorgo|cebada|papa|patata|novill|terner|vaca|vaquillon|hacienda|ganad|invernada|feedlot|encierre)/.test(
+      t
+    ) ||
     RE_MERCADO_HORTI_O_FRUTA.test(t) ||
     pideMontoSinDecirPrecio
   ) {
@@ -112,6 +117,376 @@ const detectarCultivo = (pregunta = "") => {
   if (/\blima(s)?\b/.test(t)) return "lima";
   if (/\byerbamate\b|\byerba\s+mate\b|\byerba\b/.test(t)) return "yerba_mate";
   return null;
+};
+
+const CULTIVOS_GRANOS_TABLERO = ["soja", "maiz", "trigo", "girasol", "sorgo", "cebada"];
+
+/** Pregunta de precio/mercado ganadero en pie (no reemplaza una consulta explícita solo de granos). */
+const esConsultaMercadoHaciendaPregunta = (pregunta = "", cultivo) => {
+  const t = normalizar(pregunta);
+  const c = cultivo && normalizar(String(cultivo));
+  if (c && CULTIVOS_GRANOS_TABLERO.includes(c)) {
+    if (!/(novill|terner|vaca|vaquillon|hacienda|ganad|invernada|feedlot|encierre)/.test(t)) return false;
+  }
+  if (detectarCategoriaHacienda(pregunta)) return true;
+  if (!/(novill|terner|vaca|vaquillon|hacienda|ganad|invernada|feedlot|encierre)/.test(t)) return false;
+  if (/(soja|ma[ií]z|trigo|girasol|cebada|sorgo)\b/.test(t)) return false;
+  return true;
+};
+
+const esPedidoTodosLosGranos = (pregunta = "") => {
+  const t = normalizar(pregunta);
+  if (!/(precio|precios|cotizacion|cotización|mercado|disponible|vale|valen|cuanto|cuánto)/.test(t)) return false;
+  return /\b(todos?\s+los?\s+granos|todos?\s+granos|granos?\s+en\s+general|panel\s+de\s+granos|resumen\s+de\s+granos)\b/.test(
+    t
+  );
+};
+
+const esFilaDisponibleMercadoFisico = (row = {}) => {
+  const c = row?.clasificacion_precio || clasificarTipoFuentePrecio(row);
+  if (!c || c.tipoFuente !== "mercado_fisico") return false;
+  return Number.isFinite(Number(row?.precio)) && Number(row.precio) > 0;
+};
+
+const obtenerPreciosDisponiblesGranos = async () => {
+  const r = await query(
+    `
+      SELECT cultivo, mercado, precio, moneda, fecha, fuente
+      FROM precios
+      WHERE LOWER(cultivo) = ANY($1::text[])
+      ORDER BY fecha DESC, actualizado_en DESC NULLS LAST, id DESC
+      LIMIT 600
+    `,
+    [CULTIVOS_GRANOS_TABLERO]
+  );
+  const rows = Array.isArray(r?.rows) ? r.rows : [];
+  const byCultivo = new Map();
+  for (const row of rows) {
+    const cultivo = normalizar(row?.cultivo || "");
+    if (!cultivo || byCultivo.has(cultivo)) continue;
+    if (!esFilaDisponibleMercadoFisico(row)) continue;
+    byCultivo.set(cultivo, row);
+  }
+  const precios = CULTIVOS_GRANOS_TABLERO.map((c) => ({ cultivo: c, row: byCultivo.get(c) || null }));
+  const conDato = precios.filter((x) => x.row);
+  const fechaMax =
+    conDato.length > 0
+      ? conDato
+          .map((x) => toFecha(x.row.fecha))
+          .sort((a, b) => String(b).localeCompare(String(a)))[0]
+      : null;
+  return {
+    fecha: fechaMax,
+    items: precios,
+    cobertura: {
+      total: CULTIVOS_GRANOS_TABLERO.length,
+      conDato: conDato.length,
+      faltantes: CULTIVOS_GRANOS_TABLERO.length - conDato.length,
+    },
+  };
+};
+
+const obtenerReferenciasMultiplesCultivo = async (cultivo, maxItems = 4) => {
+  const c = normalizar(cultivo);
+  if (!c) return [];
+  const fechaR = await query(
+    `
+      SELECT MAX(fecha) AS fecha
+      FROM precios
+      WHERE LOWER(cultivo)=LOWER($1)
+    `,
+    [c]
+  );
+  const fechaMax = fechaR.rows?.[0]?.fecha || null;
+  if (!fechaMax) return [];
+  const r = await query(
+    `
+      SELECT cultivo, mercado, precio, moneda, fecha, fuente
+      FROM precios
+      WHERE LOWER(cultivo)=LOWER($1)
+        AND fecha >= ($2::date - INTERVAL '2 days')
+        AND precio IS NOT NULL
+      ORDER BY fecha DESC, actualizado_en DESC NULLS LAST, id DESC
+      LIMIT 72
+    `,
+    [c, fechaMax]
+  );
+  const rows = Array.isArray(r?.rows) ? r.rows : [];
+  const dedup = new Map();
+  const d0 = new Date(fechaMax);
+  if (!Number.isNaN(d0.getTime())) {
+    d0.setUTCDate(d0.getUTCDate() - 2);
+    const desdeStr = d0.toISOString().slice(0, 10);
+    const normRows = await listarPreciosNormalizadosParaCultivo(c, desdeStr, 24);
+    for (const row of normRows) {
+      const key = `n|${normalizar(row.mercado || "")}|${normalizar(row.fuente || "")}|${toFecha(row.fecha)}`;
+      if (!dedup.has(key)) dedup.set(key, row);
+    }
+  }
+  for (const row of rows) {
+    const key = `p|${normalizar(row.mercado || "")}|${normalizar(row.fuente || "")}|${toFecha(row.fecha)}`;
+    if (!dedup.has(key)) dedup.set(key, row);
+  }
+  const cap = Math.min(30, Math.max(6, (Number(maxItems) || 12) * 2));
+  const merged = Array.from(dedup.values());
+  const ordenTipo = (tipo) =>
+    ({ mercado_fisico: 0, institucional: 1, exportacion: 2 }[tipo] ?? 9);
+  merged.sort((a, b) => {
+    const ra = enriquecerFilaPrecioChatbot(a);
+    const rb = enriquecerFilaPrecioChatbot(b);
+    const oa = ordenTipo(ra?.clasificacion_precio?.tipoFuente);
+    const ob = ordenTipo(rb?.clasificacion_precio?.tipoFuente);
+    if (oa !== ob) return oa - ob;
+    return String(b.fecha || "").localeCompare(String(a.fecha || ""));
+  });
+  return merged.slice(0, cap);
+};
+
+/** Evita repetir en el listado la misma cotización que ya es precio principal. */
+const filasReferenciasSinDuplicarPrincipal = (precioPrincipal, refs = []) => {
+  if (!Array.isArray(refs) || !refs.length) return [];
+  if (
+    !precioPrincipal ||
+    precioPrincipal.precio == null ||
+    !Number.isFinite(Number(precioPrincipal.precio))
+  ) {
+    return refs;
+  }
+  const pm = normalizar(String(precioPrincipal.mercado || ""));
+  const pf = toFecha(precioPrincipal.fecha);
+  const pp = Number(precioPrincipal.precio);
+  return refs.filter((x) => {
+    const xm = normalizar(String(x.mercado || ""));
+    const xf = toFecha(x.fecha);
+    const xp = Number(x.precio);
+    if (!Number.isFinite(xp)) return true;
+    if (xm === pm && xf === pf && Math.abs(xp - pp) <= Math.max(0.5, pp * 0.0001)) return false;
+    return true;
+  });
+};
+
+const humanizarMercadoEtiqueta = (mercado = "") => {
+  const t = String(mercado || "").replace(/_/g, " ").replace(/\s+/g, " ").trim();
+  if (!t) return "Referencia de mercado";
+  return t.charAt(0).toUpperCase() + t.slice(1);
+};
+
+const primerNombreDesdeUsuario = (usuario) => {
+  const n = String(usuario?.nombre || "").trim();
+  if (!n) return "Hola";
+  return n.split(/\s+/)[0];
+};
+
+const fechaLargaArgentinaDesdeIso = (iso) => {
+  const s = String(iso || "").trim();
+  const isoUse = /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : fechaISOArgentina();
+  const [y, m, d] = isoUse.split("-").map(Number);
+  const civil = new Date(Date.UTC(y, m - 1, d, 15, 0, 0));
+  return new Intl.DateTimeFormat("es-AR", {
+    timeZone: "America/Argentina/Buenos_Aires",
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(civil);
+};
+
+const ETIQUETA_CULTIVO_MERCADO = {
+  soja: "la soja",
+  maiz: "el maíz",
+  trigo: "el trigo",
+  girasol: "el girasol",
+  sorgo: "el sorgo",
+  cebada: "la cebada",
+};
+
+const etiquetaCultivoLegibleMercado = (cultivo) => {
+  const c = normalizar(String(cultivo || ""));
+  return ETIQUETA_CULTIVO_MERCADO[c] || `el cultivo (${String(cultivo || "").toUpperCase()})`;
+};
+
+/**
+ * Consulta puntual de precio/venta para un grano de tablero (no panel, no reclamo, no decisión operativa).
+ */
+const debeUsarPlantillaMercadoPuntual = (pregunta, datos, temasLocal = []) => {
+  if (!datos || datos.pedido_todos_granos) return false;
+  const temas = Array.isArray(datos?.temas) && datos.temas.length ? datos.temas : temasLocal;
+  if (!temas.includes("precio") && !temas.includes("venta")) return false;
+  const c = datos.cultivo && normalizar(String(datos.cultivo));
+  if (!c || !CULTIVOS_GRANOS_TABLERO.includes(c)) return false;
+  if (esPedidoDecisionOperativa(pregunta)) return false;
+  if (esReclamoConsistenciaMercado(pregunta)) return false;
+  if (esConsultaInterpretativaRelacion(pregunta)) return false;
+  const t = normalizar(pregunta);
+  const mencionaGrano = /(soja|ma[ií]z|trigo|girasol|cebada|sorgo|grano)/.test(t);
+  if (!mencionaGrano && /(novillo|novillos|ternero|terneros|ganado|hacienda|feedlot|encierre)/.test(t)) return false;
+  return true;
+};
+
+const armarPlantillaMercadoPuntual = ({ pregunta, datos, usuario, temasLocal }) => {
+  if (!debeUsarPlantillaMercadoPuntual(pregunta, datos, temasLocal)) return null;
+  const nombre = primerNombreDesdeUsuario(usuario);
+  const cultivoLeg = etiquetaCultivoLegibleMercado(datos.cultivo);
+  const fechaLarga = fechaLargaArgentinaDesdeIso(fechaISOArgentina());
+
+  const filasUnicas = () => {
+    const seen = new Set();
+    const todas = [];
+    const add = (raw) => {
+      const x = enriquecerFilaPrecioChatbot(raw);
+      if (!x || !Number.isFinite(Number(x.precio)) || Number(x.precio) <= 0) return;
+      const key = `${normalizar(x.mercado || "")}|${normalizar(x.fuente || "")}|${toFecha(x.fecha)}|${Number(x.precio)}|${String(
+        x.moneda || ""
+      ).toUpperCase()}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      todas.push(x);
+    };
+    if (datos?.precio?.precio != null) add(datos.precio);
+    const refs = filasReferenciasSinDuplicarPrincipal(datos?.precio, datos?.referenciasMultiplesCultivo || []);
+    for (const r of refs) add(r);
+    return todas.slice(0, 8);
+  };
+
+  const todas = filasUnicas();
+  const lineasOut = [];
+  lineasOut.push(`*${nombre}*! Estuve revisando los precios con corte de *${fechaLarga}*, según lo que consultaste.`);
+  lineasOut.push("");
+  lineasOut.push(`Respecto al precio de *${cultivoLeg}*, esto es lo que tengo registrado en las principales referencias:`);
+  lineasOut.push("");
+
+  if (!todas.length) {
+    lineasOut.push(
+      `_Por ahora no figuran cotizaciones recientes en base para ${cultivoLeg} en las plazas que tenemos cableadas._`
+    );
+    lineasOut.push("Si querés, reintentamos más tarde o aclarás plaza y condición comercial.");
+  } else {
+    for (const x of todas) {
+      const clf = x.clasificacion_precio || clasificarTipoFuentePrecio(x);
+      const fm = x.fuente_mostrar || fuenteLegibleParaPrecio(x);
+      const mon = String(x.moneda || "ARS").toUpperCase();
+      const plaza = humanizarMercadoEtiqueta(x.mercado);
+      lineasOut.push(`*${plaza}* — *${fm}* (${clf.tipoEtiqueta}): *${formatearPrecio(x.precio)} ${mon}/tn*`);
+    }
+    const monedaStats = String(datos?.precio?.moneda || todas[0]?.moneda || "ARS").toUpperCase();
+    const nums = todas
+      .filter((x) => String(x.moneda || "").toUpperCase() === monedaStats)
+      .map((x) => Number(x.precio))
+      .filter((n) => Number.isFinite(n) && n > 0);
+    const numsUse = nums.length ? nums : todas.map((x) => Number(x.precio)).filter((n) => Number.isFinite(n) && n > 0);
+    if (numsUse.length >= 2) {
+      const min = Math.min(...numsUse);
+      const max = Math.max(...numsUse);
+      const avg = numsUse.reduce((a, b) => a + b, 0) / numsUse.length;
+      lineasOut.push("");
+      lineasOut.push(
+        `En *${monedaStats}*, entre estas referencias el promedio ronda *${formatearPrecio(avg)}*, con un rango de *${formatearPrecio(
+          min
+        )}* a *${formatearPrecio(max)}* ${monedaStats}/tn (no equivale a precio de liquidación: depende de plaza, calidad y condición comercial).`
+      );
+    } else if (numsUse.length === 1) {
+      lineasOut.push("");
+      lineasOut.push(`Con una sola cotización consolidada en *${monedaStats}* para este corte, no armo rango entre plazas.`);
+    }
+  }
+
+  lineasOut.push("");
+  lineasOut.push(
+    "*Lectura (IA):* debajo va el análisis breve (Mercado/Lectura/Decisión/Riesgo), sin repetir el listado ni inventar variación día a día si no está en datos."
+  );
+
+  return lineasOut.join("\n");
+};
+
+const debeUsarPlantillaHaciendaPuntual = (pregunta, datos, temasLocal = []) => {
+  if (!datos || datos.pedido_todos_granos) return false;
+  const temas = Array.isArray(datos?.temas) && datos.temas.length ? datos.temas : temasLocal;
+  if (!temas.includes("precio") && !temas.includes("venta")) return false;
+  if (!esConsultaMercadoHaciendaPregunta(pregunta, datos.cultivo)) return false;
+  if (esPedidoDecisionOperativa(pregunta)) return false;
+  if (esReclamoConsistenciaMercado(pregunta)) return false;
+  if (esConsultaInterpretativaRelacion(pregunta)) return false;
+  return true;
+};
+
+const etiquetaTemaHaciendaLegible = (categoriaHint, rows) => {
+  const h = categoriaHint && normalizar(String(categoriaHint));
+  if (h === "novillo") return "*los novillos*";
+  if (h === "ternero") return "*los terneros / la invernada*";
+  if (h === "vaca") return "*las vacas*";
+  if (h === "vaquillona") return "*las vaquillonas*";
+  const cats = (rows || []).map((r) => String(r.categoria || "").trim()).filter(Boolean);
+  if (cats.length === 1) return `*${cats[0]}*`;
+  if (cats.length > 1) return "*las categorías de hacienda que figuran hoy en base*";
+  return "*la hacienda en pie*";
+};
+
+const armarPlantillaHaciendaPuntual = ({ pregunta, datos, usuario, temasLocal }) => {
+  if (!debeUsarPlantillaHaciendaPuntual(pregunta, datos, temasLocal)) return null;
+  const nombre = primerNombreDesdeUsuario(usuario);
+  const hint = datos?.hacienda_categoria_hint || null;
+  const pack = datos?.hacienda_plantilla || { fecha: null, rows: [] };
+  const rows = Array.isArray(pack.rows) ? pack.rows : [];
+  const fechaIso = pack.fecha && /^\d{4}-\d{2}-\d{2}$/.test(String(pack.fecha).slice(0, 10)) ? String(pack.fecha).slice(0, 10) : fechaISOArgentina();
+  const fechaLarga = fechaLargaArgentinaDesdeIso(fechaIso);
+  const temaLeg = etiquetaTemaHaciendaLegible(hint, rows);
+
+  const lineasOut = [];
+  lineasOut.push(`*${nombre}*! Estuve revisando referencias de mercado ganadero con corte de *${fechaLarga}*, según lo que consultaste.`);
+  lineasOut.push("");
+  if (rows.length) {
+    lineasOut.push(
+      `Respecto al precio de ${temaLeg}, esto es lo que tengo registrado en base (*precios_hacienda*, en ${String(rows[0]?.unidad || "kg").toLowerCase()}):`
+    );
+  } else {
+    lineasOut.push(`Respecto al precio de ${temaLeg}, consulté la tabla *precios_hacienda*:`);
+  }
+  lineasOut.push("");
+
+  const nums = [];
+  if (!rows.length) {
+    lineasOut.push("_Por ahora no figuran líneas de categoría para este corte en la tabla precios_hacienda._");
+    lineasOut.push("Si querés, reintentamos más tarde o indicame categoría (novillo, ternero, vaca, etc.).");
+  } else {
+    for (const r of rows.slice(0, 10)) {
+      const p = Number(r.precio_promedio);
+      if (!Number.isFinite(p) || p <= 0) continue;
+      const un = String(r.unidad || "kg").toLowerCase();
+      const cat = String(r.categoria || "categoría").trim();
+      const rango =
+        Number.isFinite(Number(r.precio_min)) &&
+        Number.isFinite(Number(r.precio_max)) &&
+        Number(r.precio_min) > 0 &&
+        Number(r.precio_max) > 0 &&
+        Number(r.precio_min) !== Number(r.precio_max)
+          ? ` (rango ${formatearPrecio(Number(r.precio_min))}–${formatearPrecio(Number(r.precio_max))} ARS/${un})`
+          : "";
+      lineasOut.push(`*${cat}* — *Promedio del día:* *${formatearPrecio(p)} ARS/${un}*${rango}`);
+      nums.push(p);
+    }
+    if (nums.length >= 2) {
+      const min = Math.min(...nums);
+      const max = Math.max(...nums);
+      const avg = nums.reduce((a, b) => a + b, 0) / nums.length;
+      const un0 = String(rows[0]?.unidad || "kg").toLowerCase();
+      lineasOut.push("");
+      lineasOut.push(
+        `Entre *estas categorías del listado*, el promedio simple ronda *${formatearPrecio(avg)} ARS/${un0}*, con valores desde *${formatearPrecio(
+          min
+        )}* hasta *${formatearPrecio(max)}* (cada categoría tiene su propio mercado; no es precio de liquidación en tu estable).`
+      );
+    } else if (nums.length === 1) {
+      lineasOut.push("");
+      lineasOut.push("Hay *una* referencia numérica principal en este corte; no armo rango entre categorías.");
+    }
+  }
+
+  lineasOut.push("");
+  lineasOut.push(
+    "*Lectura (IA):* debajo va el análisis breve (Mercado/Lectura/Decisión/Riesgo), sin repetir el listado ni inventar subas o bajas si no están en datos."
+  );
+
+  return lineasOut.join("\n");
 };
 
 /**
@@ -613,9 +988,10 @@ const climaSinPronosticoVigente = (datos) => {
 };
 
 const hayPrecioTrazable = (datos) =>
-  datos?.precio != null &&
-  Number.isFinite(Number(datos.precio.precio)) &&
-  Number(datos.precio.precio) > 0;
+  (datos?.precio != null &&
+    Number.isFinite(Number(datos.precio.precio)) &&
+    Number(datos.precio.precio) > 0) ||
+  (Array.isArray(datos?.hacienda_plantilla?.rows) && datos.hacienda_plantilla.rows.length > 0);
 
 const preguntaPideDisponible = (pregunta = "") => /\b(disponible|mercado fisico|mercado físico|spot)\b/.test(normalizar(pregunta));
 
@@ -976,7 +1352,62 @@ const toFecha = (v) => {
   return d.toISOString().slice(0, 10);
 };
 
-const construirRespuestaBaseConDatos = async ({ pregunta, datos }) => {
+const obtenerFilasPreciosHaciendaForPlantilla = async (categoriaHint) => {
+  const fechaR = await query(`SELECT MAX(fecha) AS fecha FROM precios_hacienda`);
+  const rawFecha = fechaR.rows[0]?.fecha;
+  const fecha = rawFecha != null ? toFecha(rawFecha) : null;
+  if (!fecha || fecha === "s/d") return { fecha: null, rows: [] };
+  const params = [fecha];
+  let sql = `
+    SELECT categoria, precio_promedio, precio_min, precio_max, unidad, fecha
+    FROM precios_hacienda
+    WHERE fecha = $1::date
+  `;
+  if (categoriaHint) {
+    const hint = String(categoriaHint).replace(/%/g, "").trim();
+    if (hint) {
+      params.push(`%${hint}%`);
+      sql += ` AND LOWER(categoria) LIKE LOWER($2)`;
+    }
+  }
+  sql += ` ORDER BY categoria LIMIT 15`;
+  const r = await query(sql, params);
+  return { fecha, rows: r.rows || [] };
+};
+
+const construirRespuestaBaseConDatos = async ({ pregunta, datos, usuario }) => {
+  if (datos?.pedido_todos_granos) {
+    const panel = datos?.precios_granos_tablero || { items: [], cobertura: { total: 0, conDato: 0, faltantes: 0 } };
+    const lineas = ["🌾 *Precios disponibles de granos (Argentina)*", "━━━━━━━━━━━━━━━━━━━━"];
+    lineas.push(`Fecha de referencia: ${panel.fecha || "sin dato en base"}`);
+    if (Array.isArray(panel.items) && panel.items.length) {
+      for (const item of panel.items) {
+        const nombre = String(item.cultivo || "").toUpperCase();
+        if (!item.row) {
+          lineas.push(`- ${nombre}: sin dato en base`);
+          continue;
+        }
+        const fila = item.row;
+        const fm = fila.fuente_mostrar || fuenteLegibleParaPrecio(fila);
+        lineas.push(
+          `- ${nombre}: ${formatearPrecio(fila.precio)} ${String(fila.moneda || "ARS").toUpperCase()}/tn · ${String(
+            fila.mercado || "mercado"
+          )} · ${fm} · ${toFecha(fila.fecha)}`
+        );
+      }
+    } else {
+      lineas.push("- No encontré cotizaciones disponibles en base para el corte actual.");
+    }
+    if (panel?.cobertura?.faltantes > 0) {
+      lineas.push(
+        "",
+        `⚠️ Cobertura parcial en base: ${panel.cobertura.conDato}/${panel.cobertura.total} granos con dato disponible.`
+      );
+    }
+    lineas.push("", "Si querés, te lo convierto también a neto con flete por puerto.");
+    return lineas.join("\n");
+  }
+
   const tNorm = normalizar(pregunta);
   const pideRelacion = esConsultaInterpretativaRelacion(pregunta);
   const pideNovillo = /(novillo|novillos|hacienda|ternero|feedlot|encierre)/.test(tNorm);
@@ -1152,15 +1583,40 @@ const construirRespuestaBaseConDatos = async ({ pregunta, datos }) => {
   lineas.push(`Respuesta base (${cultivoTxt})`);
 
   if (!soloMeteoSinMercado) {
-    if (datos?.precio?.precio != null) {
+    const plantillaHacienda = armarPlantillaHaciendaPuntual({ pregunta, datos, usuario, temasLocal });
+    const plantillaMercado = plantillaHacienda ? null : armarPlantillaMercadoPuntual({ pregunta, datos, usuario, temasLocal });
+    if (plantillaHacienda) {
+      lineas.push(plantillaHacienda);
+    } else if (plantillaMercado) {
+      lineas.push(plantillaMercado);
+      if (datos?.precioComplementarioFob?.precio != null) {
+        const cfo = datos.precioComplementarioFob;
+        const clfF = cfo.clasificacion_precio || clasificarTipoFuentePrecio(cfo);
+        const fmF = cfo.fuente_mostrar || fuenteLegibleParaPrecio(cfo);
+        const mon = String(cfo.moneda || "USD").toUpperCase();
+        const valorFmt =
+          mon === "USD"
+            ? `${Number(cfo.precio).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD/tn`
+            : `${formatearPrecio(Number(cfo.precio))} ${mon}/tn`;
+        lineas.push("");
+        lineas.push("*Referencia complementaria (exportación / FOB — no es cobro en campo)*");
+        lineas.push(
+          `· *Tipo:* ${clfF.tipoEtiqueta}\n· *Fuente:* ${fmF}\n· *Mercado / plaza:* ${humanizarMercadoEtiqueta(
+            cfo.mercado
+          )}\n· *Precio:* ${valorFmt}\n· *Fecha:* ${toFecha(cfo.fecha)}\n· *Aclaración:* es referencia puerto/exportación; no compararla al neto en planta sin sumar flete, bases y condiciones comerciales.`
+        );
+      }
+    } else if (!plantillaHacienda && datos?.precio?.precio != null) {
       const clf = datos.precio.clasificacion_precio || clasificarTipoFuentePrecio(datos.precio);
       const fm = datos.precio.fuente_mostrar || fuenteLegibleParaPrecio(datos.precio);
+      const lblCul = String(datos.cultivo || "referencia").toUpperCase();
+      lineas.push(`*Precio principal (${lblCul})*`);
       lineas.push(
-        `- Precio ${datos.cultivo || "referencia"}: ${formatearPrecio(datos.precio.precio)} ${String(
-          datos.precio.moneda || "ARS"
-        )}/tn — tipo: ${clf.tipoEtiqueta}; ref/plaza: ${fm}; condición: ${clf.condicionComercial}; fecha: ${toFecha(
-          datos.precio.fecha
-        )}`
+        `· *Tipo:* ${clf.tipoEtiqueta}\n· *Fuente:* ${fm}\n· *Mercado / plaza:* ${humanizarMercadoEtiqueta(
+          datos.precio.mercado
+        )}\n· *Precio:* ${formatearPrecio(datos.precio.precio)} ${String(datos.precio.moneda || "ARS").toUpperCase()}/tn\n· *Condición comercial:* ${
+          clf.condicionComercial
+        }\n· *Fecha:* ${toFecha(datos.precio.fecha)}`
       );
       if (datos.precioComplementarioFob?.precio != null) {
         const cfo = datos.precioComplementarioFob;
@@ -1171,12 +1627,49 @@ const construirRespuestaBaseConDatos = async ({ pregunta, datos }) => {
           mon === "USD"
             ? `${Number(cfo.precio).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD/tn`
             : `${formatearPrecio(Number(cfo.precio))} ${mon}/tn`;
+        lineas.push("");
+        lineas.push("*Referencia complementaria (exportación / FOB — no es cobro en campo)*");
         lineas.push(
-          `- Complementario ${clfF.tipoEtiqueta} (no cobro campo): ${valorFmt} — ref: ${fmF}; fecha ${toFecha(cfo.fecha)} — sólo referencia exportación/puerto; no equivale al precio disponible de arriba.`
+          `· *Tipo:* ${clfF.tipoEtiqueta}\n· *Fuente:* ${fmF}\n· *Mercado / plaza:* ${humanizarMercadoEtiqueta(
+            cfo.mercado
+          )}\n· *Precio:* ${valorFmt}\n· *Fecha:* ${toFecha(cfo.fecha)}\n· *Aclaración:* es referencia puerto/exportación; no compararla al neto en planta sin sumar flete, bases y condiciones comerciales.`
         );
       }
     } else {
-      lineas.push("- Precio: sin dato puntual en base.");
+      lineas.push("*Precio principal*");
+      lineas.push("· Sin dato puntual en base para esta consulta.");
+    }
+
+    if (!plantillaMercado && !plantillaHacienda) {
+      const refsFiltradas = filasReferenciasSinDuplicarPrincipal(datos?.precio, datos?.referenciasMultiplesCultivo || []);
+      if (refsFiltradas.length >= 1) {
+        lineas.push("");
+        lineas.push("*Otras cotizaciones en base (por tipo y fuente)*");
+        refsFiltradas.forEach((raw, i) => {
+          const x = enriquecerFilaPrecioChatbot(raw);
+          const clfR = x.clasificacion_precio || clasificarTipoFuentePrecio(x);
+          const fmR = x.fuente_mostrar || fuenteLegibleParaPrecio(x);
+          const monR = String(x.moneda || "ARS").toUpperCase();
+          lineas.push(
+            `· *${clfR.tipoEtiqueta}*\n  · *Mercado:* ${humanizarMercadoEtiqueta(x.mercado)}\n  · *Fuente:* ${fmR}\n  · *Precio:* ${formatearPrecio(
+              x.precio
+            )} ${monR}/tn\n  · *Condición comercial:* ${clfR.condicionComercial}\n  · *Fecha:* ${toFecha(x.fecha)}`
+          );
+          if (i < refsFiltradas.length - 1) lineas.push("");
+        });
+        const vals = refsFiltradas.map((x) => Number(x.precio)).filter((n) => Number.isFinite(n) && n > 0);
+        if (vals.length >= 2) {
+          const min = Math.min(...vals);
+          const max = Math.max(...vals);
+          const spreadPct = min > 0 ? ((max - min) / min) * 100 : 0;
+          if (spreadPct >= 3) {
+            lineas.push("");
+            lineas.push(
+              "*¿Por qué difieren?* Plaza o mercado distinto, fecha u hora de corte distinta, *tipo de precio* (disponible vs cámara vs FOB/futuro) y condición comercial (calidad, humedad, pago, descarga). El neto en campo no es lo mismo que un precio puesto puerto."
+            );
+          }
+        }
+      }
     }
   }
 
@@ -1301,6 +1794,8 @@ module.exports = {
     }
 
     let temas = detectarTemas(pregunta);
+    const pedidoTodosGranos = esPedidoTodosLosGranos(pregunta);
+    if (pedidoTodosGranos && !temas.includes("precio")) temas.push("precio");
     const ctxHilo = resolverContextoConversacional(pregunta, historialRows);
     if (ctxHilo.temas_agregados?.length) temas = [...new Set([...temas, ...ctxHilo.temas_agregados])];
 
@@ -1310,9 +1805,13 @@ module.exports = {
     const datos = {
       temas,
       cultivo,
+      pedido_todos_granos: pedidoTodosGranos,
       historial: historialRows,
       contexto_hilo_resuelto: ctxHilo,
     };
+    if (pedidoTodosGranos) {
+      datos.precios_granos_tablero = await obtenerPreciosDisponiblesGranos();
+    }
     if (temas.includes("precio") && cultivo) {
       // Ventana amplia: el mercado se publica por jornada; 2h dejaban "sin dato" con BD poblada.
       datos.precio = await obtenerPrecioFresco(cultivo, 120);
@@ -1329,6 +1828,14 @@ module.exports = {
       if (datos.precio) {
         datos.precioComplementarioFob = await obtenerPrecioComplementarioFob(cultivo, datos.precio);
       }
+      datos.referenciasMultiplesCultivo = await obtenerReferenciasMultiplesCultivo(cultivo, 14);
+    }
+    const quiereHaciendaPlantilla =
+      (temas.includes("precio") || temas.includes("venta")) && esConsultaMercadoHaciendaPregunta(pregunta, cultivo);
+    if (quiereHaciendaPlantilla) {
+      const hint = detectarCategoriaHacienda(pregunta);
+      datos.hacienda_plantilla = await obtenerFilasPreciosHaciendaForPlantilla(hint);
+      datos.hacienda_categoria_hint = hint;
     }
     if (temas.includes("dolar")) datos.dolar = await obtenerDolarFresco(0);
     let latN = Number(usuario?.lat);
@@ -1367,19 +1874,23 @@ module.exports = {
 
     const preguntaNorm = normalizar(pregunta);
     const pideFuturos = /(matba|rofex|futuro|carry|backwardation|base|spread)/.test(preguntaNorm);
-    const faltaPrecioBase = temas.includes("precio") && !datos.precio;
+    const faltaPrecioBase = temas.includes("precio") && !hayPrecioTrazable(datos);
     const itemsClima = contarItemsClima(datos);
     const sinClimaCuandoImporta = esConsultaMeteoPorTexto(pregunta) && !itemsClima;
     const sinDatosBaseRelevantes =
-      !datos.precio &&
+      !hayPrecioTrazable(datos) &&
       (!datos.dolar || !(Array.isArray(datos.dolar.items) && datos.dolar.items.length)) &&
       (!datos.clima || !itemsClima) &&
       (!datos.noticias || !datos.noticias.length);
-    if (faltaPrecioBase || pideFuturos || sinDatosBaseRelevantes || sinClimaCuandoImporta) {
+    const coberturaGranosPobre =
+      pedidoTodosGranos &&
+      (!datos.precios_granos_tablero ||
+        Number(datos.precios_granos_tablero?.cobertura?.conDato || 0) < Math.max(3, Math.ceil(CULTIVOS_GRANOS_TABLERO.length * 0.6)));
+    if (faltaPrecioBase || pideFuturos || sinDatosBaseRelevantes || sinClimaCuandoImporta || coberturaGranosPobre) {
       try {
         const webFallback = await buscarDatosAgroEnWeb({
           pregunta,
-          cultivos: datos.cultivo ? [datos.cultivo] : [],
+          cultivos: pedidoTodosGranos ? CULTIVOS_GRANOS_TABLERO : datos.cultivo ? [datos.cultivo] : [],
         });
         datos.webFallback = webFallback;
       } catch (_e) {
@@ -1391,7 +1902,20 @@ module.exports = {
 
   async renderizar(usuario, datos, pregunta) {
     const modulosContexto = detectarModulosContexto(pregunta, datos);
-    const respuestaBase = await construirRespuestaBaseConDatos({ pregunta, datos });
+    const temasFmtPlant = Array.isArray(datos?.temas) ? datos.temas : detectarTemas(pregunta);
+    const soloMeteoSinMercadoPlant =
+      esConsultaMeteoPorTexto(pregunta) &&
+      !temasFmtPlant.includes("precio") &&
+      !temasFmtPlant.includes("venta") &&
+      !temasFmtPlant.includes("dolar") &&
+      !datos?.cultivo;
+    const plantillaHaciendaPuntualActiva =
+      !soloMeteoSinMercadoPlant && debeUsarPlantillaHaciendaPuntual(pregunta, datos, temasFmtPlant);
+    const plantillaMercadoPuntualActiva =
+      !soloMeteoSinMercadoPlant &&
+      debeUsarPlantillaMercadoPuntual(pregunta, datos, temasFmtPlant) &&
+      !plantillaHaciendaPuntualActiva;
+    const respuestaBase = await construirRespuestaBaseConDatos({ pregunta, datos, usuario });
     const guardrailInterpretativoActivo = /^📌 \*No tengo patas completas/i.test(String(respuestaBase || "").trim());
     if (guardrailInterpretativoActivo) {
       let mensajeFinal = respuestaBase;
@@ -1505,6 +2029,14 @@ module.exports = {
       const hayMeteo = esConsultaMeteoPorTexto(pregunta);
       const hayMercadoTema =
         temasFmt.includes("precio") || temasFmt.includes("venta") || temasFmt.includes("dolar");
+      const tnMsgParaBd = normalizar(pregunta);
+      /** WhatsApp: bloque fijo con respuesta_base antes del editor y antes del complemento web. */
+      const anteponerResumenBd =
+        String(respuestaBase || "").trim().length > 0 &&
+        (temasFmt.includes("precio") ||
+          temasFmt.includes("venta") ||
+          temasFmt.includes("dolar") ||
+          RE_MERCADO_HORTI_O_FRUTA.test(tnMsgParaBd));
       const tituloPrimerBloque =
         hayMeteo && !hayMercadoTema ? "Clima (o Pronóstico)" : hayMercadoTema && !hayMeteo ? "Mercado" : "Contexto";
       const instruccionCuatroBloques =
@@ -1532,6 +2064,15 @@ module.exports = {
           "Si el JSON trae clima_pronostico_resumen con contenido, son datos de pronóstico ya cargados: no digas que faltan en base salvo que esté vacío. " +
           "Usá fecha_hoy_ar del JSON como única fecha de 'hoy' en Argentina (no uses la fecha del servidor ni inventes el día). " +
           "La respuesta_base ya fue calculada por reglas de negocio y datos internos. " +
+          (anteponerResumenBd
+            ? "Presentación WhatsApp: la app antepondrá antes de tu texto un bloque *Base AgroHabilis* con respuesta_base literal. No repitas ni re-enumeres esas mismas líneas ni cifras; tu salida suma solo la capa editorial (lectura/decisión/riesgo o las reglas de hueco único) sin duplicar el bloque previo. "
+            : "") +
+          (plantillaHaciendaPuntualActiva
+            ? "PLANTILLA HACIENDA PUNTUAL: respuesta_base ya abre con saludo y categorías desde precios_hacienda (mercado ganadero en pie). No repitas ese saludo ni renumeres filas. En Mercado/Lectura/Decisión/Riesgo resumí lectura accionable; no mezclés con precios de granos salvo que la pregunta lo pida. No inventes variación porcentual si no está en datos. "
+            : "") +
+          (plantillaMercadoPuntualActiva
+            ? "PLANTILLA MERCADO PUNTUAL: respuesta_base ya abre con saludo personalizado y listado de fuentes para un solo grano (datos.cultivo). No repitas ese saludo ni renumeres esas líneas. En Mercado/Lectura/Decisión/Riesgo resumí lectura accionable en pocas líneas; mantené estrictamente el cultivo datos.cultivo y no lo sustituyas por otro grano. No inventes variación porcentual día a día ni comparaciones con ayer si no están en respuesta_base o en el JSON. "
+            : "") +
           "NO reemplaces ni contradigas la respuesta_base. " +
           "Tu tarea es SOLO mejorar claridad, orden y contexto operativo. " +
           (huecoUnico
@@ -1559,7 +2100,14 @@ module.exports = {
       const textoIA = limpiarSalidaIA(String(ia.texto || "").trim());
       const traceExtra = [];
       let pipeline = "base_datos + contexto_ia";
-      let mensajeFinal = textoIA || respuestaBase;
+      const bloquePrioridadBd = anteponerResumenBd
+        ? ["📊 *Base AgroHabilis*", "━━━━━━━━━━━━━━━━━━━━", String(respuestaBase).trim()].join("\n")
+        : "";
+      let mensajeFinal = bloquePrioridadBd
+        ? textoIA
+          ? [bloquePrioridadBd, textoIA].join("\n\n")
+          : bloquePrioridadBd
+        : textoIA || respuestaBase;
 
       const cultivoGapPrecio = datos?.cultivo || detectarCultivo(pregunta);
       const temasGapPrecio = Array.isArray(datos?.temas) ? datos.temas : detectarTemas(pregunta);

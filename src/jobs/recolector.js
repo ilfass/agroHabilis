@@ -2,6 +2,7 @@ const cron = require("node-cron");
 const { query } = require("../config/database");
 const { obtenerPreciosMAGYPFOB } = require("../scrapers/granos_magyp_fob");
 const { obtenerPreciosCAC } = require("../scrapers/granos_cac");
+const { obtenerPreciosAFA } = require("../scrapers/granos_afa");
 const { obtenerTipoCambio } = require("../scrapers/dolar");
 const { obtenerClima } = require("../scrapers/clima");
 const { obtenerPreciosHacienda } = require("../scrapers/hacienda");
@@ -132,6 +133,20 @@ const obtenerConfianzaMercado = (mercado = "") => {
   return 0.78;
 };
 
+/** Etiqueta estable para clave única (cultivo, mercado, fecha, fuente) y UPSERT diario. */
+const inferirFuenteIngesta = (item = {}, mercadoNorm = "") => {
+  const direct = String(item?.fuente || item?.fuente_scraper || item?.id_fuente || "").trim();
+  if (direct) return direct.slice(0, 120);
+  const m = String(mercadoNorm || "").toLowerCase();
+  if (/cac|bcr_gix|camara|c[aá]mara/.test(m)) return "cac_bcr";
+  if (/magyp|fob/.test(m)) return "magyp_fob";
+  if (/afa|cbot/.test(m)) return "afa_scl";
+  if (/sio|monitor/.test(m)) return "sio_granos";
+  if (/todoagro|lncampo|_web|mercados_web|agrofy/.test(m)) return "mercados_web";
+  if (/matba|rofex/.test(m)) return "matba_rofex";
+  return "ingesta";
+};
+
 const prepararItemPrecio = (item = {}) => {
   const fallbackFecha = fechaHoyAr();
   const mercado = item?.mercado || "desconocido";
@@ -184,6 +199,7 @@ const prepararItemPrecio = (item = {}) => {
     presentacion: presentacionInferida,
     volumen_ingreso_nivel: volumenNivelInferido,
     volumen_ingreso_fuente: volumenFuenteInferida,
+    fuente_ingesta: inferirFuenteIngesta(item, mercadoNorm),
   };
 };
 
@@ -359,14 +375,24 @@ const insertPrecio = async (item, { perfilValidacion = "general" } = {}) => {
   const moneda = Number.isFinite(precio) ? "ARS" : "USD";
   const valor = Number.isFinite(precio) ? precio : precioUsd;
 
+  const fuenteFila = String(canon.fuente_ingesta || "ingesta").slice(0, 120);
   const result = await query(
     `
       INSERT INTO precios (
         cultivo, mercado, precio, moneda, tipo_precio, calidad, presentacion,
-        volumen_ingreso_nivel, volumen_ingreso_fuente, fecha
+        volumen_ingreso_nivel, volumen_ingreso_fuente, fecha, fuente
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-      ON CONFLICT (cultivo, mercado, fecha) DO NOTHING
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      ON CONFLICT (cultivo, mercado, fecha, fuente)
+      DO UPDATE SET
+        precio = EXCLUDED.precio,
+        moneda = EXCLUDED.moneda,
+        tipo_precio = EXCLUDED.tipo_precio,
+        calidad = EXCLUDED.calidad,
+        presentacion = EXCLUDED.presentacion,
+        volumen_ingreso_nivel = EXCLUDED.volumen_ingreso_nivel,
+        volumen_ingreso_fuente = EXCLUDED.volumen_ingreso_fuente,
+        actualizado_en = NOW()
     `,
     [
       canon.cultivo,
@@ -379,6 +405,7 @@ const insertPrecio = async (item, { perfilValidacion = "general" } = {}) => {
       canon.volumen_ingreso_nivel || null,
       canon.volumen_ingreso_fuente || null,
       canon.fecha,
+      fuenteFila,
     ]
   );
   await upsertPrecioNormalizado({
@@ -391,7 +418,7 @@ const insertPrecio = async (item, { perfilValidacion = "general" } = {}) => {
     tipoCambioImplicito: null,
     condicion: inferirCondicion(canon.mercado),
     plaza: inferirPlaza(canon.mercado),
-    fuente: canon.mercado,
+    fuente: String(canon.fuente_ingesta || canon.mercado || "").slice(0, 120) || canon.mercado,
     fechaMercado: canon.fecha,
     timestampOrigen: canon.creado_en || new Date().toISOString(),
     metadata: {
@@ -572,9 +599,12 @@ const reusarUltimoDatoValidoPreciosPorMercado = async ({
   );
   const fechaOrigen = ultimaFecha.rows[0]?.fecha;
   if (!fechaOrigen) return 0;
+  const tagFuente = `reuso_${String(sufijoFuente || "valido")
+    .replace(/[^a-zA-Z0-9_]/g, "_")
+    .slice(0, 48)}`;
   const result = await query(
     `
-      INSERT INTO precios (cultivo, mercado, precio, moneda, fecha)
+      INSERT INTO precios (cultivo, mercado, precio, moneda, fecha, fuente)
       SELECT
         cultivo,
         CASE
@@ -583,13 +613,14 @@ const reusarUltimoDatoValidoPreciosPorMercado = async ({
         END AS mercado,
         precio,
         moneda,
-        $1::date
+        $1::date,
+        COALESCE(NULLIF(BTRIM(fuente), ''), $4)
       FROM precios
       WHERE fecha = $2::date
         AND mercado ILIKE $3
-      ON CONFLICT (cultivo, mercado, fecha) DO NOTHING
+      ON CONFLICT (cultivo, mercado, fecha, fuente) DO NOTHING
     `,
-    [fechaDestino, fechaOrigen, mercadoLike]
+    [fechaDestino, fechaOrigen, mercadoLike, tagFuente]
   );
   return result.rowCount || 0;
 };
@@ -906,6 +937,13 @@ const ejecutarRecolectorDiario = async () =>
       insertados: 0,
       errores: [],
     },
+    afa: {
+      totalFuente: 0,
+      insertados: 0,
+      futurosFuente: 0,
+      futurosInsertados: 0,
+      errores: [],
+    },
     sio_granos: {
       totalFuente: 0,
       insertados: 0,
@@ -1016,6 +1054,42 @@ const ejecutarRecolectorDiario = async () =>
   resumen.precios.cacInsertados = rCac.insertados;
   if (rCac.errores.length) {
     resumen.precios.errores.push(...rCac.errores.map((e) => `CAC paralelo: ${e}`));
+  }
+
+  try {
+    const afa = await conReintentos(() => obtenerPreciosAFA(), {
+      intentos: 2,
+      esperaBaseMs: 1200,
+      etiqueta: "AFA_MERCADOS",
+    });
+    const locales = Array.isArray(afa?.locales) ? afa.locales : [];
+    const futurosCbot = Array.isArray(afa?.futurosCbot) ? afa.futurosCbot : [];
+    resumen.afa.totalFuente = locales.length;
+    resumen.afa.futurosFuente = futurosCbot.length;
+    for (const item of locales) {
+      try {
+        resumen.afa.insertados += await insertPrecio(item, { perfilValidacion: "web" });
+      } catch (error) {
+        resumen.afa.errores.push(`AFA local ${item.cultivo || "n/d"} ${item.mercado || "n/d"}: ${error.message}`);
+      }
+    }
+    for (const item of futurosCbot) {
+      try {
+        resumen.afa.futurosInsertados += await insertFuturoPosicion({
+          cultivo: item.cultivo,
+          posicion: item.posicion,
+          precio_usd: item.precio_usd,
+          variacion: item.diferencia ?? null,
+          volumen: null,
+          fecha: item.fecha,
+          fuente: "afa_cbot",
+        });
+      } catch (error) {
+        resumen.afa.errores.push(`AFA futuro ${item.cultivo || "n/d"} ${item.posicion || "n/d"}: ${error.message}`);
+      }
+    }
+  } catch (error) {
+    resumen.afa.errores.push(error.message);
   }
 
   try {

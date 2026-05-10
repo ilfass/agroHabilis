@@ -51,9 +51,10 @@ CREATE TABLE IF NOT EXISTS precios (
   presentacion VARCHAR(40),
   volumen_ingreso_nivel VARCHAR(16),
   volumen_ingreso_fuente VARCHAR(120),
+  fuente VARCHAR(120) NOT NULL DEFAULT '',
+  actualizado_en TIMESTAMPTZ,
   fecha DATE NOT NULL,
-  creado_en TIMESTAMP DEFAULT NOW(),
-  UNIQUE(cultivo, mercado, fecha)
+  creado_en TIMESTAMP DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS precios_horticolas (
@@ -617,6 +618,26 @@ ALTER TABLE precios
 ALTER TABLE precios
   ADD COLUMN IF NOT EXISTS volumen_ingreso_fuente VARCHAR(120);
 
+ALTER TABLE precios ADD COLUMN IF NOT EXISTS fuente VARCHAR(120);
+ALTER TABLE precios ADD COLUMN IF NOT EXISTS actualizado_en TIMESTAMPTZ;
+
+UPDATE precios
+SET fuente = LEFT(
+  regexp_replace(lower(trim(COALESCE(mercado, ''))), '\s+', '_', 'g'),
+  120
+)
+WHERE fuente IS NULL OR btrim(fuente) = '';
+
+UPDATE precios SET fuente = 'legacy' WHERE btrim(COALESCE(fuente, '')) = '';
+
+ALTER TABLE precios ALTER COLUMN fuente SET DEFAULT '';
+ALTER TABLE precios ALTER COLUMN fuente SET NOT NULL;
+
+ALTER TABLE precios DROP CONSTRAINT IF EXISTS precios_cultivo_mercado_fecha_key;
+
+CREATE UNIQUE INDEX IF NOT EXISTS ux_precios_cultivo_mercado_fecha_fuente
+  ON precios (cultivo, mercado, fecha, fuente);
+
 ALTER TABLE precios
   DROP CONSTRAINT IF EXISTS chk_precios_tipo_precio;
 ALTER TABLE precios
@@ -758,18 +779,18 @@ const seedFallbackMercadosSQL = `
 WITH base AS (
   SELECT CURRENT_DATE::date AS fecha
 )
-INSERT INTO precios (cultivo, mercado, precio, moneda, fecha)
-SELECT t.cultivo, t.mercado, t.precio, t.moneda, b.fecha
+INSERT INTO precios (cultivo, mercado, precio, moneda, fecha, fuente)
+SELECT t.cultivo, t.mercado, t.precio, t.moneda, b.fecha, t.fuente
 FROM base b
 CROSS JOIN (
   VALUES
-    ('soja', 'bcr_gix_seed', 315000::numeric, 'ARS'),
-    ('maiz', 'bcr_gix_seed', 228000::numeric, 'ARS'),
-    ('trigo', 'bcr_gix_seed', 242000::numeric, 'ARS'),
-    ('soja', 'LNCAMPO_WEB_SEED', 312500::numeric, 'ARS'),
-    ('maiz', 'LNCAMPO_WEB_SEED', 225500::numeric, 'ARS'),
-    ('trigo', 'LNCAMPO_WEB_SEED', 240200::numeric, 'ARS')
-) AS t(cultivo, mercado, precio, moneda)
+    ('soja', 'bcr_gix_seed', 315000::numeric, 'ARS', 'seed_bcr_gix'),
+    ('maiz', 'bcr_gix_seed', 228000::numeric, 'ARS', 'seed_bcr_gix'),
+    ('trigo', 'bcr_gix_seed', 242000::numeric, 'ARS', 'seed_bcr_gix'),
+    ('soja', 'LNCAMPO_WEB_SEED', 312500::numeric, 'ARS', 'seed_lncampo'),
+    ('maiz', 'LNCAMPO_WEB_SEED', 225500::numeric, 'ARS', 'seed_lncampo'),
+    ('trigo', 'LNCAMPO_WEB_SEED', 240200::numeric, 'ARS', 'seed_lncampo')
+) AS t(cultivo, mercado, precio, moneda, fuente)
 WHERE NOT EXISTS (
   SELECT 1 FROM precios p
   WHERE p.fecha = b.fecha
@@ -778,7 +799,7 @@ WHERE NOT EXISTS (
       OR p.mercado ILIKE 'LNCAMPO_WEB%'
     )
 )
-ON CONFLICT (cultivo, mercado, fecha) DO NOTHING;
+ON CONFLICT (cultivo, mercado, fecha, fuente) DO NOTHING;
 `;
 
 const setupDatabase = async () => {

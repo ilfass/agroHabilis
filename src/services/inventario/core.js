@@ -419,6 +419,56 @@ async function confirmarMovimientoPorId(id, usuarioId) {
   );
   const row = r.rows[0];
   if (!row) return null;
+  const p = typeof row.payload === "object" && row.payload ? row.payload : JSON.parse(row.payload || "{}");
+  if (Array.isArray(p.items_compuestos) && p.items_compuestos.length) {
+    for (let i = 0; i < p.items_compuestos.length; i += 1) {
+      const it = p.items_compuestos[i] || {};
+      const dom = String(it.dominio || "").trim();
+      if (!["ganado", "cultivo", "insumo", "grano"].includes(dom)) continue;
+      const ef = it.efecto === "delta" ? "delta" : "replace";
+      const pay = it.payload && typeof it.payload === "object" ? it.payload : null;
+      if (!pay) continue;
+      const child = await insertarMovimientoBase({
+        usuarioId: row.usuario_id,
+        campanaId: row.campana_id,
+        loteId: row.lote_id,
+        dominio: dom,
+        clase: claseDominioMovimiento(dom),
+        efecto: ef,
+        payload: pay,
+        fechaReferencia: row.fecha_referencia,
+        textoNl: `${row.texto_nl || "registro compuesto"} [item ${i + 1}/${p.items_compuestos.length}]`,
+        estado: "confirmado",
+        canal: row.canal || "whatsapp",
+      });
+      await upsertSaldoDesdeMovimientoConfirmado(child);
+    }
+    return row;
+  }
+  if (row.dominio === "ganado" && row.efecto === "replace" && Array.isArray(p.items) && p.items.length) {
+    for (let i = 0; i < p.items.length; i += 1) {
+      const it = p.items[i] || {};
+      const categoria = String(it.categoria || "").trim();
+      const especie = String(it.especie || inferirEspecieDesdeEtiqueta(categoria));
+      const cantidad = Number(it.cantidad);
+      if (!categoria || !Number.isFinite(cantidad) || cantidad < 0) continue;
+      const child = await insertarMovimientoBase({
+        usuarioId: row.usuario_id,
+        campanaId: row.campana_id,
+        loteId: row.lote_id,
+        dominio: "ganado",
+        clase: "stock",
+        efecto: "replace",
+        payload: { especie, categoria, cantidad: Math.round(cantidad) },
+        fechaReferencia: row.fecha_referencia,
+        textoNl: `${row.texto_nl || "lote ganado"} [item ${i + 1}/${p.items.length}]`,
+        estado: "confirmado",
+        canal: row.canal || "whatsapp",
+      });
+      await upsertSaldoDesdeMovimientoConfirmado(child);
+    }
+    return row;
+  }
   await upsertSaldoDesdeMovimientoConfirmado(row);
   return row;
 }
@@ -529,11 +579,33 @@ function resumenMovimientoParaHumano(row, loteNombre = "", campanaNombre = "") {
   const p = typeof row.payload === "object" && row.payload ? row.payload : JSON.parse(row.payload || "{}");
   let det = "";
   if (row.dominio === "ganado") {
+    if (Array.isArray(p.items_compuestos) && p.items_compuestos.length) {
+      det = p.items_compuestos
+        .slice(0, 6)
+        .map((it) => {
+          const d = String(it.dominio || "");
+          const q = it.payload || {};
+          if (d === "cultivo") return `${q.cultivo || "cultivo"}: ${numeroFormateado(q.hectareas ?? q.delta)} ha`;
+          if (d === "insumo") return `${q.producto || "insumo"}: ${numeroFormateado(q.cantidad ?? q.delta)} ${normalizarUnidadInsumo(q.unidad)}`;
+          if (d === "grano") return `${q.cultivo || "grano"}: ${numeroFormateado(q.toneladas ?? q.delta)} tn`;
+          return `${q.categoria || "ganado"}: ${numeroFormateado(q.cantidad ?? q.delta)} cab`;
+        })
+        .join(" + ");
+      if (p.items_compuestos.length > 6) det += ` + ${p.items_compuestos.length - 6} ítems`;
+    } else
+    if (!esDelta && Array.isArray(p.items) && p.items.length) {
+      det = p.items
+        .slice(0, 8)
+        .map((it) => `${numeroFormateado(it.cantidad)} ${String(it.categoria || "ganado")}`)
+        .join(" + ");
+      if (p.items.length > 8) det += ` + ${p.items.length - 8} ítems`;
+    } else {
     const cat = String(p.categoria || p.etiqueta || "ganado");
     if (esDelta) {
       const d = Number(p.delta ?? p.cambio ?? p.variacion);
       det = `${cat}: Δ ${Number.isFinite(d) && d > 0 ? "+" : ""}${numeroFormateado(d)} cab`;
     } else det = `${cat}: ${numeroFormateado(p.cantidad)} cab`;
+    }
   } else if (row.dominio === "cultivo") {
     const cr = String(p.cultivo || "cultivo");
     if (esDelta) {

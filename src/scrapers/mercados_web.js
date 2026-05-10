@@ -200,6 +200,38 @@ const obtenerMercadosWeb = async () => {
     errores.push(`infocampo_mercados: ${error.message}`);
   }
 
+  try {
+    const agrofyPizarra = await axios.get("https://news.agrofy.com.ar/granos/precios-pizarra", {
+      timeout: 30_000,
+      headers: HEADERS,
+      validateStatus: (s) => s >= 200 && s < 400,
+    });
+    items.push(
+      ...extraerDesdeHtml({
+        html: agrofyPizarra.data,
+        mercado: "AGROFY_NEWS_PIZARRA",
+      })
+    );
+  } catch (error) {
+    errores.push(`agrofy_pizarra: ${error.message}`);
+  }
+
+  try {
+    const agrofySoja = await axios.get("https://news.agrofy.com.ar/granos/precio-soja", {
+      timeout: 30_000,
+      headers: HEADERS,
+      validateStatus: (s) => s >= 200 && s < 400,
+    });
+    items.push(
+      ...extraerDesdeHtml({
+        html: agrofySoja.data,
+        mercado: "AGROFY_NEWS_SOJA",
+      })
+    );
+  } catch (error) {
+    errores.push(`agrofy_soja: ${error.message}`);
+  }
+
   return { items, errores };
 };
 
