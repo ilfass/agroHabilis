@@ -1,6 +1,7 @@
 const { query } = require("../config/database");
 const { generarConPromptLibre } = require("../services/gemini");
 const { obtenerPrecioFresco, obtenerDolarFresco, variacion, formatearPrecio, separador } = require("./base");
+const { aplicarLayout } = require("./layouts");
 
 module.exports = {
   nombre: "alerta",
@@ -38,8 +39,7 @@ module.exports = {
       analisis = String(ia.texto || analisis).trim();
     } catch (_e) {}
     const tc = (datos.dolar.items || []).find((x) => String(x.tipo).toLowerCase() === "oficial");
-    return {
-      mensaje: [
+    const mensajeBase = [
         "🚨 *ALERTA DE PRECIO*",
         separador(),
         `Cultivo: ${String(datos.alerta.cultivo || "").toUpperCase()}`,
@@ -52,7 +52,9 @@ module.exports = {
         analisis,
         "",
         `Escribí *ANALIZAR ${String(datos.alerta.cultivo || "").toUpperCase()}* para análisis completo.`,
-      ].join("\n"),
+      ].join("\n");
+    return {
+      mensaje: aplicarLayout("alerta", _usuario, { mensaje: mensajeBase }),
       meta: {},
     };
   },

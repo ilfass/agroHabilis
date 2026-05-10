@@ -1,5 +1,17 @@
 const { analizarConvenienciaVentaRaw } = require("../services/analisis_venta");
 const { obtenerPrecioFresco, obtenerDolarFresco, obtenerNoticiasFrescas } = require("./base");
+const { aplicarLayout } = require("./layouts");
+
+const resumirNoticia = (n = {}) => {
+  const titulo = String(n?.titulo || "").trim();
+  const fuente = String(n?.fuente || "").trim();
+  const resumen = String(n?.resumen || "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 520);
+  const cuerpo = resumen || "Sin bajada disponible en la fuente.";
+  return [`- 📰 ${titulo}${fuente ? ` (${fuente})` : ""}`, cuerpo].filter(Boolean).join("\n");
+};
 
 module.exports = {
   nombre: "analisis_venta",
@@ -13,9 +25,12 @@ module.exports = {
   },
 
   async renderizar(_usuario, datos) {
-    const noticiasTxt = (datos.noticias || []).map((n) => `- ${n}`).join("\n");
+    const noticiasTxt = (datos.noticias || []).map((n) => resumirNoticia(n)).join("\n\n");
+    const base = `${datos.analisis}\n\n📰 *Contexto reciente*\n${
+      noticiasTxt || "- Sin noticias relevantes recientes."
+    }`;
     return {
-      mensaje: `${datos.analisis}\n\n📰 *Contexto reciente*\n${noticiasTxt || "- Sin noticias relevantes recientes."}`,
+      mensaje: aplicarLayout("analisis_venta", _usuario, { mensaje: base }),
       meta: {},
     };
   },

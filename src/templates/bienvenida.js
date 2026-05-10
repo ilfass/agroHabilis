@@ -4,6 +4,7 @@ const {
   obtenerDolarFresco,
   obtenerClimaFresco,
 } = require("./base");
+const { aplicarLayout } = require("./layouts");
 
 module.exports = {
   nombre: "bienvenida",
@@ -20,8 +21,9 @@ module.exports = {
 
   async renderizar(usuario, _datos, opts = {}) {
     const generado = await generarPrimerResumen(usuario, { enviar: opts?.enviar !== false });
+    const texto = aplicarLayout("bienvenida", usuario, { mensaje: generado.texto });
     return {
-      mensaje: generado.texto,
+      mensaje: texto,
       meta: {
         template: "bienvenida",
         resumenId: generado.resumenId,

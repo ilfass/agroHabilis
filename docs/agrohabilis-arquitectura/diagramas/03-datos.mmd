@@ -1,0 +1,32 @@
+flowchart LR
+  subgraph ingest["Ingesta"]
+    R["recolector"]
+    S["scrapers"]
+    R --> S
+  end
+  subgraph tablas["Tablas"]
+    precios["precios"]
+    tc["tipo_cambio"]
+    clima["clima"]
+    notis["noticias_agro"]
+    fut["futuros_posiciones"]
+    hac["precios_hacienda"]
+  end
+  subgraph consume["Consumo"]
+    res["resumen.js"]
+    snap["snapshot.js"]
+    con["consulta.js"]
+    dash["dashboard.js"]
+  end
+  S --> tablas
+  R --> tablas
+  tablas --> res
+  tablas --> snap
+  tablas --> con
+  tablas --> dash
+  
+  5031 7557 3453 0604    123  11/30
+  (DNI) 12345678
+  
+  test_user_2823260145718125622@testuser.com
+

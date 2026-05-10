@@ -100,10 +100,10 @@ Incluye:
 
 ### Sprint 1 - Loop tecnico minimo (2-3 dias)
 
-- [ ] Definir scraper inicial de precios Rosario (API, HTML o PDF).
-- [ ] Implementar `src/scrapers/granos.js` con salida normalizada.
-- [ ] Guardar precios en tabla `precios` con control de duplicados.
-- [ ] Crear servicio de resumen IA (`src/services/resumen.js`).
+- [x] Definir scraper inicial de precios Rosario (API, HTML o PDF).
+- [x] Implementar scrapers de granos con salida normalizada (`src/scrapers/granos_magyp_fob.js`, `src/scrapers/granos_cac.js`, `src/scrapers/granos_afa.js`).
+- [x] Guardar precios en tabla `precios` con control de duplicados.
+- [x] Crear servicio de resumen IA (`src/services/gemini.js` con soporte Gemini/OpenRouter para consultas).
 - [x] Crear proveedor de envio WhatsApp (`src/config/whatsapp.js`, `src/services/notificaciones.js`, `src/services/enviosWhatsapp.js`).
 
 Entregable: comando manual que corre fin a fin (sin cron) y envia un resumen.
@@ -112,7 +112,7 @@ Entregable: comando manual que corre fin a fin (sin cron) y envia un resumen.
 
 - [ ] Job diario `src/jobs/recolector.js` (7:00).
 - [ ] Job diario `src/jobs/enviador.js` (8:00).
-- [ ] Persistir resumen en `resumenes` y log en `envios_whatsapp`.
+- [x] Persistir resumen en `resumenes` y log en `envios_whatsapp`.
 - [ ] Manejo de errores y reintentos basicos.
 - [ ] Variables de entorno y validacion de config al inicio.
 
@@ -125,6 +125,7 @@ Entregable: flujo diario automatico estable para un numero fijo.
 - [ ] Medir costo (tokens) y latencia por corrida.
 - [ ] Definir mensaje de onboarding y consentimiento WhatsApp.
 - [ ] Prueba piloto con 3-10 productores.
+- [x] Consulta libre por WhatsApp con IA + historial en DB (`historial_consultas`).
 
 Entregable: MVP validado con feedback real y metricas iniciales.
 

@@ -1,0 +1,397 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AgroHabilis - Métricas</title>
+    <style>
+      :root { --bg:#f3f7ff; --bg-soft:#eef4ff; --panel:#ffffff; --panel-soft:#f7faff; --text:#17233a; --muted:#5f7294; --accent:#2f8bff; --line:#dbe7ff; --warn:#ffd27d; --bad:#ff8f8f; --shadow:0 12px 30px rgba(39,81,161,.12); }
+      * { box-sizing:border-box; }
+      body { margin:0; font-family:Inter,Segoe UI,Arial,sans-serif; font-size:15px; background: linear-gradient(180deg, var(--bg-soft), var(--bg)); color:var(--text); padding:24px 24px 24px 276px; }
+      .topbar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:12px; }
+      .nav { position: fixed; left: 18px; top: 18px; width: 230px; display:flex; flex-direction:column; gap:8px; padding:12px; border:1px solid var(--line); border-radius:16px; background:#fff; box-shadow: var(--shadow); margin-bottom:14px; }
+      .nav .brand { display:flex; align-items:center; gap:10px; padding:8px 10px 12px; border-bottom:1px solid #e7efff; margin-bottom:4px; font-weight:800; color:#1e3b6e; }
+      .brand-dot { width:10px; height:10px; border-radius:999px; background:#2f8bff; box-shadow:0 0 0 4px rgba(47,139,255,.12); }
+      .nav a { text-decoration:none; padding:9px 12px; border-radius:10px; border:1px solid #d5e3ff; color:#38507b; background:#fff; font-size:13px; font-weight:600; width:100%; }
+      .nav a.active { background: linear-gradient(180deg, var(--accent), #1f66c9); border:none; color:#fff; font-weight:700; }
+      .card { background: linear-gradient(180deg, var(--panel), var(--panel-soft)); border:1px solid var(--line); border-radius:16px; padding:16px; margin-bottom:14px; box-shadow:var(--shadow); }
+      .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:8px; }
+      .kpi { border:1px solid #d8e5ff; border-radius:12px; padding:12px; background:#fff; }
+      .kpi .v { font-size:24px; font-weight:800; margin-top:4px; }
+      .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:10px; }
+      .chart-title { color:var(--muted); font-size:13px; margin-bottom:10px; font-weight:700; }
+      .bar { display:grid; grid-template-columns:110px 1fr auto; gap:8px; align-items:center; margin-bottom:6px; font-size:12px; }
+      .track { height:9px; border-radius:999px; border:1px solid #2f446f; background:#1a2a49; overflow:hidden; }
+      .fill { height:100%; border-radius:999px; background:linear-gradient(90deg,#35c56f,#3ad37c); }
+      .fill.warn { background:linear-gradient(90deg,#e2b656,#ffd27d); }
+      .fill.bad { background:linear-gradient(90deg,#dd6060,#ff8f8f); }
+      .muted { color:var(--muted); font-size:12px; }
+      button { padding:10px 12px; border-radius:8px; border:none; background:linear-gradient(180deg,var(--accent),#1f7a3f); color:#07210f; font-weight:700; cursor:pointer; }
+      select { padding:10px 12px; border-radius:8px; border:1px solid #3d5689; background:#0f1930; color:var(--text); }
+      .delta { font-size:12px; margin-top:2px; }
+      .up { color:#8af7b8; }
+      .down { color:#ffb2b2; }
+      .alert { border:1px solid #3a5a8f; border-radius:10px; padding:10px; margin-bottom:8px; background:rgba(255,255,255,.02); }
+      .alert.warn { border-color:#8a6d2f; background:rgba(255,210,125,.08); }
+      .alert.bad { border-color:#7e3d3d; background:rgba(255,125,125,.10); }
+      .alert.rate { border-color:#7e2f2f; background:rgba(255,95,95,.15); }
+      .alert.ok { border-color:#2f7e4a; background:rgba(95,255,140,.10); }
+      .table-wrap { overflow:auto; border:1px solid #d8e5ff; border-radius:10px; background:#fff; }
+      table { width:100%; border-collapse:collapse; font-size:12px; }
+      th, td { padding:8px 10px; border-bottom:1px solid #edf2ff; text-align:left; white-space:nowrap; }
+      th { position:sticky; top:0; background:#f6f9ff; color:#35507a; font-weight:700; }
+      .pill { padding:2px 8px; border-radius:999px; font-size:11px; border:1px solid #d9e6ff; }
+      .page-head { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:14px; }
+      .crumb { color:var(--muted); font-size:13px; }
+      @media (max-width: 1100px) {
+        body { padding:16px; }
+        .nav { position: static; width: auto; flex-direction: row; flex-wrap: wrap; }
+      }
+      @media (max-width: 760px) {
+        body { padding: 12px; font-size: 14px; }
+        .card { padding: 12px; border-radius: 12px; }
+        .topbar { align-items: stretch; }
+        .topbar > * { width: 100%; }
+        .nav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; padding: 10px; border-radius: 12px; }
+        .nav .brand { grid-column: 1 / -1; }
+        .nav a { width: 100%; text-align: center; padding: 8px 10px; font-size: 12px; }
+        .page-head { align-items: flex-start; }
+        .grid { grid-template-columns: 1fr; }
+        .bar { grid-template-columns: 80px 1fr auto; }
+        .table-wrap { overflow: auto; -webkit-overflow-scrolling: touch; }
+        table { min-width: 680px; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="topbar">
+      <h1 style="margin:0;">AgroHabilis - Métricas y Fuentes</h1>
+      <select id="rango">
+        <option value="hoy">Hoy</option>
+        <option value="snapshot">Comparar con snapshot anterior</option>
+      </select>
+      <button id="btnReload">Actualizar</button>
+    </div>
+    <div class="nav">
+      <div class="brand"><span class="brand-dot"></span><span>AgroHabilis Admin</span></div>
+      <a href="/dashboard/admin">🏠 Dashboard</a>
+      <a href="/dashboard/metricas" class="active">📊 Métricas</a>
+      <a href="/dashboard/precios">💹 Precios</a>
+      <a href="/dashboard/usuarios">👥 Usuarios</a>
+      <a href="/dashboard/comandos">⌨️ Comandos</a>
+      <a href="/dashboard/templates">🧩 Templates</a>
+      <a href="/dashboard/cliente">🙍 Cliente</a>
+    </div>
+    <div class="page-head">
+      <div>
+        <div class="crumb">Inicio / Métricas</div>
+        <h3 style="margin:2px 0 0;">Monitoreo operativo y calidad de datos</h3>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="kpis">
+        <div class="kpi"><div class="muted">Consultas hoy</div><div id="k1" class="v">-</div><div id="d1" class="delta muted">-</div></div>
+        <div class="kpi"><div class="muted">IA hoy</div><div id="k2" class="v">-</div><div id="d2" class="delta muted">-</div></div>
+        <div class="kpi"><div class="muted">Fallback hoy</div><div id="k3" class="v">-</div><div id="d3" class="delta muted">-</div></div>
+        <div class="kpi"><div class="muted">Cobertura datos</div><div id="k4" class="v">-</div><div id="d4" class="delta muted">-</div></div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <div class="chart-title">Cobertura por tema</div>
+        <div id="cov" class="muted">Sin datos</div>
+      </div>
+      <div class="card">
+        <div class="chart-title">Distribución de planes</div>
+        <div id="planes" class="muted">Sin datos</div>
+      </div>
+      <div class="card">
+        <div class="chart-title">Calidad Insumos/Hacienda</div>
+        <div id="calidad" class="muted">Sin datos</div>
+      </div>
+      <div class="card">
+        <div class="chart-title">Estado IA y consumo</div>
+        <div id="ia" class="muted">Sin datos</div>
+      </div>
+      <div class="card">
+        <div class="chart-title">Alertas de anomalía</div>
+        <div id="anomalias" class="muted">Sin datos</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="chart-title">Planilla de fuentes (prioridad y método)</div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Fuente</th>
+              <th>Activa</th>
+              <th>Estado</th>
+              <th>Prioridad</th>
+              <th>Método</th>
+              <th>Orden</th>
+              <th>Categorías</th>
+            </tr>
+          </thead>
+          <tbody id="tablaFuentes">
+            <tr><td colspan="7" class="muted">Cargando fuentes…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+      const num = (n) => Number(n || 0).toLocaleString("es-AR");
+      const pct = (n) => `${Number(n || 0).toFixed(1)}%`;
+      const cls = (v) => v >= 80 ? "" : v >= 50 ? "warn" : "bad";
+      const FILTER_KEY = "agro_admin_metricas_filters_v1";
+      const SNAPSHOT_KEY = "agro_admin_metricas_snapshot_v1";
+
+      function deltaText(curr, prev, isPct = false) {
+        if (prev === null || prev === undefined) return "Sin histórico";
+        const d = Number(curr || 0) - Number(prev || 0);
+        if (d === 0) return "→ sin cambios";
+        const value = isPct ? `${d > 0 ? "+" : ""}${d.toFixed(1)} pp` : `${d > 0 ? "+" : ""}${num(d)}`;
+        return d > 0 ? `▲ ${value}` : `▼ ${value}`;
+      }
+
+      function paintDelta(el, curr, prev, isPct = false) {
+        const d = Number(curr || 0) - Number(prev || 0);
+        el.textContent = deltaText(curr, prev, isPct);
+        el.className = `delta ${d > 0 ? "up" : d < 0 ? "down" : "muted"}`;
+      }
+
+      function barra(label, valor) {
+        const v = Math.max(0, Math.min(100, Number(valor || 0)));
+        return `<div class="bar"><div>${label}</div><div class="track"><div class="fill ${cls(v)}" style="width:${v}%"></div></div><div>${pct(v)}</div></div>`;
+      }
+
+      function planBars(pl) {
+        const total = Number(pl.total || 0) || 1;
+        const g = (Number(pl.gratis || 0) * 100) / total;
+        const b = (Number(pl.basico || 0) * 100) / total;
+        const p = (Number(pl.pro || 0) * 100) / total;
+        return `${barra("Gratis", g)}${barra("Básico", b)}${barra("Pro", p)}`;
+      }
+
+      function renderAnomalias(curr, prev) {
+        const out = [];
+        if (!prev) {
+          out.push('<div class="alert">No hay snapshot previo para detectar anomalías todavía.</div>');
+          return out.join("");
+        }
+        const deltaFallback = Number(curr.fallbackHoy || 0) - Number(prev.fallbackHoy || 0);
+        const deltaCob = Number(curr.cobertura || 0) - Number(prev.cobertura || 0);
+        const ratioFallback = Number(curr.consultasHoy || 0) > 0
+          ? (Number(curr.fallbackHoy || 0) * 100) / Number(curr.consultasHoy || 0)
+          : 0;
+        if (Number(curr.iaSinContextoHoy || 0) >= 3) {
+          out.push(`<div class="alert bad"><b>Calidad IA:</b> ${num(curr.iaSinContextoHoy)} respuestas hoy marcadas sin contexto de BD/fuente.</div>`);
+        }
+        if (deltaFallback >= 10 || ratioFallback >= 40) {
+          out.push(`<div class="alert bad"><b>Riesgo IA/Fallback:</b> fallback alto (${num(curr.fallbackHoy)}; ${ratioFallback.toFixed(1)}%). Revisar proveedores IA y prompt de fallback.</div>`);
+        }
+        if (deltaCob <= -12 || Number(curr.cobertura || 0) < 60) {
+          out.push(`<div class="alert warn"><b>Cobertura en descenso:</b> ${pct(curr.cobertura)} (variación ${deltaCob.toFixed(1)} pp). Revisar recolector y fuentes con estado desactualizado.</div>`);
+        }
+        if (!out.length) {
+          out.push('<div class="alert">Sin anomalías críticas detectadas en esta actualización.</div>');
+        }
+        return out.join("");
+      }
+
+      function getIaHealth(totalConsultas, rateLimitTotal) {
+        const total = Number(totalConsultas || 0);
+        const rl = Number(rateLimitTotal || 0);
+        const pctRl = total > 0 ? Number(((rl / total) * 100).toFixed(1)) : 0;
+        if (rl === 0) {
+          return { nivel: "ok", emoji: "🟢", titulo: "Salud IA estable", detalle: "Sin eventos de rate limit hoy.", pctRl };
+        }
+        if (pctRl <= 5) {
+          return { nivel: "warn", emoji: "🟡", titulo: "Salud IA con alertas leves", detalle: "Hay rate limit, pero dentro de tolerancia operativa.", pctRl };
+        }
+        return { nivel: "bad", emoji: "🔴", titulo: "Salud IA comprometida", detalle: "Rate limit alto; revisar proveedor principal y fallback.", pctRl };
+      }
+
+      function formatDiaCorto(isoDate) {
+        try {
+          const dt = new Date(isoDate);
+          return dt.toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit" });
+        } catch (_e) {
+          return String(isoDate || "-");
+        }
+      }
+
+      function renderRateLimitSerie7d(serie = []) {
+        if (!Array.isArray(serie) || !serie.length) {
+          return '<div class="muted">Sin histórico de rate limit.</div>';
+        }
+        return serie
+          .map((p) => {
+            const pctVal = Math.max(0, Math.min(100, Number(p.porcentaje || 0)));
+            const fillClass = p.nivel === "bad" ? "bad" : p.nivel === "warn" ? "warn" : "";
+            return `
+              <div class="bar">
+                <div>${formatDiaCorto(p.dia)}</div>
+                <div class="track"><div class="fill ${fillClass}" style="width:${pctVal}%"></div></div>
+                <div>${pct(p.porcentaje)} (${num(p.totalRateLimit)}/${num(p.totalConsultas)})</div>
+              </div>
+            `;
+          })
+          .join("");
+      }
+
+      async function loadFuentesMatriz() {
+        const tb = $("tablaFuentes");
+        try {
+          const r = await fetch("/api/dashboard/admin/fuentes-matriz");
+          const d = await r.json();
+          if (!d.ok) throw new Error(d.error || "No se pudo cargar fuentes");
+          const rows = d.rows || [];
+          if (!rows.length) {
+            tb.innerHTML = '<tr><td colspan="7" class="muted">Sin fuentes</td></tr>';
+            return;
+          }
+          const rank = { critica: 0, alta: 1, media: 2, baja: 3 };
+          rows.sort((a, b) => {
+            const pa = rank[String(a.prioridad || "media").toLowerCase()] ?? 9;
+            const pb = rank[String(b.prioridad || "media").toLowerCase()] ?? 9;
+            if (pa !== pb) return pa - pb;
+            const oa = Number.isFinite(Number(a.ordenIngesta)) ? Number(a.ordenIngesta) : 999;
+            const ob = Number.isFinite(Number(b.ordenIngesta)) ? Number(b.ordenIngesta) : 999;
+            if (oa !== ob) return oa - ob;
+            return String(a.nombre || "").localeCompare(String(b.nombre || ""), "es");
+          });
+          tb.innerHTML = rows.map((r) => {
+            const cats = Object.entries(r.categorias || {}).filter(([, v]) => v).map(([k]) => k).join(", ");
+            return `
+              <tr>
+                <td>${r.nombre || r.id}</td>
+                <td>${r.activa ? "Sí" : "No"}</td>
+                <td><span class="pill">${r.status || "sin_verificar"}</span></td>
+                <td>${r.prioridad || "media"}</td>
+                <td>${r.metodoPreferido || "n/d"}</td>
+                <td>${r.ordenIngesta ?? "-"}</td>
+                <td title="${cats}">${cats || "-"}</td>
+              </tr>
+            `;
+          }).join("");
+        } catch (e) {
+          tb.innerHTML = `<tr><td colspan="7" class="muted">${e.message}</td></tr>`;
+        }
+      }
+
+      async function load() {
+        localStorage.setItem(FILTER_KEY, JSON.stringify({ rango: $("rango").value || "hoy" }));
+        const compareMode = $("rango").value === "snapshot";
+        const r = await fetch("/api/dashboard/admin/resumen");
+        const d = await r.json();
+        if (!d.ok) throw new Error(d.error || "No se pudo cargar métricas");
+        const x = d.data || {};
+        const ia = x.ia?.metricas || {};
+        const cov = x.datos?.cobertura || {};
+        const matbaFuentesHoy = x.datos?.futuros?.matbaFuentesHoy || [];
+        const temas = cov.temas || [];
+        const planes = x.usuarios?.planes || {};
+        const temaPct = (t) => t?.estado === "ok" ? 100 : t?.estado === "desactualizado" ? 55 : 15;
+        const ins = temas.find((t) => t.id === "insumos");
+        const hac = temas.find((t) => t.id === "hacienda");
+        const totalConsultasHoy = Number(x.interacciones?.consultasHoy || 0);
+        const rateLimitTotalHoy = Number(ia?.rateLimit?.totalHoy || 0);
+        const iaHealth = getIaHealth(totalConsultasHoy, rateLimitTotalHoy);
+
+        const prev = (() => {
+          try { return JSON.parse(localStorage.getItem(SNAPSHOT_KEY) || "null"); } catch (_e) { return null; }
+        })();
+
+        $("k1").textContent = num(x.interacciones?.consultasHoy);
+        $("k2").textContent = num(ia.consultasConIAHoy);
+        $("k3").textContent = num(ia.consultasFallbackHoy);
+        $("k4").textContent = pct(cov.porcentaje);
+        if (compareMode) {
+          paintDelta($("d1"), x.interacciones?.consultasHoy, prev?.consultasHoy, false);
+          paintDelta($("d2"), ia.consultasConIAHoy, prev?.iaHoy, false);
+          paintDelta($("d3"), ia.consultasFallbackHoy, prev?.fallbackHoy, false);
+          paintDelta($("d4"), cov.porcentaje, prev?.cobertura, true);
+        } else {
+          ["d1", "d2", "d3", "d4"].forEach((id) => {
+            $(id).textContent = "Comparación desactivada";
+            $(id).className = "delta muted";
+          });
+        }
+
+        $("cov").innerHTML = temas.map((t) => barra(t.nombre || t.id, temaPct(t))).join("") || "Sin temas";
+        $("planes").innerHTML = planBars(planes) + `<div class="muted">Total usuarios: ${num(planes.total)}</div>`;
+        $("calidad").innerHTML = `
+          <div class="bar"><div>Insumos</div><div>${ins ? (ins.calidad || "sin_datos") : "-"}</div><div>${ins?.calidadDetalle || "-"}</div></div>
+          <div class="bar"><div>Hacienda</div><div>${hac ? (hac.calidad || "sin_datos") : "-"}</div><div>${hac?.calidadDetalle || "-"}</div></div>
+        `;
+        $("ia").innerHTML = `
+          <p><b>Estado IA:</b> ${x.ia?.estado || "-"}</p>
+          <div class="alert ${iaHealth.nivel === "ok" ? "ok" : iaHealth.nivel}">
+            <b>${iaHealth.emoji} ${iaHealth.titulo}</b><br />
+            ${iaHealth.detalle} <b>Impacto:</b> ${pct(iaHealth.pctRl)} de las consultas del día.
+          </div>
+          ${
+            Number(ia?.rateLimit?.totalHoy || 0) > 0
+              ? `<div class="alert rate"><b>⚠️ RATE LIMIT HOY:</b> ${num(ia.rateLimit.totalHoy)} eventos · ${(
+                  ia.rateLimit.porProveedorHoy || []
+                )
+                  .map((p) => `${p.proveedor}: ${num(p.total)}`)
+                  .join(" · ")}</div>`
+              : `<div class="alert"><b>Rate limit hoy:</b> sin eventos detectados.</div>`
+          }
+          <p><b>Tasa IA:</b> ${pct(ia.porcentajeIAHoy)} · <b>Tasa fallback:</b> ${pct(ia.porcentajeFallbackHoy)}</p>
+          <p><b>Respuestas IA sin contexto:</b> hoy ${num(ia.respuestasIASinContextoHoy)} · 7d ${num(ia.respuestasIASinContexto7d)}</p>
+          <p><b>Tokens hoy:</b> ${num(x.ia?.tokens?.consultasHoy)} · <b>Tokens total:</b> ${num(x.ia?.tokens?.consultasTotal)}</p>
+          <p><b>Proveedor usado hoy:</b> ${
+            (ia.porProveedorHoy || [])
+              .map((p) => `${p.proveedor}: ${num(p.total)}${p.sinContexto ? ` (sin contexto: ${num(p.sinContexto)})` : ""}`)
+              .join(" · ") || "-"
+          }</p>
+          <p><b>Futuros MATBA (fuente hoy):</b> ${
+            matbaFuentesHoy.length
+              ? matbaFuentesHoy
+                  .map((f) => `${f.fuente}: ${num(f.total)}${f.ultima_fecha ? ` (fecha ${String(f.ultima_fecha).slice(0,10)})` : ""}`)
+                  .join(" · ")
+              : "sin registros hoy"
+          }</p>
+          <p><b>Histórico 7d (rate limit / consultas):</b></p>
+          ${renderRateLimitSerie7d(ia?.rateLimit?.serie7d || [])}
+          <p class="muted">Fallback: ${(x.ia?.ordenFallback || []).join(" -> ") || "-"}</p>
+        `;
+        $("anomalias").innerHTML = renderAnomalias(
+          {
+            consultasHoy: Number(x.interacciones?.consultasHoy || 0),
+            fallbackHoy: Number(ia.consultasFallbackHoy || 0),
+            cobertura: Number(cov.porcentaje || 0),
+            iaSinContextoHoy: Number(ia.respuestasIASinContextoHoy || 0),
+          },
+          prev
+        );
+
+        localStorage.setItem(SNAPSHOT_KEY, JSON.stringify({
+          consultasHoy: Number(x.interacciones?.consultasHoy || 0),
+          iaHoy: Number(ia.consultasConIAHoy || 0),
+          fallbackHoy: Number(ia.consultasFallbackHoy || 0),
+          cobertura: Number(cov.porcentaje || 0),
+          at: Date.now(),
+        }));
+        await loadFuentesMatriz();
+      }
+
+      (() => {
+        try {
+          const f = JSON.parse(localStorage.getItem(FILTER_KEY) || "{}");
+          if (f.rango) $("rango").value = f.rango;
+        } catch (_e) {}
+      })();
+      $("rango").addEventListener("change", () => load().catch((e) => alert(e.message)));
+      $("btnReload").addEventListener("click", () => load().catch((e) => alert(e.message)));
+      load().catch((e) => alert(e.message));
+    </script>
+  </body>
+</html>

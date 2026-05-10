@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AgroHabilis — Arquitectura e inconsistencias</title>
+  <style>
+    @page { margin: 14mm; }
+    body {
+      font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-size: 11pt;
+      line-height: 1.45;
+      color: #1a1a1a;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 12px 16px 48px;
+    }
+    h1 { font-size: 1.55rem; border-bottom: 2px solid #2c5282; padding-bottom: 0.35em; }
+    h2 { font-size: 1.2rem; margin-top: 1.6em; color: #2c5282; }
+    h3 { font-size: 1.05rem; margin-top: 1.1em; }
+    .meta { color: #555; font-size: 0.95rem; margin-bottom: 1.5em; }
+    figure {
+      margin: 1em 0;
+      padding: 10px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      page-break-inside: avoid;
+    }
+    figure img { max-width: 100%; height: auto; display: block; margin: 0 auto; }
+    figcaption { font-size: 0.88rem; color: #64748b; margin-top: 8px; }
+    table { border-collapse: collapse; width: 100%; margin: 0.8em 0; font-size: 0.92rem; page-break-inside: avoid; }
+    th, td { border: 1px solid #cbd5e1; padding: 8px 10px; text-align: left; vertical-align: top; }
+    th { background: #edf2f7; }
+    ul { padding-left: 1.2em; }
+    .note { background: #fffbeb; border-left: 4px solid #d97706; padding: 10px 14px; margin: 1em 0; }
+    code { font-size: 0.88em; background: #f1f5f9; padding: 1px 5px; border-radius: 3px; }
+  </style>
+</head>
+<body>
+  <h1>AgroHabilis — Arquitectura, capas y análisis de inconsistencias</h1>
+  <p class="meta">Documento generado para documentación interna. Incluye diagramas renderizados (Mermaid vía Kroki). Alcance: revisión estructural del repositorio, no auditoría línea por línea de todos los archivos.</p>
+
+  <h2>1. Vista general del runtime</h2>
+  <p>El servicio principal es <code>src/index.js</code>: un proceso Node que combina <strong>Express</strong> (API REST + archivos estáticos en <code>frontend/public</code>), cliente <strong>WhatsApp Web</strong> (<code>whatsapp-web.js</code>), <strong>PostgreSQL</strong>, crons (<code>node-cron</code>) y arranque de jobs (<code>recolector</code>, <code>enviador</code>).</p>
+  <figure>
+    <img src="diagramas/01-runtime.svg" alt="Diagrama runtime y jobs" />
+    <figcaption>Figura 1 — Proceso Node, jobs, persistencia y externos (referencia).</figcaption>
+  </figure>
+
+  <h2>2. Flujo conversacional WhatsApp</h2>
+  <p>Los mensajes entran por <code>config/whatsapp.js</code>: primero onboarding si aplica; comandos explícitos (p. ej. MI RESUMEN) pueden resolver con <code>renderTemplate</code> sin pasar por <code>procesarConsulta</code>; las consultas operativas van a <code>services/consultas.js</code> y plantilla <code>consulta</code>, con cadena de IA en <code>services/gemini.js</code> y persistencia en <code>historial_consultas</code> cuando corresponde.</p>
+  <figure>
+    <img src="diagramas/02-whatsapp.svg" alt="Diagrama secuencia WhatsApp" />
+    <figcaption>Figura 2 — Secuencia simplificada usuario → WhatsApp → consultas / templates → BD.</figcaption>
+  </figure>
+
+  <h2>3. Flujo de datos (ingesta → tablas → consumo)</h2>
+  <p>El <code>recolector</code> y los <code>scrapers</code> alimentan tablas como <code>precios</code>, <code>tipo_cambio</code>, <code>clima</code>, <code>noticias_agro</code>, etc. Servicios como <code>resumen.js</code>, <code>snapshot.js</code>, la plantilla <code>consulta</code> y el <code>dashboard</code> leen esas tablas. También existen escrituras puntuales desde otras rutas (p. ej. refresco de dólar en <code>templates/base.js</code>).</p>
+  <figure>
+    <img src="diagramas/03-datos.svg" alt="Diagrama datos" />
+    <figcaption>Figura 3 — Ingesta, tablas y consumo (referencia).</figcaption>
+  </figure>
+
+  <h2>4. Panel admin y API</h2>
+  <p>Express sirve páginas HTML del panel y expone APIs bajo <code>/api/</code>. La autenticación admin usa cookie firmada con <code>ADMIN_KEY</code>. <code>services/dashboard.js</code> concentra consultas agregadas para métricas, usuarios, alertas e IA.</p>
+
+  <h2>5. Informe de inconsistencias (observaciones, sin acciones tomadas)</h2>
+  <div class="note">Las siguientes observaciones describen riesgos o duplicación de lógica; no implican que cada ítem sea un bug en runtime.</div>
+
+  <h3>A. Duplicación o definiciones paralelas</h3>
+  <table>
+    <thead><tr><th>Área</th><th>Observación</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Tipo de cambio “del día”</td>
+        <td>Existen dos implementaciones <code>obtenerTipoCambioDia</code>: en <code>services/resumen.js</code> (ventana 10 días, <code>DISTINCT ON (LOWER(tipo))</code>, mapeos bna→oficial, bolsa→mep) y en <code>services/primer_resumen.js</code> (7 días, <code>DISTINCT ON (tipo)</code>, con compra/fuente, sin esos mapeos).</td>
+      </tr>
+      <tr>
+        <td>Plan del usuario</td>
+        <td><code>resolverPlan</code> en <code>templates/base.js</code> (alias <code>basic</code>) vs normalización y <code>resolverPlanEfectivo</code> en <code>services/planes.js</code> (incluye <code>básico</code> con tilde y trial). La capa de plantillas no refleja por sí sola <code>plan_activo_hasta</code>.</td>
+      </tr>
+      <tr>
+        <td>Actualización USD</td>
+        <td>Varios puntos escriben <code>tipo_cambio</code>: <code>obtenerDolarFresco</code> en <code>templates/base.js</code>, <code>insertTipoCambio</code> en <code>jobs/recolector.js</code>, <code>asegurarTipoCambioReciente</code> en <code>primer_resumen.js</code>.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>B. Trazabilidad y métricas</h3>
+  <table>
+    <thead><tr><th>Área</th><th>Observación</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Historial</td>
+        <td>La acción <strong>MI RESUMEN</strong> resuelta directamente en <code>whatsapp.js</code> no pasa por <code>procesarConsulta</code>, por lo que puede no generar fila en <code>historial_consultas</code> (impacto en cupos y métricas “por consulta”).</td>
+      </tr>
+      <tr>
+        <td>IA pipeline mercado vs usuario</td>
+        <td><code>jobs/pipelineDiario.js</code> usa <code>generarResumenMercado</code> (Gemini). Las consultas de usuario usan <code>generarConPromptLibre</code> con orden multi-proveedor según env: políticas distintas.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>C. Configuración y entorno</h3>
+  <table>
+    <thead><tr><th>Área</th><th>Observación</th></tr></thead>
+    <tbody>
+      <tr><td>Tests</td><td>En <code>package.json</code>, el script <code>test</code> no ejecuta pruebas reales.</td></tr>
+      <tr><td>Deploy</td><td><code>deploy:safe</code> apunta a una ruta absoluta local de multisitio; depende de la máquina del desarrollador.</td></tr>
+      <tr><td>Nombre</td><td>Paquete <code>agrohabilis</code> vs marca/dominio AgroHabilis / habilispro en distintos textos.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>D. Modelo de datos</h3>
+  <table>
+    <thead><tr><th>Área</th><th>Observación</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Esquema</td>
+        <td>Definiciones en <code>scripts/setup-db.js</code>, migraciones SQL y en ocasiones DDL en <code>models/*.js</code>: conviene documentar el orden de aplicación para entornos viejos.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>E. Capa WhatsApp</h3>
+  <table>
+    <thead><tr><th>Área</th><th>Observación</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Doble capa IA</td>
+        <td><code>msg.reply</code> puede pasar por <code>humanizarSalidaConIA</code> salvo excepciones (<code>replySinIA</code>, bypass por plantilla con separadores / PLANTILLA): riesgo de reescritura de salidas estructuradas si una ruta no está contemplada.</td>
+      </tr>
+      <tr>
+        <td>Cupos</td>
+        <td>El límite mensual de plan gratis se aplica en el flujo de consulta operativa; rutas de comando directo pueden no consumir el mismo cupo.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>F. Stack</h3>
+  <ul>
+    <li><strong>Express 5</strong> en dependencias: menor adopción que la serie 4.x; revisar compatibilidad con middlewares y documentación genérica.</li>
+    <li>Acoplamiento <strong>templates ↔ services ↔ BD</strong>: no se detectó ciclo de require obvio, pero el acoplamiento es fuerte y conviene mantener límites claros al evolucionar.</li>
+  </ul>
+
+  <h2>6. Alcance del análisis</h2>
+  <p>Se revisó la estructura de carpetas, <code>index.js</code>, jobs principales, <code>whatsapp.js</code>, <code>consultas.js</code>, <code>dashboard.js</code>, registro de plantillas, <code>resumen.js</code> / <code>primer_resumen.js</code>, <code>planes.js</code>, <code>templates/base.js</code> y búsquedas cruzadas (<code>guardarConsulta</code>, <code>obtenerTipoCambioDia</code>, <code>procesarConsulta</code>). No equivale a leer y validar cada archivo del repositorio.</p>
+
+  <p class="meta"><strong>Fuente de diagramas:</strong> archivos <code>.mmd</code> en <code>docs/agrohabilis-arquitectura/diagramas/</code>, renderizados a SVG con el servicio público Kroki (<code>kroki.io</code>) en el momento de generar este documento.</p>
+</body>
+</html>

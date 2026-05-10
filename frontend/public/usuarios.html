@@ -1,0 +1,667 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AgroHabilis - Usuarios Admin</title>
+    <style>
+      :root { --bg:#f3f7ff; --bg-soft:#eef4ff; --panel:#ffffff; --panel-soft:#f7faff; --text:#17233a; --muted:#5f7294; --accent:#2f8bff; --line:#dbe7ff; --danger:#e45858; --shadow:0 12px 30px rgba(39,81,161,.12); }
+      * { box-sizing:border-box; }
+      body { margin:0; font-family:Inter,Segoe UI,Arial,sans-serif; font-size:15px; background: linear-gradient(180deg, var(--bg-soft), var(--bg)); color:var(--text); padding:24px 24px 24px 276px; }
+      .topbar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:12px; }
+      .nav { position: fixed; left: 18px; top: 18px; width: 230px; display:flex; flex-direction:column; gap:8px; padding:12px; border:1px solid var(--line); border-radius:16px; background:#fff; box-shadow: var(--shadow); margin-bottom:14px; }
+      .nav .brand { display:flex; align-items:center; gap:10px; padding:8px 10px 12px; border-bottom:1px solid #e7efff; margin-bottom:4px; font-weight:800; color:#1e3b6e; }
+      .brand-dot { width:10px; height:10px; border-radius:999px; background:#2f8bff; box-shadow:0 0 0 4px rgba(47,139,255,.12); }
+      .nav a { text-decoration:none; padding:9px 12px; border-radius:10px; border:1px solid #d5e3ff; color:#38507b; background:#fff; font-size:13px; font-weight:600; width:100%; }
+      .nav a.active { background: linear-gradient(180deg, var(--accent), #1f66c9); border:none; color:#fff; font-weight:700; }
+      .card { background: linear-gradient(180deg, var(--panel), var(--panel-soft)); border:1px solid var(--line); border-radius:16px; padding:16px; margin-bottom:14px; box-shadow:var(--shadow); }
+      .tools { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px; }
+      .tools .grow { flex:1; min-width:240px; }
+      input, select, button { padding:11px 13px; border-radius:10px; border:1px solid #cfddfa; background:#fff; color:#24395f; }
+      button.primary { background:linear-gradient(180deg,var(--accent),#1f7a3f); border:none; color:#07210f; font-weight:700; cursor:pointer; }
+      button.secondary { background:linear-gradient(180deg,#9fc0ff,#5f84de); border:none; color:#07112b; font-weight:700; cursor:pointer; }
+      button.danger { background:linear-gradient(180deg,#ffb0b0,#df5a5a); border:none; color:#300808; font-weight:700; cursor:pointer; }
+      table { width:100%; border-collapse: collapse; }
+      th, td { border-bottom:1px solid var(--line); padding:10px 8px; text-align:left; font-size:14px; }
+      th { color:var(--muted); }
+      .chip { display:inline-block; padding:3px 8px; border-radius:999px; border:1px solid #35548d; font-size:11px; }
+      .ok { color:#8af7b8; }
+      .bad { color:var(--danger); }
+      .muted { color:var(--muted); }
+      .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:8px; margin-bottom:10px; }
+      .kpi { border:1px solid #d8e5ff; border-radius:12px; padding:12px; background:#fff; }
+      .kpi .v { font-size:24px; font-weight:800; margin-top:4px; }
+      .delta { font-size:12px; margin-top:2px; }
+      .up { color:#8af7b8; }
+      .down { color:#ffb2b2; }
+      .status { font-size:12px; color:var(--muted); margin-top:8px; }
+      .page-head { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:14px; }
+      .crumb { color:var(--muted); font-size:13px; }
+      @media (max-width: 1100px) {
+        body { padding:16px; }
+        .nav { position: static; width: auto; flex-direction: row; flex-wrap: wrap; }
+      }
+      @media (max-width: 760px) {
+        body { padding: 12px; font-size: 14px; }
+        .card { padding: 12px; border-radius: 12px; }
+        .topbar { align-items: stretch; }
+        .topbar > * { width: 100%; }
+        .nav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; padding: 10px; border-radius: 12px; }
+        .nav .brand { grid-column: 1 / -1; }
+        .nav a { width: 100%; text-align: center; padding: 8px 10px; font-size: 12px; }
+        .tools .grow { min-width: 0; }
+        .tools > * { width: 100%; }
+        .page-head { align-items: flex-start; }
+        table { display: block; overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="topbar">
+      <h1 style="margin:0;">AgroHabilis - Usuarios</h1>
+      <button id="btnReload" class="primary">Actualizar</button>
+    </div>
+    <div class="nav">
+      <div class="brand"><span class="brand-dot"></span><span>AgroHabilis Admin</span></div>
+      <a href="/dashboard/admin">🏠 Dashboard</a>
+      <a href="/dashboard/metricas">📊 Métricas</a>
+      <a href="/dashboard/precios">💹 Precios</a>
+      <a href="/dashboard/usuarios" class="active">👥 Usuarios</a>
+      <a href="/dashboard/comandos">⌨️ Comandos</a>
+      <a href="/dashboard/templates">🧩 Templates</a>
+      <a href="/dashboard/cliente">🙍 Cliente</a>
+    </div>
+    <div class="page-head">
+      <div>
+        <div class="crumb">Inicio / Usuarios</div>
+        <h3 style="margin:2px 0 0;">Gestión integral de cuentas</h3>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="kpis">
+        <div class="kpi"><div class="muted">Registrados</div><div id="kReg" class="v">-</div><div id="dReg" class="delta muted">-</div></div>
+        <div class="kpi"><div class="muted">Activos</div><div id="kAct" class="v">-</div><div id="dAct" class="delta muted">-</div></div>
+        <div class="kpi"><div class="muted">Onboarding en curso</div><div id="kOnb" class="v">-</div><div id="dOnb" class="delta muted">-</div></div>
+      </div>
+      <div class="tools">
+        <input id="q" class="grow" placeholder="Buscar por id, nombre o whatsapp" />
+        <select id="fEstado">
+          <option value="todos">Todos</option>
+          <option value="activos">Activos</option>
+          <option value="inactivos">Inactivos</option>
+        </select>
+        <select id="fPlan">
+          <option value="todos">Todos los planes</option>
+          <option value="gratis">Gratis</option>
+          <option value="basico">Básico</option>
+          <option value="pro">Pro</option>
+        </select>
+        <select id="fPerfil" title="Perfil productivo (onboarding)">
+          <option value="todos">Todos los perfiles</option>
+          <option value="agricultura">Agricultura</option>
+          <option value="ganaderia">Ganadería</option>
+          <option value="mixto">Mixto</option>
+          <option value="sin_perfil">Sin perfil cargado</option>
+        </select>
+        <button id="btnActivarSel" class="secondary">Activar seleccionados</button>
+        <button id="btnPausarSel" class="secondary">Pausar seleccionados</button>
+        <button id="btnEliminarSel" class="danger">Eliminar seleccionados</button>
+        <button id="btnExportCsv" class="secondary">Exportar CSV</button>
+      </div>
+      <div class="tools" style="margin-top:8px;">
+        <select id="fProvincia" title="Provincia">
+          <option value="todos">Todas las provincias</option>
+          <option value="__sin__">Sin provincia</option>
+        </select>
+        <input id="fPartido" class="grow" placeholder="Partido (contiene)" style="min-width:160px;" />
+        <select id="fConsultas" title="Historial de consultas al bot">
+          <option value="todos">Consultas: todas</option>
+          <option value="con">Con consultas (&gt;0)</option>
+          <option value="sin">Sin consultas</option>
+        </select>
+        <select id="fRegistro" title="Fecha de alta">
+          <option value="todos">Alta: cualquier fecha</option>
+          <option value="7d">Alta últimos 7 días</option>
+          <option value="30d">Alta últimos 30 días</option>
+          <option value="m30d">Alta +30 días</option>
+        </select>
+        <select id="fUltimaAct" title="Última consulta">
+          <option value="todos">Última consulta: cualquiera</option>
+          <option value="nunca">Nunca escribieron</option>
+          <option value="7d">Activo últimos 7 días</option>
+          <option value="30d">Activo últimos 30 días</option>
+          <option value="in30">Sin actividad +30 días</option>
+        </select>
+        <select id="fCultivos" title="Cultivos en perfil">
+          <option value="todos">Cultivos: todos</option>
+          <option value="con">Con cultivo cargado</option>
+          <option value="sin">Sin cultivos</option>
+        </select>
+        <select id="fStockGan" title="Historial tabla stock ganadero">
+          <option value="todos">Stock ganad.: todos</option>
+          <option value="con">Con movimientos</option>
+          <option value="sin">Sin movimientos</option>
+        </select>
+      </div>
+      <table>
+        <thead><tr><th><input id="selAll" type="checkbox" /></th><th>ID</th><th>Nombre</th><th>Zona</th><th>WhatsApp</th><th>Perfil</th><th>Plan</th><th>Estado</th><th># Cons.</th><th>Creado</th></tr></thead>
+        <tbody id="body"><tr><td colspan="10" class="muted">Cargando...</td></tr></tbody>
+      </table>
+      <div id="status" class="status">Filtros persistentes habilitados.</div>
+      <div id="filterHint" class="status" style="margin-top:6px;">-</div>
+    </div>
+
+    <div class="card">
+      <div id="waMasivoWarn" style="display:none;padding:12px 14px;border-radius:12px;background:#fff7e8;border:1px solid #e8b84a;margin-bottom:12px;">
+        <strong style="color:#7a4b00;">WhatsApp del servidor no está listo para enviar.</strong>
+        <div id="waMasivoWarnTxt" class="muted" style="margin-top:6px;font-size:14px;"></div>
+        <div style="margin-top:10px;">
+          <a id="waMasivoQrLink" href="/api/dashboard/admin/whatsapp-qr.png" target="_blank" rel="noopener" style="display:inline-block;padding:8px 12px;border-radius:10px;background:#2f8bff;color:#fff;text-decoration:none;font-weight:700;">Abrir QR de vinculación (PNG)</a>
+          <span class="muted" style="margin-left:8px;font-size:13px;">Con la sesión admin iniciada; escanealo con el celular del bot.</span>
+        </div>
+      </div>
+      <h3 style="margin:0 0 8px;">Mensaje masivo por WhatsApp</h3>
+      <p class="muted" style="margin:0 0 10px;font-size:14px;">
+        Podés combinar filtros (provincia, partido, consultas, antigüedad de alta, última actividad, cultivos, stock ganadero) y perfil (ej. Ganadería). Marcá usuarios o la grilla filtrada, desmarcá excepciones y enviá el texto. Respeta la política de WhatsApp (evitar spam). Entre envíos hay una pausa configurable en el servidor (<code>ADMIN_BROADCAST_DELAY_MS</code>).
+      </p>
+      <textarea id="txtMasivo" class="grow" rows="5" style="width:100%;max-width:720px;font-family:inherit;" placeholder="Ej.: Hola {{nombre}}, … ({{nombre}} o {nombre} se reemplazan por el nombre de cada usuario; si falta, se usa «productor».)"></textarea>
+      <div class="tools" style="margin-top:10px;">
+        <button id="btnEnviarMasivo" class="primary">Enviar a seleccionados</button>
+        <span id="masivoHint" class="muted"></span>
+      </div>
+    </div>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+      const fmt = (v) => (v ? new Date(v).toLocaleString("es-AR") : "-");
+      const num = (n) => Number(n || 0).toLocaleString("es-AR");
+      const state = { users: [], resumen: null, selected: new Set() };
+      let waEstadoPoll = null;
+      const FILTERS_KEY = "agro_admin_users_filters_v2";
+      const SNAPSHOT_KEY = "agro_admin_users_snapshot_v1";
+
+      function deltaText(curr, prev) {
+        if (prev === null || prev === undefined) return "Sin histórico";
+        const d = Number(curr || 0) - Number(prev || 0);
+        if (d === 0) return "→ sin cambios";
+        return d > 0 ? `▲ +${num(d)}` : `▼ ${num(d)}`;
+      }
+
+      function renderDelta(el, curr, prev) {
+        const d = Number(curr || 0) - Number(prev || 0);
+        el.textContent = deltaText(curr, prev);
+        el.className = `delta ${d > 0 ? "up" : d < 0 ? "down" : "muted"}`;
+      }
+
+      function persistFilters() {
+        localStorage.setItem(FILTERS_KEY, JSON.stringify({
+          q: $("q").value || "",
+          estado: $("fEstado").value || "todos",
+          plan: $("fPlan").value || "todos",
+          perfil: $("fPerfil").value || "todos",
+          provincia: $("fProvincia").value || "todos",
+          partido: $("fPartido").value || "",
+          consultas: $("fConsultas").value || "todos",
+          registro: $("fRegistro").value || "todos",
+          ultimaAct: $("fUltimaAct").value || "todos",
+          cultivos: $("fCultivos").value || "todos",
+          stockGan: $("fStockGan").value || "todos",
+        }));
+      }
+
+      function restoreFilters() {
+        try {
+          const f = JSON.parse(localStorage.getItem(FILTERS_KEY) || "{}");
+          if (typeof f.q === "string") $("q").value = f.q;
+          if (f.estado) $("fEstado").value = f.estado;
+          if (f.plan) $("fPlan").value = f.plan;
+          if (f.perfil) $("fPerfil").value = f.perfil;
+          if (f.provincia) $("fProvincia").value = f.provincia;
+          if (typeof f.partido === "string") $("fPartido").value = f.partido;
+          if (f.consultas) $("fConsultas").value = f.consultas;
+          if (f.registro) $("fRegistro").value = f.registro;
+          if (f.ultimaAct) $("fUltimaAct").value = f.ultimaAct;
+          if (f.cultivos) $("fCultivos").value = f.cultivos;
+          if (f.stockGan) $("fStockGan").value = f.stockGan;
+        } catch (_e) {}
+      }
+
+      function rebuildProvinciaFilter() {
+        const set = new Set();
+        for (const u of state.users) {
+          const p = String(u.provincia || "").trim();
+          if (p) set.add(p);
+        }
+        const sorted = [...set].sort((a, b) => a.localeCompare(b, "es"));
+        const sel = $("fProvincia");
+        const preserve = sel.value;
+        sel.innerHTML = "";
+        const o0 = document.createElement("option");
+        o0.value = "todos";
+        o0.textContent = "Todas las provincias";
+        sel.appendChild(o0);
+        const oSin = document.createElement("option");
+        oSin.value = "__sin__";
+        oSin.textContent = "Sin provincia";
+        sel.appendChild(oSin);
+        for (const p of sorted) {
+          const o = document.createElement("option");
+          o.value = p;
+          o.textContent = p;
+          sel.appendChild(o);
+        }
+        if ([...sel.options].some((x) => x.value === preserve)) sel.value = preserve;
+        else sel.value = "todos";
+      }
+
+      const MS_DAY = 86400000;
+
+      function matchProvincia(u, val) {
+        if (!val || val === "todos") return true;
+        const prov = String(u.provincia || "").trim();
+        if (val === "__sin__") return !prov;
+        return prov.toLowerCase() === String(val).toLowerCase();
+      }
+
+      function matchPartidoContiene(u, q) {
+        const t = String(q || "").toLowerCase().trim();
+        if (!t) return true;
+        return String(u.partido || "").toLowerCase().includes(t);
+      }
+
+      function matchConsultasF(u, val) {
+        const n = Number(u.consultas_total || 0);
+        if (val === "todos" || !val) return true;
+        if (val === "con") return n > 0;
+        if (val === "sin") return n === 0;
+        return true;
+      }
+
+      function matchRegistro(u, val) {
+        if (val === "todos" || !val) return true;
+        const c = u.creado_en ? new Date(u.creado_en).getTime() : 0;
+        if (!c) return val === "m30d";
+        const age = Date.now() - c;
+        if (val === "7d") return age <= 7 * MS_DAY;
+        if (val === "30d") return age <= 30 * MS_DAY;
+        if (val === "m30d") return age > 30 * MS_DAY;
+        return true;
+      }
+
+      function matchUltimaAct(u, val) {
+        if (val === "todos" || !val) return true;
+        const t = u.ultima_consulta ? new Date(u.ultima_consulta).getTime() : 0;
+        const now = Date.now();
+        if (val === "nunca") return !t;
+        if (val === "7d") return t > 0 && now - t <= 7 * MS_DAY;
+        if (val === "30d") return t > 0 && now - t <= 30 * MS_DAY;
+        if (val === "in30") return !t || now - t > 30 * MS_DAY;
+        return true;
+      }
+
+      function matchCultivos(u, val) {
+        const n = Number(u.cultivos_activos || 0);
+        if (val === "todos" || !val) return true;
+        if (val === "con") return n > 0;
+        if (val === "sin") return n === 0;
+        return true;
+      }
+
+      function matchStockGan(u, val) {
+        const n = Number(u.movimientos_stock_ganadero || 0);
+        if (val === "todos" || !val) return true;
+        if (val === "con") return n > 0;
+        if (val === "sin") return n === 0;
+        return true;
+      }
+
+      function filterUsersList() {
+        const q = ($("q").value || "").toLowerCase().trim();
+        const e = $("fEstado").value;
+        const pl = $("fPlan").value;
+        const fp = $("fPerfil").value;
+        const prov = $("fProvincia").value;
+        const partQ = $("fPartido").value || "";
+        const fCon = $("fConsultas").value;
+        const fReg = $("fRegistro").value;
+        const fUlt = $("fUltimaAct").value;
+        const fCul = $("fCultivos").value;
+        const fSt = $("fStockGan").value;
+        return state.users.filter((u) => {
+          const txt =
+            `${u.id} ${u.nombre || ""} ${u.whatsapp || ""} ${u.provincia || ""} ${u.partido || ""}`.toLowerCase();
+          const okQ = !q || txt.includes(q);
+          const okE = e === "todos" ? true : e === "activos" ? !!u.activo : !u.activo;
+          const okP = pl === "todos" ? true : String(u.plan || "gratis").toLowerCase() === pl;
+          const okPf = matchPerfil(u, fp);
+          const okPr = matchProvincia(u, prov);
+          const okPa = matchPartidoContiene(u, partQ);
+          const okCon = matchConsultasF(u, fCon);
+          const okReg = matchRegistro(u, fReg);
+          const okUlt = matchUltimaAct(u, fUlt);
+          const okCul = matchCultivos(u, fCul);
+          const okSt = matchStockGan(u, fSt);
+          return (
+            okQ &&
+            okE &&
+            okP &&
+            okPf &&
+            okPr &&
+            okPa &&
+            okCon &&
+            okReg &&
+            okUlt &&
+            okCul &&
+            okSt
+          );
+        });
+      }
+
+      function zonaLabel(u) {
+        const pr = (u.provincia || "").trim() || "—";
+        const pa = (u.partido || "").trim() || "—";
+        const s = `${pr} · ${pa}`;
+        return s.length > 42 ? `${s.slice(0, 40)}…` : s;
+      }
+
+      function matchPerfil(u, fp) {
+        const p = (u.perfil_productivo || "").toLowerCase().trim();
+        if (fp === "todos") return true;
+        if (fp === "sin_perfil") return !u.perfil_productivo;
+        return p === fp;
+      }
+
+      function labelPerfil(u) {
+        const p = (u.perfil_productivo || "").toLowerCase();
+        if (!p) return "—";
+        if (p === "ganaderia") return "Ganadería";
+        if (p === "agricultura") return "Agricultura";
+        if (p === "mixto") return "Mixto";
+        return p;
+      }
+
+      function render() {
+        const rows = filterUsersList();
+        const nCons = (u) => num(String(u.consultas_total ?? 0));
+        $("body").innerHTML = rows.map((u) => `
+          <tr>
+            <td><input class="sel" type="checkbox" data-id="${u.id}" ${state.selected.has(Number(u.id)) ? "checked" : ""} /></td>
+            <td>${u.id}</td>
+            <td>${u.nombre || "-"}</td>
+            <td title="${String(u.provincia || "").trim()} / ${String(u.partido || "").trim()}">${zonaLabel(u)}</td>
+            <td>${u.whatsapp || "-"}</td>
+            <td><span class="chip">${labelPerfil(u)}</span></td>
+            <td><span class="chip">${String(u.plan || "gratis").toUpperCase()}</span></td>
+            <td class="${u.activo ? "ok" : "bad"}">${u.activo ? "Activo" : "Inactivo"}</td>
+            <td>${nCons(u)}</td>
+            <td>${fmt(u.creado_en)}</td>
+          </tr>
+        `).join("") || `<tr><td colspan="10" class="muted">Sin resultados para el filtro actual</td></tr>`;
+        $("filterHint").textContent = state.users.length
+          ? `${rows.length} usuario(s) visibles con filtros actuales · ${state.users.length} cargados`
+          : "";
+        $("body").querySelectorAll(".sel").forEach((cb) => {
+          cb.addEventListener("change", () => {
+            const id = Number(cb.getAttribute("data-id"));
+            if (cb.checked) state.selected.add(id);
+            else state.selected.delete(id);
+          });
+        });
+        persistFilters();
+      }
+
+      function csvEscape(v) {
+        const s = String(v ?? "");
+        if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+        return s;
+      }
+
+      function exportCsv() {
+        const rows = filterUsersList();
+        const header = [
+          "id",
+          "nombre",
+          "provincia",
+          "partido",
+          "whatsapp",
+          "perfil_productivo",
+          "plan",
+          "activo",
+          "consultas_total",
+          "ultima_consulta",
+          "cultivos_activos",
+          "movimientos_stock_ganadero",
+          "creado_en",
+        ];
+        const lines = [header.join(",")].concat(
+          rows.map((u) => [
+            u.id,
+            csvEscape(u.nombre || ""),
+            csvEscape(u.provincia || ""),
+            csvEscape(u.partido || ""),
+            csvEscape(u.whatsapp || ""),
+            csvEscape(u.perfil_productivo || ""),
+            csvEscape(String(u.plan || "gratis")),
+            u.activo ? "1" : "0",
+            Number(u.consultas_total || 0),
+            csvEscape(u.ultima_consulta || ""),
+            Number(u.cultivos_activos || 0),
+            Number(u.movimientos_stock_ganadero || 0),
+            csvEscape(u.creado_en || ""),
+          ].join(","))
+        );
+        const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+        a.href = url;
+        a.download = `usuarios-${ts}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        $("status").textContent = `CSV exportado (${rows.length} filas)`;
+      }
+
+      async function aplicarAccionMasiva(accion) {
+        const ids = [...state.selected].filter((id) => !!id && id !== 1);
+        if (!ids.length) return alert("Seleccioná al menos un usuario (excepto sistema)");
+        if (!confirm(`Confirmar ${accion} para ${ids.length} usuarios`)) return;
+        if (accion === "eliminar") {
+          const token = prompt(`Escribí ELIMINAR (${ids.length}) para confirmar`);
+          if (token !== `ELIMINAR (${ids.length})`) {
+            return alert("Confirmación inválida. No se aplicaron cambios.");
+          }
+        }
+        $("status").textContent = `Ejecutando ${accion} en ${ids.length} usuarios...`;
+        let ok = 0;
+        for (const usuarioId of ids) {
+          const r = await fetch("/api/dashboard/admin/usuario-accion", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ usuarioId, accion }),
+          });
+          const d = await r.json();
+          if (d.ok) ok += 1;
+        }
+        $("status").textContent = `${accion} finalizado: ${ok}/${ids.length} aplicados`;
+        state.selected.clear();
+        await load();
+      }
+
+      async function leerRespuestaJson(r) {
+        const raw = await r.text();
+        const ct = (r.headers.get("content-type") || "").toLowerCase();
+        if (!ct.includes("application/json")) {
+          const snippet = raw.replace(/\s+/g, " ").slice(0, 160);
+          throw new Error(
+            `La respuesta no es JSON (suele ser timeout del proxy, error HTML o sesión admin vencida). HTTP ${r.status}. ${snippet}`
+          );
+        }
+        try {
+          return JSON.parse(raw);
+        } catch (_e) {
+          throw new Error(`JSON inválido: ${raw.slice(0, 120).replace(/\s+/g, " ")}`);
+        }
+      }
+
+      const sleepMs = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+      async function enviarMasivo() {
+        const ids = [...state.selected].filter((id) => !!id && id !== 1);
+        const mensaje = ($("txtMasivo").value || "").trim();
+        if (!ids.length) return alert("Seleccioná al menos un usuario (no se envía al usuario sistema id 1).");
+        if (!mensaje) return alert("Escribí el mensaje.");
+        const waOk = state.resumen?.estado?.whatsapp === "listo";
+        if (!waOk) {
+          if (
+            !confirm(
+              "WhatsApp del servidor no está en estado «listo». El envío probablemente falle. ¿Querés intentar igualmente?"
+            )
+          ) {
+            return;
+          }
+        }
+        if (!confirm(`Enviar este mensaje por WhatsApp a ${ids.length} usuario(s)?`)) return;
+        $("btnEnviarMasivo").disabled = true;
+        $("masivoHint").textContent = "Encolando…";
+        $("status").textContent = `Envío masivo: encolando ${ids.length} destinatario(s)…`;
+        try {
+          const r = await fetch("/api/dashboard/admin/envio-masivo", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "same-origin",
+            body: JSON.stringify({ usuarioIds: ids, mensaje }),
+          });
+          const d = await leerRespuestaJson(r);
+          if (!d.ok) throw new Error(d.error || "Error al encolar");
+          const jobId = d.jobId;
+          if (!jobId) throw new Error("El servidor no devolvió jobId");
+          $("masivoHint").textContent = "Enviando en el servidor… (podés esperar o recargar más tarde)";
+          $("status").textContent = `Job ${jobId.slice(0, 8)}… en curso`;
+
+          const pollMs = 650;
+          const maxPolls = 2800;
+          for (let i = 0; i < maxPolls; i += 1) {
+            await sleepMs(pollMs);
+            const rs = await fetch(
+              `/api/dashboard/admin/envio-masivo/estado?jobId=${encodeURIComponent(jobId)}`,
+              { credentials: "same-origin" }
+            );
+            const st = await leerRespuestaJson(rs);
+            if (!st.ok) throw new Error(st.error || "Error leyendo estado");
+            if (st.estado === "running") {
+              if (i % 8 === 0) $("status").textContent = `Envío en curso… (${Math.round((i * pollMs) / 1000)} s)`;
+              continue;
+            }
+            if (st.estado === "listo") {
+              $("masivoHint").textContent = `Listo: ${st.enviados} enviados, ${st.fallidos} fallidos (total ${st.total}).`;
+              $("status").textContent = `Envío masivo: ${st.enviados} ok, ${st.fallidos} errores.`;
+              return;
+            }
+            if (st.estado === "error") {
+              throw new Error(st.error || "Fallo en el envío masivo");
+            }
+            throw new Error(`Estado de job desconocido: ${st.estado}`);
+          }
+          throw new Error("Tiempo máximo de espera agotado; el envío puede seguir en el servidor. Revisá logs o envios_whatsapp.");
+        } catch (err) {
+          $("masivoHint").textContent = "";
+          $("status").textContent = "Error en envío masivo.";
+          alert(err.message || String(err));
+        } finally {
+          $("btnEnviarMasivo").disabled = false;
+        }
+      }
+
+      function updateWaMasivoBanner() {
+        const box = $("waMasivoWarn");
+        if (!box) return;
+        const wa = state.resumen?.estado?.whatsapp;
+        const det = state.resumen?.estado?.whatsappDetalle;
+        if (wa === "listo") {
+          box.style.display = "none";
+          return;
+        }
+        box.style.display = "block";
+        const motivo = det?.ultimoMotivo ? ` Último evento: ${det.ultimoMotivo}.` : "";
+        $("waMasivoWarnTxt").textContent =
+          `Estado API: ${det?.etiqueta || wa || "desconocido"}.${motivo} Si el bot ya responde en WhatsApp, probá recargar la página (F5): a veces el panel mostraba un estado en caché. Abajo se actualiza solo cada 15 s.`;
+      }
+
+      function iniciarPollEstadoWhatsapp() {
+        if (waEstadoPoll) clearInterval(waEstadoPoll);
+        waEstadoPoll = setInterval(async () => {
+          try {
+            const r = await fetch("/api/dashboard/admin/resumen", {
+              credentials: "same-origin",
+              cache: "no-store",
+            });
+            const d = await r.json();
+            if (!d.ok) return;
+            state.resumen = d.data || {};
+            updateWaMasivoBanner();
+          } catch (_e) {
+            /* ignorar */
+          }
+        }, 15000);
+      }
+
+      async function load() {
+        const fetchOpts = { credentials: "same-origin", cache: "no-store" };
+        const [r1, r2] = await Promise.all([
+          fetch("/api/dashboard/admin/usuarios?limit=2000", fetchOpts),
+          fetch("/api/dashboard/admin/resumen", fetchOpts),
+        ]);
+        const d1 = await r1.json();
+        const d2 = await r2.json();
+        if (!d1.ok) throw new Error(d1.error || "Error usuarios");
+        if (!d2.ok) throw new Error(d2.error || "Error resumen");
+        state.users = d1.usuarios || [];
+        state.resumen = d2.data || {};
+        const prev = (() => {
+          try { return JSON.parse(localStorage.getItem(SNAPSHOT_KEY) || "null"); } catch (_e) { return null; }
+        })();
+        $("kReg").textContent = num(state.resumen?.usuarios?.registrados);
+        $("kAct").textContent = num(state.resumen?.usuarios?.activos);
+        $("kOnb").textContent = num(state.resumen?.usuarios?.onboardingEnCurso);
+        renderDelta($("dReg"), state.resumen?.usuarios?.registrados, prev?.registrados);
+        renderDelta($("dAct"), state.resumen?.usuarios?.activos, prev?.activos);
+        renderDelta($("dOnb"), state.resumen?.usuarios?.onboardingEnCurso, prev?.onboarding);
+        localStorage.setItem(SNAPSHOT_KEY, JSON.stringify({
+          registrados: Number(state.resumen?.usuarios?.registrados || 0),
+          activos: Number(state.resumen?.usuarios?.activos || 0),
+          onboarding: Number(state.resumen?.usuarios?.onboardingEnCurso || 0),
+          at: Date.now(),
+        }));
+        rebuildProvinciaFilter();
+        updateWaMasivoBanner();
+        iniciarPollEstadoWhatsapp();
+        render();
+      }
+
+      ["q", "fEstado", "fPlan", "fPartido"].forEach((id) => $(id).addEventListener("input", render));
+      ["fEstado", "fPlan", "fPerfil", "fProvincia", "fConsultas", "fRegistro", "fUltimaAct", "fCultivos", "fStockGan"].forEach((id) =>
+        $(id).addEventListener("change", render)
+      );
+      $("selAll").addEventListener("change", () => {
+        const on = $("selAll").checked;
+        $("body").querySelectorAll(".sel").forEach((cb) => {
+          cb.checked = on;
+          const id = Number(cb.getAttribute("data-id"));
+          if (on) state.selected.add(id);
+          else state.selected.delete(id);
+        });
+      });
+      $("btnActivarSel").addEventListener("click", () => aplicarAccionMasiva("activar").catch((e) => alert(e.message)));
+      $("btnPausarSel").addEventListener("click", () => aplicarAccionMasiva("pausar").catch((e) => alert(e.message)));
+      $("btnEliminarSel").addEventListener("click", () => aplicarAccionMasiva("eliminar").catch((e) => alert(e.message)));
+      $("btnExportCsv").addEventListener("click", exportCsv);
+      $("btnEnviarMasivo").addEventListener("click", () => enviarMasivo().catch((e) => alert(e.message)));
+      $("btnReload").addEventListener("click", () => load().catch((e) => alert(e.message)));
+      restoreFilters();
+      load().catch((e) => alert(e.message));
+    </script>
+  </body>
+</html>

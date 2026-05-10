@@ -1,0 +1,384 @@
+{
+  "generatedAt": "2026-05-04T17:26:15.367Z",
+  "out": [
+    {
+      "productor": 1,
+      "nombre": "Roberto Gimenez",
+      "whatsapp": "5491199800001",
+      "conv": [
+        {
+          "user": "Hola",
+          "bot": "Hola! Soy AgroHabilis 🌾, tu asistente agropecuario.\nArrancás en Plan GRATIS y podés cambiarlo cuando quieras:\n- GRATIS: $0/mes\n- BASICO: $9.000/mes (QUIERO PLAN BASICO)\n- PRO: $18.000/mes (QUIERO PLAN PRO)\n\nPara empezar solo necesito tres datos rápidos.\n¿Cuál es tu nombre y apellido?",
+          "ms": 17
+        },
+        {
+          "user": "Roberto Gimenez",
+          "bot": "¿En qué provincia y partido trabajás?\nSepará zonas con guion (-).\nLímite por plan: Gratis 1 zona, Básico 3 zonas, Pro 6 zonas.\nFormato: Provincia, Partido - Provincia, Partido\nEj: Buenos Aires, Tandil - Córdoba, Río Cuarto",
+          "ms": 18
+        },
+        {
+          "user": "Buenos Aires, Pergamino - Cordoba, Marcos Juarez - Entre Rios, Gualeguaychu",
+          "bot": "En plan *Gratis* solo registro *una* zona: *Buenos Aires, Pergamino*. No guardé las otras 2 (con plan Básico podés hasta 3 y con Pro hasta 6).\n\n¿Qué trabajás principalmente?\nPodés elegir más de una opción: cultivos y/o ganadería.\nEjemplos:\n- soja, maíz, trigo\n- ganadería\n- soja, maíz y ganadería",
+          "ms": 15
+        },
+        {
+          "user": "soja, maiz, trigo y girasol",
+          "bot": "🌾 *¡Bienvenido a AgroHabilis, Roberto Gimenez!*\nEste es tu primer resumen personalizado.\n\n━━━━━━━━━━━━━━━━━━━━━━━\n💰 *TUS CULTIVOS HOY*\n━━━━━━━━━━━━━━━━━━━━━━━\n🌻 *Girasol*\nDisponible rosario_cac: ARS 579.132/tn\nFuturo cercano: s/d\nTendencia 7 días: sin datos\n\n🌽 *Maíz*\nDisponible bcr_gix_seed: ARS 228.000/tn\nFuturo cercano: s/d\nTendencia 7 días: sin datos\n\n🫘 *Soja*\nDisponible rosario_cac: ARS 422.000/tn\nFuturo cercano: s/d\nTendencia 7 días: ▼ 1.6%\n\n🌾 *Trigo*\nDisponible rosario_cac: ARS 283.000/tn\nFuturo cercano: s/d\nTendencia 7 días: sin datos\n\n━━━━━━━━━━━━━━━━━━━━━━━\n💵 *TIPO DE CAMBIO*\n━━━━━━━━━━━━━━━━━━━━━━━\nOficial: $1.420 | Blue: $1.405 | MEP: $1.449\n\n━━━━━━━━━━━━━━━━━━━━━━━\n🌤️ *CLIMA EN TUS ZONAS*\n━━━━━━━━━━━━━━━━━━━━━━━\n📍 Pergamino, Buenos Aires\nlunes: 8°C - 20°C | Soleado | 🌧️ 0,0 mm\nmartes: 11°C - 21°C | Soleado | 🌧️ 0,0 mm\nmiércoles: 11°C - 17°C | Fuertes lluvias | 🌧️ 36,6 mm\n\n━━━━━━━━━━━━━━━━━━━━━━━\n🔍 *DATO QUE QUIZÁS NO SABÍAS*\n━━━━━━━━━━━━━━━━━━━━━━━\n🫘 soja muestra presión bajista (-1.6% en 7 días) con brecha cambiaria en 2%.\nEste combo suele abrir/cerrar ventanas de venta en plazos cortos.\n\nHoy además se destaca en noticias:\n- Precio del maíz en Rosario hoy 26 abril 2026 (InfoCampo)\n- Pergamino impulsa la llegada de inversiones con exención de tasas por siete años para nuevas industrias (Noticias de Campo)\n\n━━━━━━━━━━━━━━━━━━━━━━━\n💡 *PODÉS PREGUNTARME AHORA*\n━━━━━━━━━━━━━━━━━━━━━━━\n→ \"¿Me conviene vender girasol esta semana?\"\n→ \"Avisame cuando el maíz supere USD 200\"\n→ \"¿Cómo viene la cosecha gruesa este año?\"\n\n━━━━━━━━━━━━━━━━━━━━━━━\n📦 *PLAN ACTUAL: GRATIS*\n━━━━━━━━━━━━━━━━━━━━━━━\nSi querés cambiarlo, escribí:\n- QUIERO PLAN BASICO ($9.000/mes)\n- QUIERO PLAN PRO ($18.000/mes)\n- QUIERO PLAN GRATIS ($0/mes)\n\n📆 En Plan Gratis recibís resumen 2 veces por semana:\n- al día siguiente de tu registro\n- luego todos los lunes y jueves (8am)\n\nY cuando quieras mejorar tus recomendaciones escribí:\nCOMPLETAR PERFIL\n\nSi querés recomendaciones más procesadas (ej: margen por cultivo), te voy a pedir datos como hectáreas y costo por ha.\nPara ver todos los comandos, escribí:\nVER COMANDOS\n\n━━━━━━━━━━━━━━━━━━━━━━━\n📦 *PLANTILLA GRATIS*\n━━━━━━━━━━━━━━━━━━━━",
+          "ms": 10278
+        },
+        {
+          "user": "Dame lectura corta: spread disponible vs futuro en maiz y soja con MEP de hoy",
+          "bot": "SOJA:\n- Spot disponible (misma referencia que tu resumen): rosario cac $ 422.000 · 2026-04-30\n- Futuro MATBA cercano: s/d\n- TC financiero (BOLSA): $ 1.441\n- TC implícito del par spot/futuro: s/d\n- Lectura cambiaria: s/d (negativo = grano barato en USD vs financiero; positivo = implícito arriba del MEP).\n- Spread spot USD vs futuro: s/d (s/d)\n\nMAIZ:\n- Spot disponible (misma referencia que tu resumen): bcr gix seed $ 228.000 · 2026-04-28\n- Futuro MATBA cercano: s/d\n- TC financiero (BOLSA): $ 1.441\n- TC implícito del par spot/futuro: s/d\n- Lectura cambiaria: s/d (negativo = grano barato en USD vs financiero; positivo = implícito arriba del MEP).\n- Spread spot USD vs futuro: s/d (s/d)\n\nLECTURA (corta):\n- Números con la misma fila de disponible que tu resumen + futuro MATBA + MEP/bolsa del día.\n- Si el implícito queda lejos del MEP, antes que “carry puro” suele pesar la mezcla cambiaria.\n\nYO HARÍA (orientación, no asesoramiento personalizado):\n- Soja: sin par completo spot+futuro+MEP para sugerir postura.\n- Maíz: sin par completo spot+futuro+MEP para sugerir postura.\nSi no tenés apuro de pesos: conviene operar en tramos (20-40%) en vez de todo o nada, y revalidar cuando el implícito se acerque al MEP o cambie la curva.",
+          "ms": 55
+        },
+        {
+          "user": "Si el oficial se mueve +1% en el dia, que implica para mi carry en soja?",
+          "bot": "SOJA:\n- Spot disponible (misma referencia que tu resumen): rosario cac $ 422.000 · 2026-04-30\n- Futuro MATBA cercano: s/d\n- TC financiero (BOLSA): $ 1.441\n- TC implícito del par spot/futuro: s/d\n- Lectura cambiaria: s/d (negativo = grano barato en USD vs financiero; positivo = implícito arriba del MEP).\n- Spread spot USD vs futuro: s/d (s/d)\n\nLECTURA (corta):\n- Números con la misma fila de disponible que tu resumen + futuro MATBA + MEP/bolsa del día.\n- Si el implícito queda lejos del MEP, antes que “carry puro” suele pesar la mezcla cambiaria.\n\nYO HARÍA (orientación, no asesoramiento personalizado):\n- Soja: sin par completo spot+futuro+MEP para sugerir postura.\nSi no tenés apuro de pesos: conviene operar en tramos (20-40%) en vez de todo o nada, y revalidar cuando el implícito se acerque al MEP o cambie la curva.",
+          "ms": 37
+        },
+        {
+          "user": "Tengo arriendo: como lo meto en el perfil para que no me rompa el margen?",
+          "bot": "*Mercado*\n- TRIGO: $281.600 ARS (2026-05-04, TODOAGRO_WEB_ROS).\n- MAIZ: $265.400 ARS (2026-05-04, TODOAGRO_WEB_ROS).\n- SOJA: $429.000 ARS (2026-05-04, TODOAGRO_WEB_ROS).\n- SOJA Futuro (mayo): 315,40 USD/t (2026-04-28, Safras).\n- Precios internos: sin datos en base.\n\n*Lectura*\nPara no distorsionar el margen en Pergamino, el arriendo debe cargarse como un costo directo (fijo en USD o variable en quintales). Los valores de mercado actuales (Web fallback) muestran una soja disponible en $429.000, lo que define tu capacidad de pago y el punto de equilibrio de la explotación.\n\n*Decisión*\nImputar el costo de arriendo en el perfil de cultivo antes de calcular el margen neto. Si el pacto es en quintales, usar el precio de la soja mayo (315,40 USD/t) como referencia de valor de cosecha para proyectar el flujo de fondos.\n\n*Riesgo*\nDescalce por volatilidad de precios: si el arriendo es en quintales y no se toma cobertura, una baja en el precio del grano aumenta la cantidad de producto necesaria para cubrir el costo fijo del suelo.\n\nCargá el arriendo como costo directo para sincerar el margen neto.\n¿Necesitás el cálculo de quintales de equilibrio para Pergamino?\n\n━━━━━━━━━━━━━━━━━━━━\n🌐 *Complemento web*\n━━━━━━━━━━━━━━━━━━━━\n⚠️ _Complemento web_ — *no reemplaza* la base AgroHabilis.\nPuede estar desactualizado o ser inexacto → verificá *fuente* y *fecha* antes de operar.\n\n📌 **Precios (04/05/26):** Trigo **$281.600**, Maíz **$265.400** y Soja Mayo **USD 315,40/t**.\n━━━━━━━━━━━━━━━━━━━━\n🚜 **Estrategia Arriendo:** Cargalo como **costo variable en QQ de soja/ha** y no como suma fija.\n_Para no romper el margen_, buscá negociar **esquemas a porcentaje** o con cláusulas de ajuste.\nSi el contrato es fijo, usá **Futuros/Opciones** para cubrir el costo de esos quintales.\n📊 **Ojo:** Recalculá tu **rinde de indiferencia** sumando el arriendo a los costos directos\npara saber exactamente cuánto grano necesitás para empezar a ganar.\n\n━━━━━━━━━━━━━━━━━━━━━━━\n📦 *PLANTILLA GRATIS*\n━━━━━━━━━━━━━━━━━━━━━━━\nIncluye 7 bloques activos en este mensaje. Precio: $0/mes.\nConsulta libre esencial con respuesta concreta.\n\n💡 Para darte el margen exacto necesito tu costo por hectárea. ¿Lo sabés? Respon",
+          "ms": 78798
+        },
+        {
+          "user": "QUIERO PLAN BASICO",
+          "bot": "Para gestionar el acceso al nivel solicitado y analizar los valores de mercado actuales, aquí tenés el resumen operativo basado en las referencias disponibles.\n\n*Contexto*\n- TRIGO: $281.600 ARS (2026-05-04, TODOAGRO_WEB_ROS).\n- MAIZ: $265.400 ARS (2026-05-04, TODOAGRO_WEB_ROS).\n- SOJA: $429.000 ARS (2026-05-04, TODOAGRO_WEB_ROS).\n- SOJA Futuro (mayo): 315,40 USD/t (2026-04-28, Safras).\n- Plan Básico: sin datos en base sobre condiciones comerciales.\n\n*Lectura*\nLos precios de pizarra y referencias web muestran una paridad estrecha entre el disponible y el MatbaRofex (brecha de $600 en maíz). El trigo opera con un spread de $4.400 entre el físico y la posición MatbaRofex. Se observa una soja disponible firme en los $429.000 ARS, mientras los futuros de mayo se sitúan en los 315,40 USD/t.\n\n*Decisión*\nUtilizar los valores de Rosario como base para liquidaciones inmediatas. Para la suscripción al Plan Básico, se requiere contacto con soporte comercial ya que no figuran especificaciones técnicas en la base actual.\n\n*Riesgo*\nLa información de precios actuales proviene de fuentes de referencia externa (web fallback). Se recomienda validar el cierre de la posición mayo de soja ante posibles ajustes de volatilidad por fin de mes técnico.\n\nConsultá con soporte para activar tu plan; operá con los valores de Rosario de hoy.\n\n━━━━━━━━━━━━━━━━━━━━━━━\n📦 *PLANTILLA GRATIS*\n━━━━━━━━━━━━━━━━━━━━━━━\nIncluye 7 bloques activos en este mensaje. Precio: $0/mes.\nConsulta libre esencial con respuesta concreta.",
+          "ms": 64357
+        }
+      ]
+    },
+    {
+      "productor": 2,
+      "nombre": "Marcela Sotelo",
+      "whatsapp": "5491199800002",
+      "conv": [
+        {
+          "user": "Hola",
+          "bot": "Hola! Soy AgroHabilis 🌾, tu asistente agropecuario.\nArrancás en Plan GRATIS y podés cambiarlo cuando quieras:\n- GRATIS: $0/mes\n- BASICO: $9.000/mes (QUIERO PLAN BASICO)\n- PRO: $18.000/mes (QUIERO PLAN PRO)\n\nPara empezar solo necesito tres datos rápidos.\n¿Cuál es tu nombre y apellido?",
+          "ms": 14
+        },
+        {
+          "user": "Marcela Sotelo",
+          "bot": "¿En qué provincia y partido trabajás?\nSepará zonas con guion (-).\nLímite por plan: Gratis 1 zona, Básico 3 zonas, Pro 6 zonas.\nFormato: Provincia, Partido - Provincia, Partido\nEj: Buenos Aires, Tandil - Córdoba, Río Cuarto",
+          "ms": 12
+        },
+        {
+          "user": "Buenos Aires, Azul",
+          "bot": "¿Qué trabajás principalmente?\nPodés elegir más de una opción: cultivos y/o ganadería.\nEjemplos:\n- soja, maíz, trigo\n- ganadería\n- soja, maíz y ganadería",
+          "ms": 14
+        },
+        {
+          "user": "soja, trigo y ganaderia",
+          "bot": "Perfecto. Para personalizar mejor ganadería, decime tipo/categorías de ganado separadas por coma.\nEjemplos:\n- vacuno novillos, vacuno terneros\n- porcino madres, ovino ovejas\n- llama, alpaca",
+          "ms": 16
+        },
+        {
+          "user": "vacuno cria, vacuno terneros",
+          "bot": "🌾 *¡Bienvenido a AgroHabilis, Marcela Sotelo!*\nEste es tu primer resumen personalizado.\n\n━━━━━━━━━━━━━━━━━━━━━━━\n💰 *TUS CULTIVOS HOY*\n━━━━━━━━━━━━━━━━━━━━━━━\n🫘 *Soja*\nDisponible rosario_cac: ARS 422.000/tn\nFuturo cercano: s/d\nTendencia 7 días: ▼ 1.6%\n\n🌾 *Trigo*\nDisponible rosario_cac: ARS 283.000/tn\nFuturo cercano: s/d\nTendencia 7 días: sin datos\n\n━━━━━━━━━━━━━━━━━━━━━━━\n🐄 *TU HACIENDA HOY*\n━━━━━━━━━━━━━━━━━━━━━━━\nnovillo:  $4.490/kg →\nvaca:  $3.625/kg →\nvaquillona:  $4.345/kg →\n━━━━━━━━━━━━━━━━━━━━━━━\n💵 *TIPO DE CAMBIO*\n━━━━━━━━━━━━━━━━━━━━━━━\nOficial: $1.420 | Blue: $1.405 | MEP: $1.449\n\n━━━━━━━━━━━━━━━━━━━━━━━\n🌤️ *CLIMA EN TUS ZONAS*\n━━━━━━━━━━━━━━━━━━━━━━━\n📍 Azul, Buenos Aires\nlunes: 8°C - 20°C | Soleado | 🌧️ 0,0 mm\nmartes: 11°C - 21°C | Soleado | 🌧️ 0,0 mm\nmiércoles: 11°C - 17°C | Fuertes lluvias | 🌧️ 36,6 mm\n\n━━━━━━━━━━━━━━━━━━━━━━━\n🔍 *DATO QUE QUIZÁS NO SABÍAS*\n━━━━━━━━━━━━━━━━━━━━━━━\n🫘 soja muestra presión bajista (-1.6% en 7 días) con brecha cambiaria en 2%.\nEste combo suele abrir/cerrar ventanas de venta en plazos cortos.\n\nHoy además se destaca en noticias:\n- Precio del Trigo en Rosario hoy 26 abril 2026 (InfoCampo)\n- Regar los campos argentinos ahora trae beneficios impositivos (TodoAgro)\n\n━━━━━━━━━━━━━━━━━━━━━━━\n💡 *PODÉS PREGUNTARME AHORA*\n━━━━━━━━━━━━━━━━━━━━━━━\n→ \"¿Me conviene vender soja esta semana?\"\n→ \"¿Cómo viene el novillo y el maíz?\"\n→ \"Avisame cuando haya salto en dólar MEP\"\n\n━━━━━━━━━━━━━━━━━━━━━━━\n📦 *PLAN ACTUAL: GRATIS*\n━━━━━━━━━━━━━━━━━━━━━━━\nSi querés cambiarlo, escribí:\n- QUIERO PLAN BASICO ($9.000/mes)\n- QUIERO PLAN PRO ($18.000/mes)\n- QUIERO PLAN GRATIS ($0/mes)\n\n📆 En Plan Gratis recibís resumen 2 veces por semana:\n- al día siguiente de tu registro\n- luego todos los lunes y jueves (8am)\n\nY cuando quieras mejorar tus recomendaciones escribí:\nCOMPLETAR PERFIL\n\nSi querés recomendaciones más procesadas (ej: margen por cultivo), te voy a pedir datos como hectáreas y costo por ha.\nPara ver todos los comandos, escribí:\nVER COMANDOS\n\n━━━━━━━━━━━━━━━━━━━━━━━\n📦 *PLANTILLA GRATIS*\n━━━━━━━━━━━━━━━━━━━━━━━\nIncluye 7 bloques activos en este mensaje. Precio: $0/mes.\nBloques habilitados: precio, clima y muestra trial.",
+          "ms": 10108
+        },
+        {
+          "user": "Hola, soy nueva con esto. Me decis simple cuanto esta la soja hoy?",
+          "bot": "*Mercado*\n- Soja Rosario: $422.000 ARS/tn\n- Fecha del dato: 2026-04-30\n- Fuente: vivo_cac\n\n*Lectura*\nEl precio de referencia se mantiene en $422.000 según el último registro disponible. A la fecha de hoy, 2026-05-04, no se han reportado nuevos valores en la base interna.\n\n*Decisión*\nConsiderar el costo del flete desde Azul hacia puerto (Rosario o Quequén) para determinar el margen neto real. Si no hay necesidad urgente de liquidez, monitorear la apertura de nuevos precios de pizarra.\n\n*Riesgo*\nVolatilidad en el tipo de cambio y desfase de 4 días en la actualización de precios de referencia.\n\nConsultá nuevamente al cierre de la rueda para verificar actualizaciones.\n\n━━━━━━━━━━━━━━━━━━━━━━━\n📦 *PLANTILLA GRATIS*\n━━━━━━━━━━━━━━━━━━━━━━━\nIncluye 7 bloques activos en este mensaje. Precio: $0/mes.\nConsulta libre esencial con respuesta concreta.",
+          "ms": 10328
+        },
+        {
+          "user": "Y el clima para Azul los proximos 3 dias?",
+          "bot": "*Pronóstico*\n- Hoy 04/05: 7.50°C a 19.50°C | 0.00 mm (Soleado)\n- Mañana 05/05: 10.70°C a 20.70°C | 0.00 mm (Soleado)\n- Miércoles 06/05: 11.10°C a 16.60°C | 36.57 mm (Fuertes lluvias)\n- Fuente: open_meteo (04/05/2026)\n\n*Lectura*\nSe observa una ventana de buen tiempo y temperaturas agradables en Azul para las próximas 48 horas. Sin embargo, el registro para el miércoles indica un evento de precipitaciones intensas que cortará la estabilidad actual.\n\n*Decisión*\nPriorizar y completar labores de cosecha, siembra o aplicaciones terrestres entre hoy y mañana. El miércoles 06/05 las condiciones no serán aptas para trabajo en campo ni tránsito pesado.\n\n*Riesgo*\nEl volumen de lluvia previsto (36.57 mm) para el miércoles representa un riesgo alto de falta de piso y complicaciones logísticas en caminos secundarios de la zona.\n\nAprovechá la ventana seca hasta mañana martes inclusive.\n\n━━━━━━━━━━━━━━━━━━━━━━━\n📦 *PLANTILLA GRATIS*\n━━━━━━━━━━━━━━━━━━━━━━━\nIncluye 7 bloques activos en este mensaje. Precio: $0/mes.\nConsulta libre esencial con respuesta concreta.",
+          "ms": 11732
+        },
+        {
+          "user": "Tengo 180 cabezas, como las cargo bien?",
+          "bot": "*Contexto*\n- Hacienda: sin datos en base (referencias de precios no disponibles en snapshot actual).\n- Clima Azul (04/05): 7.50°C a 19.50°C, soleado.\n- Clima Azul (05/05): 10.70°C a 20.70°C, soleado.\n- Clima Azul (06/05): 36.57 mm, fuertes lluvias.\n- Fuente: open_meteo (04/05/2026).\n\n*Lectura*\nDisponés de una ventana operativa de 48 horas de buen tiempo antes del frente de tormenta previsto para el miércoles 06/05. Para 180 cabezas, considerando jaulas estándar de 30-35 animales (según peso/categoría), necesitás coordinar entre 5 y 6 movimientos de camión. El estado de los caminos en Azul permitirá la entrada y salida sin inconvenientes solo hasta mañana martes.\n\n*Decisión*\nConcentrar la carga y el despacho entre hoy lunes 04/05 y mañana martes 05/05 para evitar complicaciones logísticas por barro.\n\n*Riesgo*\nEl pronóstico indica lluvias de importancia (más de 36 mm) el miércoles, lo que podría anular la carga y generar estrés innecesario en los animales o encajaduras de transporte.\n\n**Resumen operativo:**\nCargá hoy o mañana para evitar el agua del miércoles.\n- Ventana seca: hasta 05/05.\n- Alerta lluvia: 06/05 (36.57 mm).\n- Logística: Coordinar 6 jaulas antes del miércoles.\n\nAprovechá el buen tiempo de hoy para despachar.\n\n━━━━━━━━━━━━━━━━━━━━\n🌐 *Complemento web*\n━━━━━━━━━━━━━━━━━━━━\n⚠️ _Complemento web_ — *no reemplaza* la base AgroHabilis.\nPuede estar desactualizado o ser inexacto → verificá *fuente* y *fecha* antes de operar.\n\n📌 **Logística:** Para **180 cabezas**, necesitás **1 camión doble piso** (si son terneros de ~110kg) o **4 jaulas simples** (si es novillo pesado).\n💱 **Mercado (04/05/26):** En Cañuelas, el Novillito promedia **$5.000/kg**, Novillo **$4.600/kg** y Vaca buena **$3.328/kg**.\n━━━━━━━━━━━━━━━━━━━━\n📜 **Normativa SENASA:** Imprescindible el **DT-e** y la nueva **identificación electrónica (RFID)** obligatoria desde el 01/01/26.\n💉 **Sanidad:** El sistema bloquea el DT-e si falta el *certificado de seronegatividad de brucelosis* para destinos de cría o invernada.\n🚛 **Carga:** Hacé encierre la noche anterior; animales con \"panza vacía\" viajan mejor. El transporte debe estar habilitado y lavado.\n⚠️ *Nota:* La capacidad de carga varía según e",
+          "ms": 81588
+        },
+        {
+          "user": "COMPLETAR PERFIL",
+          "bot": "Vamos a completar tu perfil para darte mejores recomendaciones.\n¿Qué querés agregar?\n1️⃣ Hectáreas y costos (para análisis de margen)\n2️⃣ Lotes en distintas zonas\n3️⃣ Datos de hacienda (si tenés ganado)\n4️⃣ Cómo comercializás (disponible o futuros)\n5️⃣ Cultivos (agregar o actualizar lista)",
+          "ms": 22
+        },
+        {
+          "user": "3",
+          "bot": "¿Cuántas cabezas tenés aproximadamente?",
+          "ms": 19
+        },
+        {
+          "user": "180",
+          "bot": "¿Qué categorías/especies manejás? (ej: vacuno novillos, vacuno terneros, porcino madres, ovino ovejas)",
+          "ms": 14
+        },
+        {
+          "user": "vacuno cria, vacuno terneros",
+          "bot": "Listo, guardé tus datos de hacienda. ✅\n\nSi querés más información procesada (por ejemplo, margen por cultivo), te voy a pedir datos como hectáreas y costo por ha.\nPara ver todos los comandos, escribí: *VER COMANDOS*",
+          "ms": 48
+        }
+      ]
+    },
+    {
+      "productor": 3,
+      "nombre": "Nestor Palavecino",
+      "whatsapp": "5491199800003",
+      "conv": [
+        {
+          "user": "Hola",
+          "bot": "Hola! Soy AgroHabilis 🌾, tu asistente agropecuario.\nArrancás en Plan GRATIS y podés cambiarlo cuando quieras:\n- GRATIS: $0/mes\n- BASICO: $9.000/mes (QUIERO PLAN BASICO)\n- PRO: $18.000/mes (QUIERO PLAN PRO)\n\nPara empezar solo necesito tres datos rápidos.\n¿Cuál es tu nombre y apellido?",
+          "ms": 13
+        },
+        {
+          "user": "Nestor Palavecino",
+          "bot": "¿En qué provincia y partido trabajás?\nSepará zonas con guion (-).\nLímite por plan: Gratis 1 zona, Básico 3 zonas, Pro 6 zonas.\nFormato: Provincia, Partido - Provincia, Partido\nEj: Buenos Aires, Tandil - Córdoba, Río Cuarto",
+          "ms": 14
+        },
+        {
+          "user": "Buenos Aires, Balcarce",
+          "bot": "¿Qué trabajás principalmente?\nPodés elegir más de una opción: cultivos y/o ganadería.\nEjemplos:\n- soja, maíz, trigo\n- ganadería\n- soja, maíz y ganadería",
+          "ms": 14
+        },
+        {
+          "user": "papa",
+          "bot": "🌾 *¡Bienvenido a AgroHabilis, Nestor Palavecino!*\nEste es tu primer resumen personalizado.\n\n━━━━━━━━━━━━━━━━━━━━━━━\n💰 *TUS CULTIVOS HOY*\n━━━━━━━━━━━━━━━━━━━━━━━\n🌱 *Papa*\nDisponible MCBA_PUESTOS_SUDESTE_CEPILLADA: ARS 611.110/tn\nFuturo cercano: s/d\nTendencia 7 días: sin datos\n\n━━━━━━━━━━━━━━━━━━━━━━━\n💵 *TIPO DE CAMBIO*\n━━━━━━━━━━━━━━━━━━━━━━━\nOficial: $1.420 | Blue: $1.405 | MEP: $1.449\n\n━━━━━━━━━━━━━━━━━━━━━━━\n🌤️ *CLIMA EN TUS ZONAS*\n━━━━━━━━━━━━━━━━━━━━━━━\n📍 Balcarce, Buenos Aires\ndomingo: 9°C - 20°C | Soleado | 🌧️ 0,0 mm\nlunes: 11°C - 20°C | Soleado | 🌧️ 0,0 mm\nmartes: 10°C - 16°C | Fuertes lluvias | 🌧️ 61,4 mm\nmiércoles: 12°C - 16°C | Lluvia  moderada a intervalos | 🌧️ 3,9 mm\njueves: 4°C - 10°C | Lluvia moderada | 🌧️ 5,9 mm\nviernes: 7°C - 9°C | Lluvia  moderada a intervalos | 🌧️ 0,9 mm\nsábado: 5°C - 15°C | Soleado | 🌧️ 0,1 mm\n\n━━━━━━━━━━━━━━━━━━━━━━━\n🔍 *DATO QUE QUIZÁS NO SABÍAS*\n━━━━━━━━━━━━━━━━━━━━━━━\nLa papa sudeste cepillada cotiza a $611.110,00 ARS en los puestos del Mercado Central (24/04/2026, fuente: MCBA).\nEste valor es la referencia actual para la mercadería premium de Balcarce en plaza; tendencia de 7 días: sin datos en base.\n\nHoy además se destaca en noticias:\n- Viñedos extremos, papa, nogales y hasta ganado: los secretos del “chateau” francés que revive en Mendoza (InfoCampo)\n- Regar los campos argentinos ahora trae beneficios impositivos (TodoAgro)\n\n━━━━━━━━━━━━━━━━━━━━━━━\n💡 *PODÉS PREGUNTARME AHORA*\n━━━━━━━━━━━━━━━━━━━━━━━\n→ \"¿Me conviene vender papa esta semana?\"\n→ \"Avisame cuando el maíz supere USD 200\"\n→ \"¿Cómo viene la cosecha gruesa este año?\"\n\n━━━━━━━━━━━━━━━━━━━━━━━\n📦 *PLAN ACTUAL: GRATIS*\n━━━━━━━━━━━━━━━━━━━━━━━\nSi querés cambiarlo, escribí:\n- QUIERO PLAN BASICO ($9.000/mes)\n- QUIERO PLAN PRO ($18.000/mes)\n- QUIERO PLAN GRATIS ($0/mes)\n\n📆 En Plan Gratis recibís resumen 2 veces por semana:\n- al día siguiente de tu registro\n- luego todos los lunes y jueves (8am)\n\nY cuando quieras mejorar tus recomendaciones escribí:\nCOMPLETAR PERFIL\n\nSi querés recomendaciones más procesadas (ej: margen por cultivo), te voy a pedir datos como hectáreas y costo por ha.\nPara ver todos los comandos, escribí:\nVER COMANDOS\n\n━━━━━━━━━━━━━━━━━━━━",
+          "ms": 14950
+        },
+        {
+          "user": "laburo Spunta y Kennebec, me sirve el bot para eso?",
+          "bot": "Para variedades de papa como Spunta y Kennebec los precios están sin datos en base, aunque el sistema permite monitorear otros mercados y logística.\n\n*Contexto*\nMercado de referencia y web fallback al 2026-05-04.\n\n*Lectura*\n- Papa (Spunta/Kennebec): sin datos en base.\n- Trigo: $281.600 ARS (2026-05-04, fuente: TODOAGRO_WEB_ROS).\n- Maíz: $265.400 ARS (2026-05-04, fuente: TODOAGRO_WEB_ROS).\n- Soja (Futuro mayo): 315.40 USD/t (2026-04-28, fuente: Safras).\n- Clima local: sin datos en base.\n\n*Decisión*\nUtilizar el bot para el seguimiento de granos si forman parte de tu rotación o para costos logísticos; para valores específicos de papa, la base no cuenta con cobertura actual.\n\n*Riesgo*\nFalta de parámetros de negociación para hortícolas específicos, lo que requiere validación externa para decisiones de venta de Spunta/Kennebec.\n\nConsultá por fletes o tipo de cambio para completar tu análisis de costos.\n\n━━━━━━━━━━━━━━━━━━━━\n🌐 *Complemento web*\n━━━━━━━━━━━━━━━━━━━━\n⚠️ _Complemento web_ — *no reemplaza* la base AgroHabilis.\nPuede estar desactualizado o ser inexacto → verificá *fuente* y *fecha* antes de operar.\n\n🥔 **Papa Spunta y Kennebec:** ¡Absolutamente! El bot rastrea estos mercados clave para vos.\n💰 Al **04/05/2026**, la bolsa de **Spunta** (20kg) en el *Mercado Central* promedia los **$11.000 ARS**.\n🏭 La **Kennebec** (_variedad industrial_) mantiene valores firmes por demanda sostenida de procesadoras.\n━━━━━━━━━━━━━━━━━━━━\n🚜 **Campaña:** El *Sudeste bonaerense* lidera la oferta con ingresos fluidos a los grandes centros.\n⚠️ **MAGYP** advierte posibles demoras en el arranque por _excesos de humedad_ en la zona de Balcarce.\n📊 Consultame por fletes actualizados y el reporte de stocks de **Argenpapa** para hoy.\nEnlaces: https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQG9RPODtpk-T4YS40vfSYdH_3sZJ_HXFGBt-G8fUrM9JNp6c30bUp5PPNorP02jtWlHX0hLg5QrtPdSz_0IwAoYpzhCVmPjJGlWthlrpYs90NghSd-KgWcPRMaBA7xHO621oW6jJT2XKjAUT8GTigwmLxw= | https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQEFcQiQJZiwZe6c2oXTrfhBRDs2wfYjPoHDqhOME5Y9EFr0ShSL9LuqlaiJu38YojrfN5zd13tD-XNS2DlPF0XjojPnFDYcJMked84h1jfq_aTBYZAkuSBv5wQohM0fJIo= | https://vertexaisearch",
+          "ms": 81450
+        },
+        {
+          "user": "precio papa mercado central hoy?",
+          "bot": "El precio de referencia para papa en el Mercado Central (Sudeste Cepillada) es de $611.110 ARS, según el último registro del 24/04/2026. Para la fecha de hoy (04/05/2026), el dato actualizado se encuentra sin datos en base.\n\n- Papa (MCBA Sudeste): $611.110 ARS (24/04/2026 | fuente: bd_stale)\n- Precio para hoy (04/05/2026): sin datos en base\n- Ubicación: Balcarce, Buenos Aires\n\n*Mercado*\nEl valor disponible para Papa (MCBA Puestos Sudeste Cepillada) es de $611.110 ARS por unidad de medida de mercado (2026-04-24, fuente: bd_stale). No se registran ingresos de precios nuevos en la base para la jornada del 04/05/2026.\n\n*Lectura*\nExiste un desfasaje de 10 días entre el último registro y la fecha actual. El valor de $611.110 ARS funciona como referencia histórica cercana, pero no captura las oscilaciones de oferta y demanda de la última semana en el Mercado Central de Buenos Aires.\n\n*Decisión*\nUtilizar el precio de abril con cautela. Se recomienda verificar los valores de carga local en Balcarce antes de coordinar fletes, dado que el precio \"hoy\" está sin datos en base para confirmar tendencia.\n\n*Riesgo*\nEl principal riesgo es la desactualización del precio ante la volatilidad propia de los productos hortícolas. Una diferencia de 10 días en papa puede implicar cambios significativos por calidad o volumen de ingresos al mercado.\n\nConsultá nuevamente por la tarde para verificar actualizaciones de pizarra.\n\n━━━━━━━━━━━━━━━━━━━━\n🌐 *Complemento web*\n━━━━━━━━━━━━━━━━━━━━\n⚠️ _Complemento web_ — *no reemplaza* la base AgroHabilis.\nPuede estar desactualizado o ser inexacto → verificá *fuente* y *fecha* antes de operar.\n\n🥔 **Papa en Mercado Central (04/05/2026)**\nEl precio de la **papa cepillada (Sudeste)** se mantiene hoy en **$611,11 por kg**, sin variaciones respecto al reporte del 24/04.\n💰 La bolsa (18-20kg) cotiza entre **$9.000 y $11.000** según calidad y procedencia.\n💱 _Tendencia:_ Estabilidad total (**0%**) tras la recomposición de precios de inicios de año.\n━━━━━━━━━━━━━━━━━━━━\n🚛 **Logística y Oferta**\nHoy ingresaron **86 camiones** (33 a Nave de Papa, 53 a Puestos). Predomina el **Sudeste bonaerense** y **Río Negro**.\n📌 _Dato:_ Variedades premium como la **Papa ",
+          "ms": 33845
+        },
+        {
+          "user": "cuanto me sale el costo por ha si gasto mucho en bolsa?",
+          "bot": "*Contexto*\n- Costo operativo (bolsa): sin datos en base.\n- Papa (Referencia histórica): $611.110 ARS (24/04/2026 | Mercado Central).\n- Trigo Ros: $281.600 ARS (04/05/2026 | TODOAGRO_WEB_ROS).\n- Maíz Ros: $265.400 ARS (04/05/2026 | TODOAGRO_WEB_ROS).\n- Soja mayo: 315,40 USD/t (28/04/2026 | Safras).\n\n*Lectura*\nNo se dispone del desglose técnico de costos operativos para insumos de empaque o silobolsa en la base interna para Balcarce al 04/05/2026. Un incremento en el gasto de bolsa impacta directamente en el margen neto por hectárea, elevando el punto de equilibrio necesario para cubrir la inversión, especialmente en cultivos regionales.\n\n*Decisión*\nSin datos en base para realizar el cálculo exacto por hectárea. Se recomienda relevar el valor actual del insumo en zona para contrastar con los precios de referencia de mercado disponibles.\n\n*Riesgo*\nFalta de trazabilidad de costos fijos y variables específicos en el sistema, lo que puede derivar en una subestimación del costo total de campaña ante la volatilidad de precios de insumos plásticos.\n\nPara calcular el impacto, cargá el valor de la bolsa; por ahora el dato está sin datos en base.\n\n━━━━━━━━━━━━━━━━━━━━\n🌐 *Complemento web*\n━━━━━━━━━━━━━━━━━━━━\n⚠️ _Complemento web_ — *no reemplaza* la base AgroHabilis.\nPuede estar desactualizado o ser inexacto → verificá *fuente* y *fecha* antes de operar.\n\n📌 **Costos Silobolsa (04/05/26):** Una bolsa (9x60) ronda los **USD 530**. Sumando servicio de embolsado y extracción (~**USD 12/t**), el costo total operativo es de aprox. **USD 14,60 por tonelada**.\n🌾 **Impacto por ha:** En un **Maíz de 80 qq/ha**, el costo extra es de **USD 117/ha**. Para una **Soja de 30 qq/ha**, el gasto baja a **USD 44/ha**.\n━━━━━━━━━━━━━━━━━━━━\n💱 **Contexto Mercado:** Con el Maíz spot a **$265.400 ARS** (Rosario) y Soja Mayo a **USD 315,40**, el almacenaje se lleva entre el _4% y 5%_ del ingreso bruto por hectárea.\n⚠️ _Nota:_ Los valores de servicios varían según la zona y si el contratista incluye el flete corto. _Fuente: Estimaciones de cámaras y Matba/Rofex._\n\n━━━━━━━━━━━━━━━━━━━━━━━\n📦 *PLANTILLA GRATIS*\n━━━━━━━━━━━━━━━━━━━━━━━\nIncluye 7 bloques activos en este mensaje. Precio: $0/mes.\nConsul",
+          "ms": 76328
+        },
+        {
+          "user": "VER COMANDOS",
+          "bot": "Para ver *todas* las acciones del bot (precios, resumen, alertas, perfil, planes, ventas/gastos):\nEscribí tal cual en una línea: *VER COMANDOS*\n\nAhí tenés la lista con los textos exactos que el asistente entiende.",
+          "ms": 12
+        }
+      ]
+    },
+    {
+      "productor": 4,
+      "nombre": "Hector Colombo",
+      "whatsapp": "5491199800004",
+      "conv": [
+        {
+          "user": "Hola",
+          "bot": "Hola! Soy AgroHabilis 🌾, tu asistente agropecuario.\nArrancás en Plan GRATIS y podés cambiarlo cuando quieras:\n- GRATIS: $0/mes\n- BASICO: $9.000/mes (QUIERO PLAN BASICO)\n- PRO: $18.000/mes (QUIERO PLAN PRO)\n\nPara empezar solo necesito tres datos rápidos.\n¿Cuál es tu nombre y apellido?",
+          "ms": 6
+        },
+        {
+          "user": "Hector Colombo",
+          "bot": "¿En qué provincia y partido trabajás?\nSepará zonas con guion (-).\nLímite por plan: Gratis 1 zona, Básico 3 zonas, Pro 6 zonas.\nFormato: Provincia, Partido - Provincia, Partido\nEj: Buenos Aires, Tandil - Córdoba, Río Cuarto",
+          "ms": 14
+        },
+        {
+          "user": "Santa Fe, Venado Tuerto",
+          "bot": "¿Qué trabajás principalmente?\nPodés elegir más de una opción: cultivos y/o ganadería.\nEjemplos:\n- soja, maíz, trigo\n- ganadería\n- soja, maíz y ganadería",
+          "ms": 16
+        },
+        {
+          "user": "soja, maiz y ganaderia",
+          "bot": "Perfecto. Para personalizar mejor ganadería, decime tipo/categorías de ganado separadas por coma.\nEjemplos:\n- vacuno novillos, vacuno terneros\n- porcino madres, ovino ovejas\n- llama, alpaca",
+          "ms": 15
+        },
+        {
+          "user": "vacuno novillos",
+          "bot": "🌾 *¡Bienvenido a AgroHabilis, Hector Colombo!*\nEste es tu primer resumen personalizado.\n\n━━━━━━━━━━━━━━━━━━━━━━━\n💰 *TUS CULTIVOS HOY*\n━━━━━━━━━━━━━━━━━━━━━━━\n🌽 *Maíz*\nDisponible bcr_gix_seed: ARS 228.000/tn\nFuturo cercano: s/d\nTendencia 7 días: sin datos\n\n🫘 *Soja*\nDisponible rosario_cac: ARS 422.000/tn\nFuturo cercano: s/d\nTendencia 7 días: ▼ 1.6%\n\n━━━━━━━━━━━━━━━━━━━━━━━\n🐄 *TU HACIENDA HOY*\n━━━━━━━━━━━━━━━━━━━━━━━\nnovillo:  $4.490/kg →\nvaca:  $3.625/kg →\nvaquillona:  $4.345/kg →\n━━━━━━━━━━━━━━━━━━━━━━━\n💵 *TIPO DE CAMBIO*\n━━━━━━━━━━━━━━━━━━━━━━━\nOficial: $1.420 | Blue: $1.405 | MEP: $1.449\n\n━━━━━━━━━━━━━━━━━━━━━━━\n🌤️ *CLIMA EN TUS ZONAS*\n━━━━━━━━━━━━━━━━━━━━━━━\n📍 Venado Tuerto, Santa Fe\nlunes: 8°C - 20°C | Soleado | 🌧️ 0,0 mm\nmartes: 11°C - 21°C | Soleado | 🌧️ 0,0 mm\nmiércoles: 11°C - 17°C | Fuertes lluvias | 🌧️ 36,6 mm\n\n━━━━━━━━━━━━━━━━━━━━━━━\n🔍 *DATO QUE QUIZÁS NO SABÍAS*\n━━━━━━━━━━━━━━━━━━━━━━━\n🫘 soja muestra presión bajista (-1.6% en 7 días) con brecha cambiaria en 2%.\nEste combo suele abrir/cerrar ventanas de venta en plazos cortos.\n\nHoy además se destaca en noticias:\n- Precio del maíz en Rosario hoy 26 abril 2026 (InfoCampo)\n- Regar los campos argentinos ahora trae beneficios impositivos (TodoAgro)\n\n━━━━━━━━━━━━━━━━━━━━━━━\n💡 *PODÉS PREGUNTARME AHORA*\n━━━━━━━━━━━━━━━━━━━━━━━\n→ \"¿Me conviene vender maiz esta semana?\"\n→ \"¿Cómo viene el novillo y el maíz?\"\n→ \"Avisame cuando haya salto en dólar MEP\"\n\n━━━━━━━━━━━━━━━━━━━━━━━\n📦 *PLAN ACTUAL: GRATIS*\n━━━━━━━━━━━━━━━━━━━━━━━\nSi querés cambiarlo, escribí:\n- QUIERO PLAN BASICO ($9.000/mes)\n- QUIERO PLAN PRO ($18.000/mes)\n- QUIERO PLAN GRATIS ($0/mes)\n\n📆 En Plan Gratis recibís resumen 2 veces por semana:\n- al día siguiente de tu registro\n- luego todos los lunes y jueves (8am)\n\nY cuando quieras mejorar tus recomendaciones escribí:\nCOMPLETAR PERFIL\n\nSi querés recomendaciones más procesadas (ej: margen por cultivo), te voy a pedir datos como hectáreas y costo por ha.\nPara ver todos los comandos, escribí:\nVER COMANDOS\n\n━━━━━━━━━━━━━━━━━━━━━━━\n📦 *PLANTILLA GRATIS*\n━━━━━━━━━━━━━━━━━━━━━━━\nIncluye 7 bloques activos en este mensaje. Precio: $0/mes.\nBloques habilitados: precio, clima y muestra trial.",
+          "ms": 14024
+        },
+        {
+          "user": "Necesito carry: comparame disponible vs futuro en maiz y soja con MEP",
+          "bot": "SOJA:\n- Spot disponible (misma referencia que tu resumen): rosario cac $ 422.000 · 2026-04-30\n- Futuro MATBA cercano: s/d\n- TC financiero (BOLSA): $ 1.441\n- TC implícito del par spot/futuro: s/d\n- Lectura cambiaria: s/d (negativo = grano barato en USD vs financiero; positivo = implícito arriba del MEP).\n- Spread spot USD vs futuro: s/d (s/d)\n\nMAIZ:\n- Spot disponible (misma referencia que tu resumen): bcr gix seed $ 228.000 · 2026-04-28\n- Futuro MATBA cercano: s/d\n- TC financiero (BOLSA): $ 1.441\n- TC implícito del par spot/futuro: s/d\n- Lectura cambiaria: s/d (negativo = grano barato en USD vs financiero; positivo = implícito arriba del MEP).\n- Spread spot USD vs futuro: s/d (s/d)\n\nLECTURA (corta):\n- Números con la misma fila de disponible que tu resumen + futuro MATBA + MEP/bolsa del día.\n- Si el implícito queda lejos del MEP, antes que “carry puro” suele pesar la mezcla cambiaria.\n\nYO HARÍA (orientación, no asesoramiento personalizado):\n- Soja: sin par completo spot+futuro+MEP para sugerir postura.\n- Maíz: sin par completo spot+futuro+MEP para sugerir postura.\nSi no tenés apuro de pesos: conviene operar en tramos (20-40%) en vez de todo o nada, y revalidar cuando el implícito se acerque al MEP o cambie la curva.",
+          "ms": 40
+        },
+        {
+          "user": "Dolar: oficial vs MEP, brecha y lectura operativa",
+          "bot": "💵 Cotización del dólar\n---------------------\nFecha: 2026-05-04\nDólar oficial (prioridad): OFICIAL: $1.420 (Mon May 04) [ref]\nOtros tipos de cambio: BLUE: $1.405 (Mon May 04) | BOLSA: $1.449 (Mon May 04) | CCL: $1.494 (Mon May 04)",
+          "ms": 36
+        },
+        {
+          "user": "Feedlot chico 80 novillos: que comando uso para cargar stock?",
+          "bot": "Para ver *todas* las acciones del bot (precios, resumen, alertas, perfil, planes, ventas/gastos):\nEscribí tal cual en una línea: *VER COMANDOS*\n\nAhí tenés la lista con los textos exactos que el asistente entiende.",
+          "ms": 17
+        },
+        {
+          "user": "QUIERO PLAN PRO",
+          "bot": "*Contexto*\nAl 2026-05-04, procesamos tu consulta sobre el **Plan Pro** integrando las referencias de mercado disponibles para Venado Tuerto y la región.\n\n*Lectura*\n- TRIGO TODOAGRO_WEB_ROS: $281.600 ARS (2026-05-04).\n- TRIGO TODOAGRO_WEB_MatbaRofex Ros: $286.000 ARS (2026-05-04).\n- MAIZ TODOAGRO_WEB_ROS: $265.400 ARS (2026-05-04).\n- MAIZ TODOAGRO_WEB_MatbaRofex Ros: $266.000 ARS (2026-05-04).\n- SOJA mayo (futuro): 315.40 USD/t (Fuente: Safras, 2026-04-28).\n- Precio institucional/Pizarra: sin datos en base.\n\n*Decisión*\nPara activar las funciones avanzadas y el soporte del Plan Pro, escribí el comando **VER COMANDOS**. Esto te permitirá acceder a la gestión de stock y alertas personalizadas para tu operativa.\n\n*Riesgo*\nLos valores reportados como \"Web fallback\" son referencias externas de sitios especializados; pueden presentar spreads respecto a los cierres oficiales de la Cámara Arbitral de Cereales cuando estos se publiquen.\n\nEscribí **VER COMANDOS** para avanzar con tu suscripción.\n\n━━━━━━━━━━━━━━━━━━━━━━━\n📦 *PLANTILLA GRATIS*\n━━━━━━━━━━━━━━━━━━━━━━━\nIncluye 7 bloques activos en este mensaje. Precio: $0/mes.\nConsulta libre esencial con respuesta concreta.",
+          "ms": 67344
+        }
+      ]
+    },
+    {
+      "productor": 5,
+      "nombre": "Ramona Flores",
+      "whatsapp": "5491199800005",
+      "conv": [
+        {
+          "user": "Hola",
+          "bot": "Hola! Soy AgroHabilis 🌾, tu asistente agropecuario.\nArrancás en Plan GRATIS y podés cambiarlo cuando quieras:\n- GRATIS: $0/mes\n- BASICO: $9.000/mes (QUIERO PLAN BASICO)\n- PRO: $18.000/mes (QUIERO PLAN PRO)\n\nPara empezar solo necesito tres datos rápidos.\n¿Cuál es tu nombre y apellido?",
+          "ms": 14
+        },
+        {
+          "user": "Ramona Flores",
+          "bot": "¿En qué provincia y partido trabajás?\nSepará zonas con guion (-).\nLímite por plan: Gratis 1 zona, Básico 3 zonas, Pro 6 zonas.\nFormato: Provincia, Partido - Provincia, Partido\nEj: Buenos Aires, Tandil - Córdoba, Río Cuarto",
+          "ms": 14
+        },
+        {
+          "user": "Tucuman, Famailla",
+          "bot": "¿Qué trabajás principalmente?\nPodés elegir más de una opción: cultivos y/o ganadería.\nEjemplos:\n- soja, maíz, trigo\n- ganadería\n- soja, maíz y ganadería",
+          "ms": 14
+        },
+        {
+          "user": "limon, cana de azucar",
+          "bot": "🌾 *¡Bienvenido a AgroHabilis, Ramona Flores!*\nEste es tu primer resumen personalizado.\n\n━━━━━━━━━━━━━━━━━━━━━━━\n💰 *TUS CULTIVOS HOY*\n━━━━━━━━━━━━━━━━━━━━━━━\n🌱 *cana de azucar*\nDisponible local: s/d (sin histórico de precios cargado)\nFuturo cercano: s/d\nTendencia 7 días: sin datos\n\n🌱 *limon*\nDisponible local: s/d (sin histórico de precios cargado)\nFuturo cercano: s/d\nTendencia 7 días: sin datos\n\n━━━━━━━━━━━━━━━━━━━━━━━\n💵 *TIPO DE CAMBIO*\n━━━━━━━━━━━━━━━━━━━━━━━\nOficial: $1.420 | Blue: $1.405 | MEP: $1.449\n\n━━━━━━━━━━━━━━━━━━━━━━━\n🌤️ *CLIMA EN TUS ZONAS*\n━━━━━━━━━━━━━━━━━━━━━━━\n📍 Famailla, Tucuman\nlunes: 10°C - 24°C | Soleado | 🌧️ 0,0 mm\nmartes: 13°C - 27°C | Soleado | 🌧️ 0,0 mm\nmiércoles: 15°C - 28°C | Soleado | 🌧️ 0,0 mm\n\n━━━━━━━━━━━━━━━━━━━━━━━\n🔍 *DATO QUE QUIZÁS NO SABÍAS*\n━━━━━━━━━━━━━━━━━━━━━━━\nsin datos en base.\n\nHoy además se destaca en noticias:\n- Precio del maíz en Rosario hoy 26 abril 2026 (InfoCampo)\n- Regar los campos argentinos ahora trae beneficios impositivos (TodoAgro)\n\n━━━━━━━━━━━━━━━━━━━━━━━\n💡 *PODÉS PREGUNTARME AHORA*\n━━━━━━━━━━━━━━━━━━━━━━━\n→ \"¿Me conviene vender cana de azucar esta semana?\"\n→ \"Avisame cuando el maíz supere USD 200\"\n→ \"¿Cómo viene la cosecha gruesa este año?\"\n\n━━━━━━━━━━━━━━━━━━━━━━━\n📦 *PLAN ACTUAL: GRATIS*\n━━━━━━━━━━━━━━━━━━━━━━━\nSi querés cambiarlo, escribí:\n- QUIERO PLAN BASICO ($9.000/mes)\n- QUIERO PLAN PRO ($18.000/mes)\n- QUIERO PLAN GRATIS ($0/mes)\n\n📆 En Plan Gratis recibís resumen 2 veces por semana:\n- al día siguiente de tu registro\n- luego todos los lunes y jueves (8am)\n\nY cuando quieras mejorar tus recomendaciones escribí:\nCOMPLETAR PERFIL\n\nSi querés recomendaciones más procesadas (ej: margen por cultivo), te voy a pedir datos como hectáreas y costo por ha.\nPara ver todos los comandos, escribí:\nVER COMANDOS\n\n━━━━━━━━━━━━━━━━━━━━━━━\n📦 *PLANTILLA GRATIS*\n━━━━━━━━━━━━━━━━━━━━━━━\nIncluye 7 bloques activos en este mensaje. Precio: $0/mes.\nBloques habilitados: precio, clima y muestra trial.",
+          "ms": 55284
+        },
+        {
+          "user": "mijita no entiendo mucho, decime simple como viene el clima",
+          "bot": "Hola, Ramona. Para Famaillá se esperan días de sol seguidos por lluvias a mitad de semana y un descenso de temperatura.\n\n*Pronóstico*\n- 04/05 (Hoy): 9.50° – 24.20° | Soleado\n- 05/05: 12.90° – 27.30° | Soleado\n- 06/05: 15.30° – 28.30° | Soleado\n- 07/05: 13.80° – 24.60° | Lluvia moderada (6.33 mm)\n- 08/05: 7.80° – 18.50° | Lluvia (1.64 mm)\n- 09/05: 4.10° – 17.20° | Soleado\n- 10/05: 4.10° – 20.30° | Soleado\n(Fuente: open_meteo, 04/05/2026)\n\n*Lectura*\nTendrán buen tiempo y calorcito hasta el miércoles. El jueves 07 y viernes 08 se esperan lluvias que cortan la racha seca, seguidas por una entrada de aire frío que hará bajar mucho la temperatura mínima hacia el fin de semana.\n\n*Decisión*\nCompletar tareas que requieran piso seco o movimiento de mercadería antes del jueves.\n\n*Riesgo*\nMonitorear el frío intenso del sábado y domingo (4.10°), ya que el cambio de temperatura será marcado después de las lluvias.\n\nBuen día para las labores.\n\n━━━━━━━━━━━━━━━━━━━━━━━\n📦 *PLANTILLA GRATIS*\n━━━━━━━━━━━━━━━━━━━━━━━\nIncluye 7 bloques activos en este mensaje. Precio: $0/mes.\nConsulta libre esencial con respuesta concreta.",
+          "ms": 11029
+        },
+        {
+          "user": "y el limon como viene de precio?",
+          "bot": "Para el limón, actualmente se encuentra sin datos en base al 04/05/2026.\n\n- Cultivo: Limón\n- Precio: sin datos en base\n\nSe sugiere consultar los reportes de precios de cámaras citrícolas o mercados regionales de Tucumán para obtener una referencia actualizada.\n\n━━━━━━━━━━━━━━━━━━━━\n🌐 *Complemento web*\n━━━━━━━━━━━━━━━━━━━━\n⚠️ _Complemento web_ — *no reemplaza* la base AgroHabilis.\nPuede estar desactualizado o ser inexacto → verificá *fuente* y *fecha* antes de operar.\n\n🍋 **Limón:** En el **Mercado Central (30/04)**, el cajón de 18kg\npromedia los **$14.000** (~**$780/kg**). Hay una tendencia a la baja\n(*-38% mensual*) por el mayor ingreso de la zafra del norte.\n━━━━━━━━━━━━━━━━━━━━\n💱 **Industria/Export:** Precios externos en alza por baches productivos\nen España y Turquía. El aceite esencial cotiza en **USD 23.320/tn**\ny el jugo duplicó su valor interanual. *Demanda firme en Europa.*\n📌 *Fuentes: Federcitrus y Precios del Central (Mayo 2026).*\nEnlaces: https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQG6W_HHO66VCMYcyFx5TGWkjJ0ErE8bYlNjbwvvIK0h6bb5EVrXxHmD58OkSZPRJKyo3gfBh5Fp1VbvBg-VcbWmviE-1DK8PP6G6Q0xTHNN5oXFA1q8_Kq-jShv6PntIRlu4i0_C9I= | https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQGY3dti3MvE38EjSjB2t9WToyCZ90peOmEfFh4S4IEoH78AMuzVbnBzvcqMr9cq9l3p_5sL_baFbdion_wYjInFQ5xtEhyHbGjQP24UJ9mR3JazR2qknJV62KcYUK_TVrgm2fMumbfOjXhpNLK1UzPywX-gwN1UJx7WTo4P3_n2-M9lP36oLO3839d_brWTXUaJ1o8Ee9dBI0tkvbwiG8o_WQFC_2djZKBy2RNpAdM= | https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQGIdrkh8Q48aWKLP6funWA1IkQ-HYVolnclOKPVmLsh-IVTpUn8h1qvQefLIGYBTe2P9kq84xPliPmod7AYNInBPUxqstC9TzyIhPkPCa-guqWQkQLkKAI5PL-UsUReNF0G8uwsVBqTmrNQIUlh1Va9WWvaWUvcgc0yEYuiXhd7Pl5kRYBiH4ir_wHTBKzrV7h34oNlx5DIXDHLbbpSble0fgiotK0Y0N1hF0mcHGYndBBjINyD | https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHRoR2vn9nzwz4BbFLqejP8hWa8x0S4D5-ji2jOaUsaAZFLq834wz1rm3c50pz3kfztZ3JUdLQjaEKSUcEM6QJ8OmfkEyKRpvXrv0Hm0pETLegD2kB1ec7fCMg71Fd1FtUOqvWpzsKnzLxSS2DvdHKNR9d5qZc783i8UiXRmZhPXQ8Vr4Dcis8JSMCh1ChjN4HrIBpvqbdjYV20Dwi-u23bFVhtZRwzKhUEMi1cTabES5R2\n\n━━━━━━━━━━━━━━━━━━━━━━━\n📦 *PLANTILLA GRATIS*\n━━━━━━━━━━━━━━━━━━━━━━━\nIncluye 7 bloques activ",
+          "ms": 81397
+        },
+        {
+          "user": "COMPLETAR PERFIL",
+          "bot": "Vamos a completar tu perfil para darte mejores recomendaciones.\n¿Qué querés agregar?\n1️⃣ Hectáreas y costos (para análisis de margen)\n2️⃣ Lotes en distintas zonas\n3️⃣ Datos de hacienda (si tenés ganado)\n4️⃣ Cómo comercializás (disponible o futuros)\n5️⃣ Cultivos (agregar o actualizar lista)",
+          "ms": 13
+        },
+        {
+          "user": "5",
+          "bot": "Pasame tus cultivos separados por coma. Ejemplo: soja, maíz, trigo (o escribí 'ganadería' si no querés cultivos).",
+          "ms": 22
+        },
+        {
+          "user": "limon, cana de azucar",
+          "bot": "Perfecto, actualicé tus cultivos: Limon, Cana De Azucar ✅\n\nSi querés más información procesada (por ejemplo, margen por cultivo), te voy a pedir datos como hectáreas y costo por ha.\nPara ver todos los comandos, escribí: *VER COMANDOS*",
+          "ms": 45
+        }
+      ]
+    },
+    {
+      "productor": 6,
+      "nombre": "Gustavo Nahuel Paillan",
+      "whatsapp": "5491199800006",
+      "conv": [
+        {
+          "user": "Hola",
+          "bot": "Hola! Soy AgroHabilis 🌾, tu asistente agropecuario.\nArrancás en Plan GRATIS y podés cambiarlo cuando quieras:\n- GRATIS: $0/mes\n- BASICO: $9.000/mes (QUIERO PLAN BASICO)\n- PRO: $18.000/mes (QUIERO PLAN PRO)\n\nPara empezar solo necesito tres datos rápidos.\n¿Cuál es tu nombre y apellido?",
+          "ms": 13
+        },
+        {
+          "user": "Gustavo Nahuel Paillan",
+          "bot": "¿En qué provincia y partido trabajás?\nSepará zonas con guion (-).\nLímite por plan: Gratis 1 zona, Básico 3 zonas, Pro 6 zonas.\nFormato: Provincia, Partido - Provincia, Partido\nEj: Buenos Aires, Tandil - Córdoba, Río Cuarto",
+          "ms": 14
+        },
+        {
+          "user": "Rio Negro, General Roca",
+          "bot": "¿Qué trabajás principalmente?\nPodés elegir más de una opción: cultivos y/o ganadería.\nEjemplos:\n- soja, maíz, trigo\n- ganadería\n- soja, maíz y ganadería",
+          "ms": 10
+        },
+        {
+          "user": "manzana, pera",
+          "bot": "🌾 *¡Bienvenido a AgroHabilis, Gustavo Nahuel Paillan!*\nEste es tu primer resumen personalizado.\n\n━━━━━━━━━━━━━━━━━━━━━━━\n💰 *TUS CULTIVOS HOY*\n━━━━━━━━━━━━━━━━━━━━━━━\n🌱 *manzana*\nDisponible local: s/d (sin histórico de precios cargado)\nFuturo cercano: s/d\nTendencia 7 días: sin datos\n\n🌱 *pera*\nDisponible local: s/d (sin histórico de precios cargado)\nFuturo cercano: s/d\nTendencia 7 días: sin datos\n\n━━━━━━━━━━━━━━━━━━━━━━━\n💵 *TIPO DE CAMBIO*\n━━━━━━━━━━━━━━━━━━━━━━━\nOficial: $1.420 | Blue: $1.405 | MEP: $1.449\n\n━━━━━━━━━━━━━━━━━━━━━━━\n🌤️ *CLIMA EN TUS ZONAS*\n━━━━━━━━━━━━━━━━━━━━━━━\n📍 General Roca, Rio Negro\nlunes: 9°C - 21°C | Lluvia  moderada a intervalos | 🌧️ 0,3 mm\nmartes: 13°C - 20°C | Lluvia  moderada a intervalos | 🌧️ 0,4 mm\nmiércoles: 12°C - 18°C | Lluvia  moderada a intervalos | 🌧️ 0,6 mm\n\n━━━━━━━━━━━━━━━━━━━━━━━\n🔍 *DATO QUE QUIZÁS NO SABÍAS*\n━━━━━━━━━━━━━━━━━━━━━━━\nsin datos en base\n\nHoy además se destaca en noticias:\n- Lucio, el joven que apuesta al cooperativismo porque “el objetivo es producir creciendo todos juntos” (InfoCampo)\n- Entre Ríos digitalizó los registros para operarios fitosanitarios (Noticias de Campo)\n\n━━━━━━━━━━━━━━━━━━━━━━━\n💡 *PODÉS PREGUNTARME AHORA*\n━━━━━━━━━━━━━━━━━━━━━━━\n→ \"¿Me conviene vender manzana esta semana?\"\n→ \"Avisame cuando el maíz supere USD 200\"\n→ \"¿Cómo viene la cosecha gruesa este año?\"\n\n━━━━━━━━━━━━━━━━━━━━━━━\n📦 *PLAN ACTUAL: GRATIS*\n━━━━━━━━━━━━━━━━━━━━━━━\nSi querés cambiarlo, escribí:\n- QUIERO PLAN BASICO ($9.000/mes)\n- QUIERO PLAN PRO ($18.000/mes)\n- QUIERO PLAN GRATIS ($0/mes)\n\n📆 En Plan Gratis recibís resumen 2 veces por semana:\n- al día siguiente de tu registro\n- luego todos los lunes y jueves (8am)\n\nY cuando quieras mejorar tus recomendaciones escribí:\nCOMPLETAR PERFIL\n\nSi querés recomendaciones más procesadas (ej: margen por cultivo), te voy a pedir datos como hectáreas y costo por ha.\nPara ver todos los comandos, escribí:\nVER COMANDOS\n\n━━━━━━━━━━━━━━━━━━━━━━━\n📦 *PLANTILLA GRATIS*\n━━━━━━━━━━━━━━━━━━━━━━━\nIncluye 7 bloques activos en este mensaje. Precio: $0/mes.\nBloques habilitados: precio, clima y muestra trial.",
+          "ms": 64471
+        },
+        {
+          "user": "vendo export y mercado interno, me das referencia usd si hay?",
+          "bot": "*Mercado*\n- Trigo (ROS): $281.600 ARS/tn (04/05/2026, Fuente: TodoAgro).\n- Maíz (ROS): $265.400 ARS/tn (04/05/2026, Fuente: TodoAgro).\n- Soja (ROS): $429.000 ARS/tn (04/05/2026, Fuente: TodoAgro).\n- Soja Futuro (Mayo): USD 315,4/tn (28/04/2026, Fuente: Safras via Web).\n- Referencias USD Exportación (FOB): sin datos en base.\n\n*Lectura*\n- Confianza de lectura media debido a la heterogeneidad de fuentes disponibles.\n- No se cuenta con datos de precios FOB en USD para la fecha actual en la base, solo referencias de mercado interno en pesos y un futuro de soja de referencia externa.\n- Falta de futuro comparable para determinar carry o backwardation cerrada.\n\n*Decisión*\n- Monitorear la brecha entre los valores en pesos del disponible y la referencia del futuro soja para coordinar ventas.\n- Ante la falta de FOB actualizado, utilizar los precios de pizarra Rosario como base de negociación para mercado interno.\n\n*Riesgo*\n- Riesgo principal: mezclar referencias heterogéneas (FOB, spot y futuros) sin considerar la comparabilidad temporal.\n- Riesgo operativo: un incremento en el precio del maíz podría comprimir los márgenes de esquemas de feedlot.\n\nFijá valores internos en pesos y esperá paridad FOB para exportación.\n\n━━━━━━━━━━━━━━━━━━━━\n🌐 *Complemento web*\n━━━━━━━━━━━━━━━━━━━━\n⚠️ _Complemento web_ — *no reemplaza* la base AgroHabilis.\nPuede estar desactualizado o ser inexacto → verificá *fuente* y *fecha* antes de operar.\n\n📌 **Referencias de Mercado (04/05/2026)**\n🚢 **Exportación (FOB Oficial):** Soja **USD 433**, Maíz **USD 216**, Trigo **USD 235**.\n━━━━━━━━━━━━━━━━━━━━\n🏘️ **Mercado Interno (Spot/Pizarra):**\n💱 **Soja:** Rosario **USD 309** _(aprox. $430.000 ARS)_, Matba May **USD 312**.\n💱 **Maíz:** Rosario **USD 189** _(aprox. $262.675 ARS)_, Matba Jul **USD 195**.\n💱 **Trigo:** Rosario **USD 204** _(aprox. $283.412 ARS)_, Matba Jul **USD 210**.\n⚠️ _TC ref. BNA **$1.391**. Valores orientativos según MAGyP y BCR._\nEnlaces: https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFlHk99sEZugPbCbDl4YjzOFC5asoGXKB-WiuejWAqM5SJ9heAdJgT9BFg6OTfCwq_yersmdlhDAHzHi87ffjB6R2cFljaM7IBU6OJJ6h7w9jvWpMCQ5a02RH_-EIC_ZfAFm58vWxAigRQxx9N02A_A-0cHBw== | https://vertexais",
+          "ms": 100716
+        },
+        {
+          "user": "clima para Roca 3 dias",
+          "bot": "*Pronóstico*\n- Hoy (04/05/2026): 8.9°C a 21.2°C | Lluvia moderada a intervalos (0.27 mm)\n- Mañana (05/05/2026): 13.3°C a 19.6°C | Lluvia moderada a intervalos (0.39 mm)\n- Miércoles (06/05/2026): 12.0°C a 18.4°C | Lluvia moderada a intervalos (0.58 mm)\n(Fuente: bd, 04/05/2026)\n\n*Lectura*\nSe observa un patrón de inestabilidad para los próximos tres días en General Roca, con precipitaciones leves pero persistentes y temperaturas mínimas en ascenso respecto a las jornadas de cielo despejado. El tiempo mejora definitivamente a partir del jueves 07/05 con cielo soleado.\n\n*Decisión*\nPriorizar tareas de mantenimiento o logística interna durante estas 72 horas. Si hay labores de cosecha o pulverización pendientes, considerar que el suelo presentará humedad superficial hasta el miércoles inclusive; retomar aplicaciones a partir del jueves.\n\n*Riesgo*\nBajo riesgo de heladas inmediatas debido a la cobertura nubosa y el ascenso de las mínimas. El principal inconveniente es la persistencia de lloviznas que pueden afectar el ritmo de carga y transporte en caminos secundarios.\n\nAprovechá la ventana de sol que inicia este jueves para labores de suelo.\n\n━━━━━━━━━━━━━━━━━━━━━━━\n📦 *PLANTILLA GRATIS*\n━━━━━━━━━━━━━━━━━━━━━━━\nIncluye 7 bloques activos en este mensaje. Precio: $0/mes.\nConsulta libre esencial con respuesta concreta.",
+          "ms": 14164
+        },
+        {
+          "user": "COMPLETAR PERFIL",
+          "bot": "Vamos a completar tu perfil para darte mejores recomendaciones.\n¿Qué querés agregar?\n1️⃣ Hectáreas y costos (para análisis de margen)\n2️⃣ Lotes en distintas zonas\n3️⃣ Datos de hacienda (si tenés ganado)\n4️⃣ Cómo comercializás (disponible o futuros)\n5️⃣ Cultivos (agregar o actualizar lista)",
+          "ms": 19
+        },
+        {
+          "user": "4",
+          "bot": "¿Cómo comercializás? Respondé: 1 disponible, 2 futuros.",
+          "ms": 14
+        },
+        {
+          "user": "2",
+          "bot": "Perfecto, actualicé tu forma de comercialización. ✅\n\nSi querés más información procesada (por ejemplo, margen por cultivo), te voy a pedir datos como hectáreas y costo por ha.\nPara ver todos los comandos, escribí: *VER COMANDOS*",
+          "ms": 32
+        }
+      ]
+    },
+    {
+      "productor": 7,
+      "nombre": "Silvia Mamani",
+      "whatsapp": "5491199800007",
+      "conv": [
+        {
+          "user": "Hola",
+          "bot": "Hola! Soy AgroHabilis 🌾, tu asistente agropecuario.\nArrancás en Plan GRATIS y podés cambiarlo cuando quieras:\n- GRATIS: $0/mes\n- BASICO: $9.000/mes (QUIERO PLAN BASICO)\n- PRO: $18.000/mes (QUIERO PLAN PRO)\n\nPara empezar solo necesito tres datos rápidos.\n¿Cuál es tu nombre y apellido?",
+          "ms": 13
+        },
+        {
+          "user": "Silvia Mamani",
+          "bot": "¿En qué provincia y partido trabajás?\nSepará zonas con guion (-).\nLímite por plan: Gratis 1 zona, Básico 3 zonas, Pro 6 zonas.\nFormato: Provincia, Partido - Provincia, Partido\nEj: Buenos Aires, Tandil - Córdoba, Río Cuarto",
+          "ms": 13
+        },
+        {
+          "user": "Jujuy, Humahuaca",
+          "bot": "¿Qué trabajás principalmente?\nPodés elegir más de una opción: cultivos y/o ganadería.\nEjemplos:\n- soja, maíz, trigo\n- ganadería\n- soja, maíz y ganadería",
+          "ms": 14
+        },
+        {
+          "user": "papa andina, quinoa y ganaderia",
+          "bot": "Perfecto. Para personalizar mejor ganadería, decime tipo/categorías de ganado separadas por coma.\nEjemplos:\n- vacuno novillos, vacuno terneros\n- porcino madres, ovino ovejas\n- llama, alpaca",
+          "ms": 14
+        },
+        {
+          "user": "llama, alpaca",
+          "bot": "🌾 *¡Bienvenido a AgroHabilis, Silvia Mamani!*\nEste es tu primer resumen personalizado.\n\n━━━━━━━━━━━━━━━━━━━━━━━\n💰 *TUS CULTIVOS HOY*\n━━━━━━━━━━━━━━━━━━━━━━━\n🌱 *Papa*\nDisponible MCBA_PUESTOS_SUDESTE_CEPILLADA: ARS 611.110/tn\nFuturo cercano: s/d\nTendencia 7 días: sin datos\n\n🌱 *quinoa*\nDisponible local: s/d (sin histórico de precios cargado)\nFuturo cercano: s/d\nTendencia 7 días: sin datos\n\n━━━━━━━━━━━━━━━━━━━━━━━\n🐄 *TU HACIENDA HOY*\n━━━━━━━━━━━━━━━━━━━━━━━\nSin cotización específica para: alpaca, llama.\n\nReferencia disponible hoy (mercado general):\nnovillo:  $4.490/kg\n━━━━━━━━━━━━━━━━━━━━━━━\n💵 *TIPO DE CAMBIO*\n━━━━━━━━━━━━━━━━━━━━━━━\nOficial: $1.416 | Blue: $1.405 | MEP: $1.449\n\n━━━━━━━━━━━━━━━━━━━━━━━\n🌤️ *CLIMA EN TUS ZONAS*\n━━━━━━━━━━━━━━━━━━━━━━━\n📍 Humahuaca, Jujuy\nlunes: 10°C - 24°C | Soleado | 🌧️ 0,0 mm\nmartes: 13°C - 27°C | Soleado | 🌧️ 0,0 mm\nmiércoles: 15°C - 28°C | Soleado | 🌧️ 0,0 mm\n\n━━━━━━━━━━━━━━━━━━━━━━━\n🔍 *DATO QUE QUIZÁS NO SABÍAS*\n━━━━━━━━━━━━━━━━━━━━━━━\nDato clave: hoy conviene monitorear base local vs futuro cercano para detectar ventanas de precio.\n\nHoy además se destaca en noticias:\n- Viñedos extremos, papa, nogales y hasta ganado: los secretos del “chateau” francés que revive en Mendoza (InfoCampo)\n- Regar los campos argentinos ahora trae beneficios impositivos (TodoAgro)\n\n━━━━━━━━━━━━━━━━━━━━━━━\n💡 *PODÉS PREGUNTARME AHORA*\n━━━━━━━━━━━━━━━━━━━━━━━\n→ \"¿Me conviene vender papa esta semana?\"\n→ \"¿Cómo viene el novillo y el maíz?\"\n→ \"Avisame cuando haya salto en dólar MEP\"\n\n━━━━━━━━━━━━━━━━━━━━━━━\n📦 *PLAN ACTUAL: GRATIS*\n━━━━━━━━━━━━━━━━━━━━━━━\nSi querés cambiarlo, escribí:\n- QUIERO PLAN BASICO ($9.000/mes)\n- QUIERO PLAN PRO ($18.000/mes)\n- QUIERO PLAN GRATIS ($0/mes)\n\n📆 En Plan Gratis recibís resumen 2 veces por semana:\n- al día siguiente de tu registro\n- luego todos los lunes y jueves (8am)\n\nY cuando quieras mejorar tus recomendaciones escribí:\nCOMPLETAR PERFIL\n\nSi querés recomendaciones más procesadas (ej: margen por cultivo), te voy a pedir datos como hectáreas y costo por ha.\nPara ver todos los comandos, escribí:\nVER COMANDOS\n\n━━━━━━━━━━━━━━━━━━━━━━━\n📦 *PLANTILLA GRATIS*\n━━━━━━━━━━━━━━━━━━━━━━━\nIncluye 7 bloques activos en este ",
+          "ms": 197293
+        },
+        {
+          "user": "allin punchay, ayudame con feria: que llevaria hoy para vender mejor?",
+          "bot": "Allin punchay, Silvia. Para hoy 04/05/2026 disponemos de referencias de granos en Rosario, pero no contamos con registros específicos de productos de feria para tu zona en la base.\n\n*Mercado*\n- Trigo: $281.600 (04/05/2026, fuente: TODOAGRO_WEB_ROS)\n- Maíz: $265.400 (04/05/2026, fuente: TODOAGRO_WEB_ROS)\n- Soja: $429.000 (04/05/2026, fuente: TODOAGRO_WEB_ROS)\n- Papa y hortalizas: sin datos en base\n\n*Lectura*\n- Confianza de lectura: media (según cobertura y comparabilidad de fuentes).\n- Si falta futuro comparable, no se fuerza una conclusión de carry/backwardation cerrada.\n- Los valores de granos en Rosario sirven como referencia macro, pero no reflejan la dinámica de la feria local en Humahuaca.\n\n*Decisión*\n- Ante la ausencia de datos en base sobre hortalizas o productos regionales, se sugiere realizar un relevamiento directo en plaza local para definir la carga.\n\n*Riesgo*\n- Riesgo principal: mezclar referencias heterogéneas (FOB/spot/futuros) sin comparabilidad temporal.\n- Riesgo operativo: si sube maíz, se comprime margen de feedlot.\n\nRelevá precios en plaza local hoy antes de vender.\n\n━━━━━━━━━━━━━━━━━━━━\n🌐 *Complemento web*\n━━━━━━━━━━━━━━━━━━━━\n⚠️ _Complemento web_ — *no reemplaza* la base AgroHabilis.\nPuede estar desactualizado o ser inexacto → verificá *fuente* y *fecha* antes de operar.\n\n📌 ¡Allin punchay! Para la feria de hoy (**04/05/26**), lo que mejor defiende el precio es la **hacienda liviana**. **Novillitos y vaquillonas** marcaron máximos de **$5.000 - $5.500/kg** (29/04) por la falta de lotes bien terminados.\n━━━━━━━━━━━━━━━━━━━━\n💱 En granos, la **Soja Rosario** cerró en **$422.000** y el **Maíz** en **$262.500** (Pizarra 30/04). El maíz firme favorece al vendedor de grano, pero _castiga_ el margen del feedlotero.\n⚠️ **Riesgo:** Con el cereal alto, el margen de engorde está muy fino; si llevás invernada, asegurá plazos cortos porque el comprador está con cautela extrema.\n━━━━━━━━━━━━━━━━━━━━\n_Nota: Los valores de pizarra son del 30/04; el MAG (Cañuelas) no reportó ingresos significativos hoy 04/05 por ser inicio de semana._\nEnlaces: https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFnwPN4Hf_4Nsp8rFngPEW4__xC94IgSmKpEiCAqfgrvst",
+          "ms": 117719
+        },
+        {
+          "user": "precios de quinoa en mi zona?",
+          "bot": "Silvia, para hoy 04/05/2026 no contamos con registros específicos para el precio de la quinoa en Humahuaca en la base de datos interna.\n\n*Mercado*\n- Quinoa (Humahuaca): sin datos en base.\n- Trigo: $281.600 ARS (04/05/2026, fuente: TODOAGRO_WEB_ROS).\n- Maíz: $265.400 ARS (04/05/2026, fuente: TODOAGRO_WEB_ROS).\n- Soja (Futuro mayo): 315,40 USD/t (28/04/2026, fuente: Safras).\n\n*Lectura*\nLas fuentes de pizarra actuales (BCR, MAGyP) se concentran en granos mayores de la zona pampeana. Al ser un cultivo de economía regional, la quinoa no cuenta con cotización diaria en los mercados centralizados integrados en el sistema.\n\n*Decisión*\nAnte la falta de dato puntual en base, se recomienda realizar un relevamiento directo en las ferias locales de la zona para establecer valores de referencia actuales.\n\n*Riesgo*\nIncertidumbre en la rentabilidad por falta de precios de referencia oficiales y posibles asimetrías de información en la cadena de comercialización local.\n\nRelevá precios en ferias locales ante la falta de registros oficiales.\n\n━━━━━━━━━━━━━━━━━━━━\n🌐 *Complemento web*\n━━━━━━━━━━━━━━━━━━━━\n⚠️ _Complemento web_ — *no reemplaza* la base AgroHabilis.\nPuede estar desactualizado o ser inexacto → verificá *fuente* y *fecha* antes de operar.\n\n📌 **Precio de Quinoa (04/05/2026)**\nAl ser un *cultivo especial*, no cuenta con cotización en **MATBA/Rofex** ni pizarras oficiales de cereales. En el NOA (principal zona productora), el precio al productor se estima entre **$3.200 y $4.100 por kg**, dependiendo del grado de limpieza y volumen de la operación.\n━━━━━━━━━━━━━━━━━━━━\n💱 **Mercado Mayorista y Referencias**\nA nivel mayorista, el rango internacional para Argentina en 2026 se sitúa entre **u$s 2,34 y u$s 3,01 por kg**. _Existe gran dispersión de precios_ debido a que las ventas se pactan mediante acuerdos directos o a través de cooperativas regionales.\n━━━━━━━━━━━━━━━━━━━━\n🌧️ **Nota**\n_Se recomienda contactar a la Cooperativa Cauqueva o procesadoras en Salta/Jujuy_ para obtener el valor spot exacto en tu zona hoy.\n\n━━━━━━━━━━━━━━━━━━━━━━━\n📦 *PLANTILLA GRATIS*\n━━━━━━━━━━━━━━━━━━━━━━━\nIncluye 7 bloques activos en este mensaje. Precio: $0/mes.\nConsulta libre esencial con res",
+          "ms": 88932
+        },
+        {
+          "user": "COMPLETAR PERFIL",
+          "bot": "Vamos a completar tu perfil para darte mejores recomendaciones.\n¿Qué querés agregar?\n1️⃣ Hectáreas y costos (para análisis de margen)\n2️⃣ Lotes en distintas zonas\n3️⃣ Datos de hacienda (si tenés ganado)\n4️⃣ Cómo comercializás (disponible o futuros)\n5️⃣ Cultivos (agregar o actualizar lista)",
+          "ms": 16
+        },
+        {
+          "user": "3",
+          "bot": "¿Cuántas cabezas tenés aproximadamente?",
+          "ms": 15
+        },
+        {
+          "user": "40",
+          "bot": "¿Qué categorías/especies manejás? (ej: vacuno novillos, vacuno terneros, porcino madres, ovino ovejas)",
+          "ms": 11
+        },
+        {
+          "user": "llama, alpaca",
+          "bot": "Listo, guardé tus datos de hacienda. ✅\n\nSi querés más información procesada (por ejemplo, margen por cultivo), te voy a pedir datos como hectáreas y costo por ha.\nPara ver todos los comandos, escribí: *VER COMANDOS*",
+          "ms": 38
+        }
+      ]
+    }
+  ]
+}

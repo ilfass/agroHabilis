@@ -11,8 +11,8 @@ const {
 const { renderTemplate } = require("../templates");
 const { resolverPlanEfectivo } = require("./planes");
 
-const MENSAJE_BIENVENIDA = `¡Hola! Soy AgroHabilis 🌾, tu asistente agropecuario.
-Arrancás en *Plan GRATIS* y podés cambiarlo cuando quieras:
+const MENSAJE_BIENVENIDA = `Hola! Soy AgroHabilis 🌾, tu asistente agropecuario.
+Arrancás en Plan GRATIS y podés cambiarlo cuando quieras:
 - GRATIS: $0/mes
 - BASICO: $9.000/mes (QUIERO PLAN BASICO)
 - PRO: $18.000/mes (QUIERO PLAN PRO)
@@ -56,6 +56,8 @@ const parseNumero = (texto) => {
 const normalizarCultivo = (txt = "") => {
   const t = normalizarTexto(txt);
   if (!t) return null;
+  // Variedades de papa deben agruparse bajo "Papa" y no crear cultivo separado.
+  if (/(spunta|kennebec|innovator|santana|russet|atlantic|shepody)/.test(t)) return "Papa";
   if (t.includes("soja")) return "Soja";
   if (t.includes("maiz")) return "Maiz";
   if (t.includes("trigo")) return "Trigo";
@@ -214,9 +216,8 @@ const detectarTipoComercializacion = (texto = "") => {
   return null;
 };
 
-const obtenerEstadoOnboarding = async (numeroWhatsapp) => {
-  const whatsapp = normalizarWhatsapp(numeroWhatsapp);
-  if (!whatsapp) return null;
+const fetchOnboardingRow = async (claveWhatsapp) => {
+  if (!claveWhatsapp) return null;
   const result = await query(
     `
       SELECT id, whatsapp, paso_actual, datos_temporales, completado
@@ -224,9 +225,32 @@ const obtenerEstadoOnboarding = async (numeroWhatsapp) => {
       WHERE whatsapp = $1
       LIMIT 1
     `,
-    [whatsapp]
+    [claveWhatsapp]
   );
   return result.rows[0] || null;
+};
+
+/**
+ * La clave en onboarding_estado es el número canónico; con @lid el jid no coincide.
+ * Si hay usuario vinculado (por jid o número), probamos también whatsapp / whatsapp_real guardados.
+ */
+const obtenerEstadoOnboarding = async (numeroWhatsapp) => {
+  const directo = normalizarWhatsapp(numeroWhatsapp);
+  const porClave = await fetchOnboardingRow(directo);
+  if (porClave) return porClave;
+
+  const usuario = await buscarPorWhatsapp(numeroWhatsapp);
+  if (!usuario) return null;
+  const alternativas = [
+    normalizarWhatsapp(usuario.whatsapp || ""),
+    normalizarWhatsapp(usuario.whatsapp_real || ""),
+  ].filter((w) => w && w !== directo);
+
+  for (const alt of alternativas) {
+    const row = await fetchOnboardingRow(alt);
+    if (row) return row;
+  }
+  return null;
 };
 
 const actualizarEstadoOnboarding = async ({
@@ -369,10 +393,12 @@ const finalizarOnboarding = async ({ numeroWhatsapp, datos }) => {
   });
 
   let primerResumenOk = false;
+  let primerResumenMensaje = null;
   const intentosMax = 2;
   for (let intento = 1; intento <= intentosMax; intento += 1) {
     try {
-      await renderTemplate("bienvenida", usuario);
+      const generado = await renderTemplate("bienvenida", usuario, { enviar: false });
+      primerResumenMensaje = generado?.mensaje || null;
       primerResumenOk = true;
       break;
     } catch (error) {
@@ -387,8 +413,8 @@ const finalizarOnboarding = async ({ numeroWhatsapp, datos }) => {
   }
 
   if (primerResumenOk) {
-    // Evitamos mensaje duplicado: el cierre de onboarding queda integrado dentro del primer resumen.
-    return null;
+    // El cierre de onboarding queda integrado dentro del primer resumen.
+    return primerResumenMensaje || "✅ Perfil completado. Escribí *MI RESUMEN* para ver tu informe inicial.";
   }
   return "No pude enviarte el primer resumen en este momento ❗ Escribí *MI RESUMEN* y te lo mando al instante.";
 };
@@ -433,7 +459,13 @@ const procesarPasoOnboarding = async (numeroWhatsapp, mensaje) => {
       datosTemporales: datos,
       completado: false,
     });
-    return MENSAJE_PASO_3;
+    const primera = zonasLimitadas[0];
+    const ackZonaUnica =
+      zonas.length > maxZonasOnboarding
+        ? `En plan *Gratis* solo registro *una* zona: *${primera.provincia}, ${primera.partido}*. ` +
+          `No guardé las otras ${zonas.length - maxZonasOnboarding} (con plan Básico podés hasta 3 y con Pro hasta 6).\n\n`
+        : "";
+    return ackZonaUnica + MENSAJE_PASO_3;
   }
 
   if (estado.paso_actual === 3) {
@@ -839,8 +871,49 @@ const gestionarCompletarPerfil = async (numeroWhatsapp, mensaje) => {
 const gestionarOnboarding = async (numeroWhatsapp, mensaje) => {
   const usuario = await buscarPorWhatsapp(numeroWhatsapp);
   const estado = await obtenerEstadoOnboarding(numeroWhatsapp);
+  const perfil = usuario ? await obtenerPerfil(numeroWhatsapp) : null;
+  const tieneCultivos =
+    Array.isArray(perfil?.cultivos) && perfil.cultivos.length > 0;
+  let perfilMinimoCompleto = Boolean(
+    perfil?.nombre &&
+      perfil?.provincia &&
+      perfil?.partido &&
+      tieneCultivos
+  );
+  if (
+    !perfilMinimoCompleto &&
+    usuario?.id &&
+    perfil?.nombre &&
+    perfil?.provincia &&
+    perfil?.partido
+  ) {
+    const gan = await query(
+      `
+        SELECT 1
+        FROM perfil_productivo
+        WHERE usuario_id = $1
+          AND activo = true
+          AND tipo IN ('ganaderia', 'mixto')
+        LIMIT 1
+      `,
+      [usuario.id]
+    );
+    perfilMinimoCompleto = Boolean(gan.rows[0]);
+  }
 
-  if (usuario && (!estado || estado.completado)) {
+  const datosBasicosEnUsuario = Boolean(
+    usuario &&
+      String(usuario.nombre || "").trim().length >= 2 &&
+      String(usuario.provincia || "").trim() &&
+      String(usuario.partido || "").trim()
+  );
+
+  // Solo salimos del onboarding si hay estado completado o perfil realmente completo.
+  if (usuario && (estado?.completado || perfilMinimoCompleto)) {
+    return { enOnboarding: false, respuesta: null };
+  }
+  // Usuario ya persistido (p. ej. fila onboarding ausente o clave distinta) pero con domicilio productivo: no bienvenida de cero.
+  if (usuario && datosBasicosEnUsuario && !estado) {
     return { enOnboarding: false, respuesta: null };
   }
   if (!estado) {

@@ -2,7 +2,6 @@ const { query } = require("../config/database");
 const { buscarPorWhatsapp, normalizarWhatsapp } = require("../models/usuario");
 const { guardarConsulta } = require("../models/consulta");
 const { generarConPromptLibre } = require("./gemini");
-const { renderTemplate } = require("../templates");
 
 const normalizarTexto = (txt = "") =>
   String(txt)
@@ -23,6 +22,11 @@ const detectarCultivo = (txt = "") => {
   if (t.includes("maiz")) return "maiz";
   if (t.includes("trigo")) return "trigo";
   if (t.includes("girasol")) return "girasol";
+  if (t.includes("novillo")) return "novillo";
+  if (t.includes("ternero")) return "ternero";
+  if (t.includes("vaca")) return "vaca";
+  if (t.includes("vaquillona")) return "vaquillona";
+  if (t.includes("hacienda")) return "novillo";
   return null;
 };
 
@@ -59,7 +63,16 @@ const configurarAlerta = async (whatsapp, texto) => {
   if (!usuario) {
     return "Para crear alertas primero necesitás completar tu registro.";
   }
-  const parsed = parsearAlerta(texto);
+  let parsed;
+  try {
+    parsed = parsearAlerta(texto);
+  } catch (error) {
+    const detalle = String(error?.message || "").trim();
+    if (detalle) {
+      return `${detalle}\nEjemplo: "avisame cuando dólar blue supere 1300".`;
+    }
+    return 'No pude interpretar la alerta. Ejemplo: "avisame cuando dólar blue supere 1300".';
+  }
   const result = await query(
     `
       INSERT INTO alertas (usuario_id, cultivo, tipo, valor_objetivo, activa, disparada)
@@ -252,11 +265,11 @@ const verificarAlertas = async (opts = {}) => {
     const contexto = alerta.tipo.startsWith("dolar")
       ? { variacionPct: null, tendencia7d: "estable" }
       : await obtenerContextoPrecio(alerta.cultivo);
-    const msg = await renderTemplate(
-      "alerta",
-      { id: alerta.usuario_id_real, nombre: null, whatsapp: alerta.whatsapp },
-      { ...alerta, valor_actual: valorActual, contexto }
-    );
+    const msg = await construirMensajeAlerta({
+      alerta: { ...alerta, valor_objetivo: objetivo },
+      valorActual,
+      contexto,
+    });
 
     await query(
       `
@@ -270,7 +283,7 @@ const verificarAlertas = async (opts = {}) => {
     if (!opts.soloSimularEnvio) {
       try {
         const { sendMessage } = require("../config/whatsapp");
-        await sendMessage(alerta.whatsapp, msg.mensaje);
+        await sendMessage(alerta.whatsapp, msg.texto);
       } catch (error) {
         console.error("[Alertas] No se pudo enviar WhatsApp:", error.message);
       }
@@ -280,12 +293,12 @@ const verificarAlertas = async (opts = {}) => {
       usuarioId: alerta.usuario_id_real,
       whatsapp: normalizarWhatsapp(alerta.whatsapp),
       pregunta: `Alerta disparada #${alerta.id}`,
-      respuesta: msg.mensaje,
-      tokensUsados: null,
+      respuesta: msg.texto,
+      tokensUsados: msg.tokensUsados || null,
     });
 
     disparadas += 1;
-    mensajes.push({ alertaId: alerta.id, texto: msg.mensaje });
+    mensajes.push({ alertaId: alerta.id, texto: msg.texto });
   }
 
   return { totalEvaluadas: alertasResult.rows.length, disparadas, mensajes };

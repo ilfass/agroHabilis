@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AgroHabilis - Templates Admin</title>
+    <style>
+      :root { --bg:#f3f7ff; --bg-soft:#eef4ff; --panel:#ffffff; --panel2:#f7faff; --text:#17233a; --muted:#5f7294; --ok:#2f8bff; --line:#dbe7ff; --shadow:0 12px 30px rgba(39,81,161,.12); }
+      * { box-sizing: border-box; }
+      body { margin:0; font-family: Inter, Segoe UI, Arial, sans-serif; font-size:15px; background: linear-gradient(180deg, var(--bg-soft), var(--bg)); color:var(--text); }
+      .wrap { padding:24px 24px 24px 276px; }
+      .topbar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:12px; }
+      .nav { position: fixed; left: 18px; top: 18px; width: 230px; display:flex; flex-direction:column; gap:8px; padding:12px; border:1px solid var(--line); border-radius:16px; background:#fff; box-shadow: var(--shadow); margin-bottom:12px; }
+      .nav .brand { display:flex; align-items:center; gap:10px; padding:8px 10px 12px; border-bottom:1px solid #e7efff; margin-bottom:4px; font-weight:800; color:#1e3b6e; }
+      .brand-dot { width:10px; height:10px; border-radius:999px; background:#2f8bff; box-shadow:0 0 0 4px rgba(47,139,255,.12); }
+      .nav a { text-decoration:none; padding:9px 12px; border-radius:10px; border:1px solid #d5e3ff; color:#38507b; background:#fff; font-size:13px; font-weight:600; width:100%; }
+      .nav a.active { background: linear-gradient(180deg, var(--ok), #1f66c9); border:none; color:#fff; font-weight:700; }
+      .btn { padding:11px 13px; border-radius:10px; border:1px solid #cfddfa; background:#fff; color:#24395f; cursor:pointer; }
+      .btn.primary { background: linear-gradient(180deg, var(--ok), #1f66c9); border:none; color:#fff; font-weight:700; }
+      input, textarea, select { width:100%; padding:11px 13px; border-radius:10px; border:1px solid #cfddfa; background:#fff; color:#24395f; }
+      .grid { display:grid; grid-template-columns: 320px 1fr; gap:12px; }
+      .subgrid { display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
+      .card { background: linear-gradient(180deg, var(--panel), var(--panel2)); border:1px solid var(--line); border-radius:16px; padding:16px; box-shadow:var(--shadow); }
+      .list { max-height:70vh; overflow:auto; }
+      .file { padding:10px; border:1px solid #365487; border-radius:10px; margin-bottom:8px; cursor:pointer; }
+      .file:hover { border-color:#4a67a3; }
+      .file.active { border-color:var(--ok); background:rgba(58,211,124,.08); }
+      .meta { font-size:12px; color:var(--muted); }
+      .editor-head { display:flex; gap:8px; align-items:center; justify-content:space-between; margin-bottom:8px; flex-wrap:wrap; }
+      textarea { min-height:68vh; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:13px; }
+      .status { font-size:12px; color:var(--muted); }
+      .preview { white-space:pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:13px; border:1px solid #d6e4ff; border-radius:8px; padding:10px; background:#fbfdff; min-height:220px; }
+      .page-head { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:14px; }
+      .crumb { color:var(--muted); font-size:13px; }
+      @media (max-width: 980px) {
+        .wrap { padding:16px; }
+        .nav { position: static; width: auto; flex-direction: row; flex-wrap: wrap; }
+        .grid { grid-template-columns: 1fr; }
+      }
+      @media (max-width: 760px) {
+        .wrap { padding: 12px; }
+        .card { padding: 12px; border-radius: 12px; }
+        .topbar > * { width: 100%; }
+        .nav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; padding: 10px; border-radius: 12px; }
+        .nav .brand { grid-column: 1 / -1; }
+        .nav a { width: 100%; text-align: center; padding: 8px 10px; font-size: 12px; }
+        .subgrid { grid-template-columns: 1fr; }
+        .list { max-height: 38vh; }
+        textarea { min-height: 48vh; font-size: 12px; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="topbar">
+        <h1 style="margin:0;">AgroHabilis - Editor de Templates</h1>
+        <button id="btnRefresh" class="btn">Actualizar lista</button>
+        <button id="btnSave" class="btn primary">Guardar archivo</button>
+      </div>
+      <div class="nav">
+        <div class="brand"><span class="brand-dot"></span><span>AgroHabilis Admin</span></div>
+        <a href="/dashboard/admin">🏠 Dashboard</a>
+        <a href="/dashboard/metricas">📊 Métricas</a>
+        <a href="/dashboard/precios">💹 Precios</a>
+        <a href="/dashboard/usuarios">👥 Usuarios</a>
+        <a href="/dashboard/comandos">⌨️ Comandos</a>
+        <a href="/dashboard/templates" class="active">🧩 Templates</a>
+        <a href="/dashboard/cliente">🙍 Cliente</a>
+      </div>
+      <div class="page-head">
+        <div>
+          <div class="crumb">Inicio / Templates</div>
+          <h3 style="margin:2px 0 0;">Editor visual de mensajes</h3>
+        </div>
+      </div>
+
+      <div class="grid">
+        <div class="card">
+          <input id="search" placeholder="Filtrar archivo..." />
+          <div class="list" id="files" style="margin-top:10px;"></div>
+        </div>
+        <div class="card">
+          <div class="editor-head">
+            <div>
+              <div id="fileName"><b>Seleccioná un archivo</b></div>
+              <div id="fileMeta" class="meta"></div>
+            </div>
+            <span id="status" class="status">Sin cambios</span>
+          </div>
+          <textarea id="editor" placeholder="Contenido del template..."></textarea>
+        </div>
+      </div>
+      <div class="card" style="margin-top:12px;">
+        <div class="editor-head">
+          <div>
+            <div><b>Previsualización de mensaje</b></div>
+            <div class="meta">Simula cómo quedaría el WhatsApp final con layout por plan.</div>
+          </div>
+          <button id="btnPreview" class="btn">Previsualizar</button>
+        </div>
+        <div class="subgrid">
+          <div>
+            <label class="meta">Template</label>
+            <select id="previewTemplate">
+              <option value="bienvenida">bienvenida</option>
+              <option value="resumen_diario">resumen_diario</option>
+              <option value="mi_resumen">mi_resumen</option>
+              <option value="alerta">alerta</option>
+              <option value="analisis_venta">analisis_venta</option>
+              <option value="consulta">consulta</option>
+            </select>
+          </div>
+          <div>
+            <label class="meta">Plan</label>
+            <select id="previewPlan">
+              <option value="gratis">gratis</option>
+              <option value="basico">basico</option>
+              <option value="pro">pro</option>
+            </select>
+          </div>
+        </div>
+        <div class="subgrid" style="margin-top:10px;">
+          <div>
+            <label class="meta">Usuario ID (opcional)</label>
+            <input id="previewUserId" placeholder="ej: 2" />
+          </div>
+          <div>
+            <label class="meta">Template detectado del archivo</label>
+            <input id="previewDetected" readonly />
+          </div>
+        </div>
+        <div id="previewOut" class="preview" style="margin-top:10px;">Previsualización pendiente.</div>
+      </div>
+    </div>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+      const state = { files: [], current: null, dirty: false };
+
+      const setStatus = (txt) => $("status").textContent = txt;
+      const fmt = (d) => new Date(d).toLocaleString("es-AR");
+
+      async function loadFiles() {
+        const r = await fetch("/api/dashboard/admin/templates");
+        const d = await r.json();
+        if (!d.ok) throw new Error(d.error || "No se pudo cargar templates");
+        state.files = d.files || [];
+        renderFiles();
+      }
+
+      function renderFiles() {
+        const q = ($("search").value || "").toLowerCase().trim();
+        const rows = state.files.filter((f) => !q || f.path.toLowerCase().includes(q));
+        $("files").innerHTML = rows.map((f) => `
+          <div class="file ${state.current?.path === f.path ? "active" : ""}" data-path="${f.path}">
+            <div><b>${f.path}</b></div>
+            <div class="meta">${Math.round((Number(f.size || 0) / 1024) * 10) / 10} KB · ${fmt(f.updatedAt)}</div>
+          </div>
+        `).join("") || `<div class="meta">Sin archivos</div>`;
+        $("files").querySelectorAll(".file").forEach((el) => {
+          el.addEventListener("click", () => openFile(el.getAttribute("data-path")));
+        });
+      }
+
+      async function openFile(path) {
+        if (state.dirty && !confirm("Tenés cambios sin guardar. ¿Continuar?")) return;
+        const r = await fetch(`/api/dashboard/admin/templates/file?path=${encodeURIComponent(path)}`);
+        const d = await r.json();
+        if (!d.ok) return alert(d.error || "No se pudo abrir archivo");
+        state.current = { path: d.file.path };
+        $("fileName").innerHTML = `<b>${d.file.path}</b>`;
+        $("fileMeta").textContent = "Editable desde Admin";
+        $("editor").value = d.file.content || "";
+        state.dirty = false;
+        setStatus("Sin cambios");
+        syncTemplateFromPath(path);
+        renderFiles();
+      }
+
+      async function saveFile() {
+        if (!state.current?.path) return alert("Seleccioná un archivo");
+        const r = await fetch("/api/dashboard/admin/templates/file", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ path: state.current.path, content: $("editor").value }),
+        });
+        const d = await r.json();
+        if (!d.ok) return alert(d.error || "No se pudo guardar");
+        state.dirty = false;
+        setStatus("Guardado");
+        await loadFiles();
+        await openFile(state.current.path);
+      }
+
+      function inferTemplateFromPath(path) {
+        const p = String(path || "").toLowerCase();
+        if (p.includes("bienvenida")) return "bienvenida";
+        if (p.includes("resumen_diario")) return "resumen_diario";
+        if (p.includes("mi_resumen")) return "mi_resumen";
+        if (p.includes("analisis_venta")) return "analisis_venta";
+        if (p.includes("alerta")) return "alerta";
+        if (p.includes("consulta")) return "consulta";
+        return "";
+      }
+
+      function syncTemplateFromPath(path) {
+        const t = inferTemplateFromPath(path);
+        $("previewDetected").value = t || "no detectado";
+        if (t) $("previewTemplate").value = t;
+      }
+
+      async function previewTemplate() {
+        const template = $("previewTemplate").value;
+        const plan = $("previewPlan").value;
+        const usuarioId = ($("previewUserId").value || "").trim();
+        const qs = new URLSearchParams({ template, plan });
+        if (usuarioId) qs.set("usuarioId", usuarioId);
+        $("previewOut").textContent = "Generando preview...";
+        const r = await fetch(`/api/dashboard/admin/templates/preview?${qs.toString()}`);
+        const d = await r.json();
+        if (!d.ok) {
+          $("previewOut").textContent = `Error: ${d.error || "no se pudo previsualizar"}`;
+          return;
+        }
+        $("previewOut").textContent = d.preview?.mensaje || "(sin contenido)";
+      }
+
+      $("search").addEventListener("input", renderFiles);
+      $("editor").addEventListener("input", () => {
+        state.dirty = true;
+        setStatus("Cambios sin guardar");
+      });
+      $("btnSave").addEventListener("click", saveFile);
+      $("btnPreview").addEventListener("click", () => previewTemplate().catch((e) => {
+        $("previewOut").textContent = `Error: ${e.message}`;
+      }));
+      $("btnRefresh").addEventListener("click", async () => {
+        await loadFiles();
+      });
+
+      loadFiles().catch((e) => alert(e.message));
+    </script>
+  </body>
+</html>

@@ -1,7 +1,10 @@
 const axios = require("axios");
 const cheerio = require("cheerio");
 
-const URL = "https://www.mercadodeliniers.com.ar";
+const URLS = [
+  "http://www.mercadoagroganadero.com.ar/dll/inicio.dll",
+  "https://www.mercadodeliniers.com.ar",
+];
 const CATEGORIAS_OBJETIVO = ["novillo", "vaca", "ternero", "vaquillona", "toro"];
 
 const normalizar = (s = "") =>
@@ -39,13 +42,8 @@ const mapearCategoria = (texto = "") => {
   return null;
 };
 
-const obtenerPreciosHacienda = async () => {
-  const response = await axios.get(URL, {
-    timeout: 30_000,
-    validateStatus: (s) => s >= 200 && s < 400,
-    headers: { "User-Agent": "AgroHabilis/1.0" },
-  });
-  const $ = cheerio.load(response.data);
+const extraerDesdeHtml = (html) => {
+  const $ = cheerio.load(html);
   const fecha = new Date().toISOString().slice(0, 10);
   const filas = extraerFilasDesdeTabla($);
   const out = [];
@@ -75,6 +73,25 @@ const obtenerPreciosHacienda = async () => {
   }
 
   return Array.from(unicos.values());
+};
+
+const obtenerPreciosHacienda = async () => {
+  let ultimoError = null;
+  for (const url of URLS) {
+    try {
+      const response = await axios.get(url, {
+        timeout: 30_000,
+        validateStatus: (s) => s >= 200 && s < 400,
+        headers: { "User-Agent": "AgroHabilis/1.0" },
+      });
+      const items = extraerDesdeHtml(response.data);
+      if (items.length) return items;
+    } catch (error) {
+      ultimoError = error;
+    }
+  }
+  if (ultimoError) throw ultimoError;
+  return [];
 };
 
 module.exports = { obtenerPreciosHacienda };

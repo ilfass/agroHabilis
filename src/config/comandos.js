@@ -2,7 +2,9 @@ module.exports = {
   whatsappUsuario: [
     { comando: "MI PLAN", descripcion: "Muestra tu plan actual." },
     { comando: "QUIERO PLAN GRATIS | BASICO | PRO", descripcion: "Cambia tu plan." },
+    { comando: "QUIERO DESUSCRIBIRME", descripcion: "Cancela suscripción en Mercado Pago y te pasa a Plan Gratis." },
     { comando: "MI NOMBRE <nombre>", descripcion: "Actualiza tu nombre." },
+    { comando: "MI EMAIL <correo>", descripcion: "Actualiza tu email para pagos/suscripciones." },
     { comando: "MI ZONA <provincia>, <partido>", descripcion: "Actualiza tu ubicación productiva." },
     { comando: "MIS CULTIVOS <c1, c2, ...>", descripcion: "Actualiza tus cultivos activos." },
     { comando: "MI GANADO <cat1, cat2, ...>", descripcion: "Actualiza categorías ganaderas." },
@@ -19,6 +21,7 @@ module.exports = {
     { comando: "MIS NOTICIAS <cantidad>", descripcion: "En Plan Pro, define cuántas noticias querés ver (1-15)." },
     { comando: "FLETE <origen> A <destino>", descripcion: "Calcula flete estimado por km y gasoil actual." },
     { comando: "VER COMANDO", descripcion: "Muestra todos los comandos y su explicación." },
+    { comando: "BORRAR MIS DATOS", descripcion: "Pedís borrar tu cuenta; luego confirmás con SI BORRO MIS DATOS." },
     { comando: "Cualquier consulta libre", descripcion: "Respuesta IA con contexto agro." },
   ],
   whatsappAdmin: [
@@ -37,6 +40,9 @@ module.exports = {
     { metodo: "POST", endpoint: "/api/dashboard/admin/usuario-accion", descripcion: "Activar/Pausar/Eliminar usuario." },
     { metodo: "POST", endpoint: "/api/dashboard/admin/alerta-accion", descripcion: "Reactivar/Cancelar alerta." },
     { metodo: "POST", endpoint: "/api/dashboard/admin/pendiente-accion", descripcion: "Acciones sobre pendientes." },
+    { metodo: "POST", endpoint: "/api/dashboard/admin/envio-masivo", descripcion: "Encola envío masivo WhatsApp; responde 202 + jobId." },
+    { metodo: "GET", endpoint: "/api/dashboard/admin/envio-masivo/estado?jobId=", descripcion: "Estado del envío masivo (running|listo|error)." },
+    { metodo: "GET", endpoint: "/api/dashboard/admin/whatsapp-qr.png", descripcion: "PNG del QR de vinculación WhatsApp (si existe)." },
     { metodo: "POST", endpoint: "/api/admin/recolectar", descripcion: "Ejecuta recolector manual." },
     { metodo: "POST", endpoint: "/api/admin/enviar-resumen", descripcion: "Envía resumen manual por admin." },
   ],

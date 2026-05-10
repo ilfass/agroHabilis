@@ -1,3 +1,9 @@
+/**
+ * Pipeline diario (cron): sincroniza precios BCR, arma contexto de boletín y genera el resumen de mercado
+ * con Gemini vía `generarResumenMercado` (generateContent directo, sin cadena OpenRouter/Groq).
+ * Las respuestas del chat/WhatsApp usan `generarConPromptLibre` / `generarRespuestaConsulta` en `gemini.js`
+ * (cadena IA_PROVIDER_ORDER + fallback). Mantener esa separación: cron estable y barato vs chat flexible.
+ */
 const { sincronizarPreciosBoletinBcr } = require("./syncBcrBoletin");
 const { armarTextoContexto } = require("../utils/boletinContexto");
 const { generarResumenMercado } = require("../services/gemini");

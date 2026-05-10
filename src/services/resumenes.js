@@ -30,9 +30,9 @@ const upsertResumenPorFechaMercado = async ({
   const fechaSql = fechaBoletinASql(fechaMercadoTexto);
   const r = await query(
     `
-    INSERT INTO resumenes (usuario_id, fecha, contenido, tokens_usados)
-    VALUES ($1, $2::date, $3, $4)
-    ON CONFLICT (usuario_id, fecha)
+    INSERT INTO resumenes (usuario_id, fecha, tipo, contenido, tokens_usados)
+    VALUES ($1, $2::date, 'diario', $3, $4)
+    ON CONFLICT (usuario_id, fecha, tipo)
     DO UPDATE SET
       contenido = EXCLUDED.contenido,
       tokens_usados = EXCLUDED.tokens_usados,

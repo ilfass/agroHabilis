@@ -50,6 +50,30 @@ const fechaAR = () => {
   return `${byType.year}-${byType.month}-${byType.day}`;
 };
 
+const fechaARDe = (value) => {
+  if (!value) return null;
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Argentina/Buenos_Aires",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date(value));
+  const byType = Object.fromEntries(parts.map((p) => [p.type, p.value]));
+  return `${byType.year}-${byType.month}-${byType.day}`;
+};
+
+const restarDiasFechaIso = (fechaIso, dias) => {
+  if (!fechaIso) return null;
+  const [y, m, d] = String(fechaIso).split("-").map(Number);
+  if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return null;
+  const utc = new Date(Date.UTC(y, m - 1, d));
+  utc.setUTCDate(utc.getUTCDate() - dias);
+  const yy = utc.getUTCFullYear();
+  const mm = String(utc.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(utc.getUTCDate()).padStart(2, "0");
+  return `${yy}-${mm}-${dd}`;
+};
+
 const esLunesOJuevesAR = () => {
   const wd = new Intl.DateTimeFormat("en-US", {
     timeZone: "America/Argentina/Buenos_Aires",
@@ -62,23 +86,9 @@ const esLunesOJuevesAR = () => {
 
 const esDiaSiguienteRegistroAR = (creadoEn) => {
   if (!creadoEn) return false;
-  const hoy = new Date(`${fechaAR()}T00:00:00`);
-  const ayer = new Date(hoy);
-  ayer.setDate(hoy.getDate() - 1);
-  const reg = new Date(creadoEn);
-  const regAR = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Argentina/Buenos_Aires",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(reg);
-  const ayerAR = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Argentina/Buenos_Aires",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(ayer);
-  return regAR === ayerAR;
+  const regAR = fechaARDe(creadoEn);
+  const ayerAR = restarDiasFechaIso(fechaAR(), 1);
+  return Boolean(regAR && ayerAR && regAR === ayerAR);
 };
 
 const esperarWhatsappEnviador = async () => {

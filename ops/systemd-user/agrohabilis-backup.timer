@@ -1,0 +1,12 @@
+[Unit]
+Description=Timer diario backup AgroHabilis (recupera ejecución si la PC estaba apagada)
+
+[Timer]
+# Hora local; si a esa hora la PC estaba apagada, Persistent dispara al encender/iniciar sesión de usuario
+OnCalendar=*-*-* 07:05:00
+Persistent=true
+AccuracySec=30min
+RandomizedDelaySec=180
+
+[Install]
+WantedBy=timers.target

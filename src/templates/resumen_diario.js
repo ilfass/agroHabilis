@@ -1,5 +1,6 @@
 const { generarResumen } = require("../services/resumen");
 const { obtenerNoticiasFrescas } = require("./base");
+const { aplicarLayout } = require("./layouts");
 
 module.exports = {
   nombre: "resumen_diario",
@@ -12,8 +13,9 @@ module.exports = {
   },
 
   async renderizar(_usuario, datos) {
+    const base = aplicarLayout("resumen_diario", _usuario, { mensaje: datos.generado.texto });
     return {
-      mensaje: datos.generado.texto,
+      mensaje: base,
       meta: { resumenId: datos.generado.resumenId, noticias: datos.noticias },
     };
   },

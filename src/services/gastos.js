@@ -276,7 +276,13 @@ const obtenerTextoMisGastos = async (whatsapp) => {
     `,
     [usuario.id]
   );
-  if (!result.rows.length) return "No tenés gastos registrados este mes.";
+  if (!result.rows.length) {
+    return [
+      "No tenés gastos registrados este mes.",
+      "Para cargar uno, escribime por ejemplo:",
+      '- "Gasté 250000 en semilla de maíz"',
+    ].join("\n");
+  }
   return [
     "📒 *Tus gastos del mes*",
     ...result.rows.map((r) => `- ${r.categoria}: $${Number(r.total).toLocaleString("es-AR")}`),
@@ -296,7 +302,13 @@ const obtenerTextoMisVentas = async (whatsapp) => {
     `,
     [usuario.id]
   );
-  if (!result.rows.length) return "No tenés ventas registradas este mes.";
+  if (!result.rows.length) {
+    return [
+      "No tenés ventas registradas este mes.",
+      "Para cargar una, escribime por ejemplo:",
+      '- "Vendí 100 toneladas de soja a 430000"',
+    ].join("\n");
+  }
   return [
     "💸 *Tus ventas del mes*",
     ...result.rows.map((r) => `- ${r.producto}: $${Number(r.total).toLocaleString("es-AR")}`),

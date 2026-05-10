@@ -5,7 +5,8 @@ AgroHabilis es una plataforma Node.js pensada para centralizar informacion agrop
 ## Definicion de producto
 
 - Ver `docs/producto.md` para la definicion oficial del producto, fases y backlog por sprints.
-- Ver `docs/roadmap-ejecucion.md` para el tablero operativo diario y plan de ejecucion del MVP.
+- Ver `docs/roadmap/roadmap-ejecucion.md` para el tablero operativo diario y plan de ejecucion del MVP.
+- Ver `docs/politica-core-chatbot.md` para la politica central de respuesta (BD primero + flujo IA/BD en consultas interpretativas).
 
 ## Stack tecnologico
 
@@ -34,6 +35,7 @@ AgroHabilis es una plataforma Node.js pensada para centralizar informacion agrop
 
 1. Copiar `.env.example` a `.env`.
 2. Completar credenciales y variables requeridas.
+   - Opcional para fallback de precipitaciones: `WEATHERAPI_KEY` (si falla Open-Meteo).
 3. Ejecutar `node scripts/setup-db.js` para inicializar base de datos.
 4. Levantar el servidor con `npm start`.
 
@@ -51,10 +53,12 @@ AgroHabilis es una plataforma Node.js pensada para centralizar informacion agrop
 
 ## WhatsApp Web.js
 
-1. Definir `WHATSAPP_SESSION_PATH=./.wwebjs_auth` en `.env` (opcional, ese es el default).
+1. Definir `WHATSAPP_SESSION_PATH` y `WHATSAPP_CLIENT_ID` en `.env` (defaults: `./.wwebjs_auth` y `agrohabilis`).
+   - En VPS usar una ruta **fuera** de la carpeta deployada para no perder sesion, por ejemplo: `WHATSAPP_SESSION_PATH=/var/lib/agrohabilis/whatsapp-session`.
 2. Iniciar con `npm start` y escanear el QR en terminal.
 3. `WHATSAPP_DESTINO`: numero destino en formato internacional **solo digitos**, sin `+` (ejemplo Argentina: `549XXXXXXXXXX`).
-4. Probar envio con `POST /jobs/whatsapp-test`.
+4. `WHATSAPP_ADMIN_NUMBERS`: numeros admin (mismos digitos); varios separados por coma. Reciben comandos `ESTADO`, `USUARIOS`, etc.
+5. Probar envio con `POST /jobs/whatsapp-test`.
 
 ### Mini manual para usuarios (WhatsApp)
 
@@ -84,7 +88,10 @@ Actualizacion: deploy automatico configurado con GitHub Actions.
 2. **`.env` en el servidor** (no se sube con rsync): copiar desde `.env.example` y completar `DATABASE_URL`, `GEMINI_API_KEY` u `OPENROUTER_API_KEY`, `PORT`, `WHATSAPP_SESSION_PATH`, etc.
 3. **Tablas**: una vez con `DATABASE_URL` correcto, en el servidor: `cd /var/www/.habilispro.com && node scripts/setup-db.js`.
 4. **Chromium / WhatsApp**: en Ubuntu/Debian ejecutar en la VPS `bash scripts/vps-install-chromium-deps.sh`. Si el Chrome embebido de Puppeteer sigue fallando, en `.env` poner `PUPPETEER_EXECUTABLE_PATH` apuntando al `chromium` del sistema (`command -v chromium`).
-5. **Sesión WhatsApp**: no reutilizar la misma carpeta `.wwebjs_auth` en dos máquinas a la vez; en el servidor conviene `WHATSAPP_SESSION_PATH=./.wwebjs_auth_vps` y escanear el QR con `pm2 logs agrohabilis`. Si aparece error de perfil bloqueado (`SingletonLock`), borrar locks o esa carpeta y volver a vincular.
+5. **Sesión WhatsApp**: no reutilizar la misma carpeta de sesion en dos máquinas a la vez. En servidor usar:
+   - `WHATSAPP_SESSION_PATH=/var/lib/agrohabilis/whatsapp-session`
+   - `WHATSAPP_CLIENT_ID=agrohabilis-vps`
+   Esto evita perder sesion en deploys y reduce pedidos de QR. Si aparece `SingletonLock`, eliminar locks o relinkear una sola vez.
 6. **Nginx**: `proxy_pass` al `PORT` donde escucha Node (ej. `3010`).
 7. **Despliegue de código**: `npm run deploy:vps` o push a `main` si GitHub Actions tiene los secrets (`VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`, `VPS_PORT` opcional).
 
@@ -108,3 +115,4 @@ Si queres cambiar parametros sin tocar scripts:
 - `APP_NAME` (default `agrohabilis`)
 - `HEALTH_HOST_HEADER` (default `agro.habilispro.com`)
 - `HEALTH_BACKEND_PORT` (opcional): si está definido, el health del deploy pega a `http://127.0.0.1:$HEALTH_BACKEND_PORT/` en lugar de Nginx (útil si el dominio aún no apunta o el proxy no está listo)
+- `SYNC_ENV=1`: antes de migraciones y PM2, sube tu `.env` local al VPS con `scp` (requiere que exista `.env` en la raíz del repo). Atajo: `npm run deploy:vps:env`

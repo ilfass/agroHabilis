@@ -5,3 +5,8 @@ logs/
 .DS_Store
 .wwebjs_auth/
 .wwebjs_cache/
+wa-qr-vps-ultimo.txt
+wa-qr.log
+exports/interacciones/*.md
+backups/*
+!backups/.gitkeep

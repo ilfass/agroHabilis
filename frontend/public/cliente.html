@@ -1,0 +1,1289 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AgroHabilis — Mi panel</title>
+    <style>
+      :root {
+        --bg0: #050d18;
+        --bg1: #0a1a2e;
+        --card: rgba(18, 42, 72, 0.85);
+        --card-edge: rgba(64, 118, 188, 0.35);
+        --txt: #e9f1fb;
+        --muted: #8fa8c8;
+        --accent: #4ae3a0;
+        --accent-dim: rgba(74, 227, 160, 0.15);
+        --warn: #ffc857;
+        --violet: #9b7cf5;
+        --radius: 14px;
+        --shadow: 0 14px 40px rgba(0, 12, 32, 0.45);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+        margin: 0;
+        min-height: 100vh;
+        color: var(--txt);
+        background:
+          radial-gradient(1200px 500px at 15% -20%, rgba(74, 227, 160, 0.08), transparent 55%),
+          radial-gradient(900px 480px at 90% 10%, rgba(155, 124, 245, 0.1), transparent 50%),
+          linear-gradient(165deg, var(--bg1), var(--bg0) 55%);
+        padding: 20px 20px 48px;
+      }
+      .wrap {
+        max-width: 1280px;
+        margin: 0 auto;
+      }
+      .topbar {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        align-items: center;
+        margin-bottom: 20px;
+      }
+      .topbar h1 {
+        margin: 0;
+        font-size: 1.45rem;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+      }
+      .grow {
+        flex: 1;
+      }
+      .muted {
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 600;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid var(--card-edge);
+      }
+      .pill.ok {
+        border-color: rgba(74, 227, 160, 0.45);
+        color: var(--accent);
+        background: var(--accent-dim);
+      }
+      .pill.off {
+        color: #ff9b9b;
+        border-color: rgba(255, 120, 120, 0.35);
+      }
+      input,
+      button,
+      select {
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: 1px solid rgba(100, 140, 200, 0.45);
+        background: rgba(8, 20, 40, 0.9);
+        color: var(--txt);
+      }
+      button {
+        border: none;
+        cursor: pointer;
+        font-weight: 700;
+        background: linear-gradient(180deg, #5df0a8, #1fa85c);
+        color: #04210f;
+      }
+      .btn-secondary {
+        background: rgba(30, 58, 98, 0.95);
+        color: var(--txt);
+        border: 1px solid rgba(100, 140, 200, 0.4);
+      }
+      .btn-ghost {
+        background: transparent;
+        color: var(--muted);
+        border: 1px dashed rgba(140, 170, 210, 0.5);
+        font-weight: 600;
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--card-edge);
+        border-radius: var(--radius);
+        padding: 16px 18px;
+        margin-bottom: 14px;
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(10px);
+      }
+      .card h2,
+      .card h3,
+      .card h4 {
+        margin: 0 0 10px;
+        font-size: 1.05rem;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+      }
+      .card h4 {
+        font-size: 0.92rem;
+        margin-top: 12px;
+      }
+      .section-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-bottom: 4px;
+      }
+      .section-head p {
+        margin: 4px 0 0;
+        max-width: 560px;
+      }
+      .grid-kpi {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 10px;
+      }
+      .kpi {
+        background: rgba(0, 0, 0, 0.2);
+        border: 1px solid var(--card-edge);
+        border-radius: 12px;
+        padding: 12px 14px;
+      }
+      .kpi .l {
+        color: var(--muted);
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      .kpi .v {
+        font-size: 22px;
+        font-weight: 800;
+        margin-top: 6px;
+        letter-spacing: -0.03em;
+      }
+      .grid-2 {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 12px;
+      }
+      .grid-cmd {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+        gap: 10px;
+      }
+      .cmd-card {
+        border-radius: 12px;
+        padding: 12px 14px;
+        border: 1px solid rgba(100, 140, 200, 0.28);
+        background: linear-gradient(145deg, rgba(255, 255, 255, 0.04), rgba(10, 30, 55, 0.5));
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        min-height: 108px;
+      }
+      .cmd-pill {
+        font-family: ui-monospace, "Consolas", monospace;
+        font-size: 12px;
+        font-weight: 700;
+        color: #bff5d6;
+        word-break: break-word;
+        line-height: 1.35;
+      }
+      .cmd-desc {
+        margin: 0;
+        font-size: 12px;
+        color: var(--muted);
+        flex: 1;
+        line-height: 1.45;
+      }
+      .btn-copy {
+        align-self: flex-start;
+        padding: 6px 12px;
+        font-size: 11px;
+        border-radius: 8px;
+        background: rgba(155, 124, 245, 0.25);
+        color: #e8ddff;
+        border: 1px solid rgba(155, 124, 245, 0.45);
+        cursor: pointer;
+        font-weight: 700;
+      }
+      .profile-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 10px;
+        margin-top: 8px;
+      }
+      .profile-label {
+        font-size: 11px;
+        color: var(--muted);
+        margin-bottom: 4px;
+        display: block;
+      }
+      .profile-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-top: 12px;
+      }
+      .profile-status {
+        margin-top: 10px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      th,
+      td {
+        border-bottom: 1px solid rgba(100, 140, 200, 0.22);
+        padding: 8px 6px;
+        text-align: left;
+      }
+      th {
+        color: var(--muted);
+        font-weight: 600;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      .chip {
+        display: inline-block;
+        padding: 3px 8px;
+        border-radius: 999px;
+        font-size: 11px;
+        border: 1px solid var(--card-edge);
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--muted);
+        margin: 2px 4px 2px 0;
+      }
+      .helper {
+        color: var(--muted);
+        font-size: 12px;
+        margin-top: 6px;
+        line-height: 1.45;
+      }
+      .quick {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 10px;
+      }
+      .quick .item {
+        border: 1px solid var(--card-edge);
+        border-radius: 12px;
+        padding: 12px;
+        background: rgba(0, 0, 0, 0.15);
+      }
+      .empty {
+        color: var(--muted);
+        text-align: center;
+        padding: 14px 8px;
+        font-size: 12px;
+      }
+      .split {
+        display: grid;
+        grid-template-columns: 1.15fr 0.95fr;
+        gap: 12px;
+      }
+      .mini-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 10px;
+      }
+      .mini-card {
+        border-radius: 12px;
+        padding: 12px;
+        border: 1px solid rgba(100, 140, 200, 0.28);
+        background: rgba(0, 0, 0, 0.18);
+      }
+      .mini-card.inactive {
+        opacity: 0.65;
+      }
+      .mini-title {
+        font-weight: 700;
+        font-size: 14px;
+      }
+      .mini-metric {
+        font-size: 13px;
+        color: var(--accent);
+        margin-top: 4px;
+      }
+      .mini-meta {
+        font-size: 11px;
+        color: var(--muted);
+        margin-top: 6px;
+      }
+      .empty-card {
+        padding: 16px;
+        border-radius: 12px;
+        border: 1px dashed rgba(140, 170, 210, 0.35);
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .tc-strip {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 8px;
+      }
+      .tc-pill {
+        padding: 8px 12px;
+        border-radius: 10px;
+        background: rgba(0, 0, 0, 0.2);
+        border: 1px solid var(--card-edge);
+        font-size: 12px;
+      }
+      .tc-pill b {
+        color: var(--warn);
+      }
+      .warn {
+        color: var(--warn);
+      }
+      .hide {
+        display: none;
+      }
+      .mono {
+        font-family: ui-monospace, monospace;
+        font-size: 12px;
+      }
+      @media (max-width: 1000px) {
+        .split {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="topbar">
+        <h1>AgroHabilis · Mi panel</h1>
+        <div class="grow muted" id="sessionMeta">Cargando sesión...</div>
+        <span id="botPill" class="pill hide"></span>
+        <button type="button" id="btnLoad" class="btn-secondary">Actualizar</button>
+        <button type="button" id="btnLogout" class="btn-secondary">Cerrar sesión</button>
+      </div>
+
+      <div id="mustChangeBox" class="card hide">
+        <h3 class="warn">Debés cambiar tu contraseña</h3>
+        <p class="helper">Por seguridad, antes de usar el panel necesitás definir una contraseña nueva.</p>
+        <div class="profile-grid">
+          <div>
+            <label class="profile-label" for="passwordActual">Contraseña actual</label>
+            <input id="passwordActual" type="password" autocomplete="current-password" />
+          </div>
+          <div>
+            <label class="profile-label" for="passwordNueva">Nueva contraseña</label>
+            <input id="passwordNueva" type="password" autocomplete="new-password" />
+          </div>
+        </div>
+        <div class="profile-actions">
+          <button type="button" id="btnCambiarPassword">Cambiar contraseña</button>
+        </div>
+        <div id="mustChangeMsg" class="helper"></div>
+      </div>
+
+      <div id="panelBody" class="hide">
+        <div class="card">
+          <div class="section-head">
+            <div>
+              <h2>Resumen de actividad</h2>
+              <p class="muted">Métricas vinculadas a tu cuenta y consultas por WhatsApp / web.</p>
+            </div>
+          </div>
+          <div class="grid-kpi" id="kpis"></div>
+          <div id="tipoCambioStrip" class="tc-strip"></div>
+        </div>
+
+        <div class="card" id="catalogoComandos">
+          <div class="section-head">
+            <div>
+              <h2>Mis comandos en WhatsApp</h2>
+              <p class="muted">
+                Mismo catálogo que ves con <span class="mono">VER COMANDOS</span>: copiá y pegá en el chat.
+              </p>
+            </div>
+          </div>
+          <div class="grid-cmd" id="comandosGrid">
+            <div class="empty">Cargando comandos…</div>
+          </div>
+        </div>
+
+        <div class="card" id="cuentaSnapshot">
+          <div class="section-head">
+            <div>
+              <h2>Tus datos guardados (cuenta)</h2>
+              <p class="muted">Lo que el bot ya tiene registrado; podés editar parte del perfil desde acá.</p>
+            </div>
+          </div>
+          <div class="mini-grid" id="cuentaCards"></div>
+        </div>
+
+        <div class="card">
+          <div class="section-head">
+            <div>
+              <h2>Mi perfil web</h2>
+              <p class="muted">Actualizá zona y preferencias; se guardan en la base igual que por WhatsApp.</p>
+            </div>
+          </div>
+          <div id="perfil">Sin datos.</div>
+        </div>
+
+        <div class="card">
+          <h3>Atajos por WhatsApp</h3>
+          <p class="helper">Frases frecuentes para gestionar plan, resúmenes, alertas e inventario.</p>
+          <div class="quick">
+            <div class="item">
+              <b>Plan</b>
+              <div class="helper">
+                <span class="chip">MI PLAN</span><span class="chip">QUIERO PLAN BASICO</span><span class="chip">QUIERO PLAN PRO</span>
+              </div>
+            </div>
+            <div class="item">
+              <b>Resumen y consultas</b>
+              <div class="helper"><span class="chip">MI RESUMEN</span><span class="chip">¿Cuánto está la soja?</span></div>
+            </div>
+            <div class="item">
+              <b>Alertas</b>
+              <div class="helper"><span class="chip">MIS ALERTAS</span><span class="chip">ALERTA soja 450000</span></div>
+            </div>
+            <div class="item">
+              <b>Control del bot</b>
+              <div class="helper"><span class="chip">PAUSAR BOT</span><span class="chip">ACTIVAR BOT</span><span class="chip">ESTADO BOT</span></div>
+            </div>
+            <div class="item">
+              <b>Inventario</b>
+              <div class="helper">
+                Frases tipo «guardá 80 ha maíz» · stock en tn · confirmación SI/NO, o usá el formulario más abajo.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <h3>Alertas de precio</h3>
+            <div class="mini-grid" id="alertasCards"></div>
+          </div>
+          <div class="card">
+            <h3>Ganadería y perfil productivo</h3>
+            <div id="ganadoBox" class="helper"></div>
+            <h4 style="margin-top: 14px">Perfil declarado</h4>
+            <div id="perfilProdBox" class="helper"></div>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <h3>Últimos gastos</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Categoría</th>
+                  <th>Monto</th>
+                </tr>
+              </thead>
+              <tbody id="gastosBody"></tbody>
+            </table>
+          </div>
+          <div class="card">
+            <h3>Últimas ventas</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Producto</th>
+                  <th>Total</th>
+                </tr>
+              </thead>
+              <tbody id="ventasBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="split">
+          <div>
+            <div class="card">
+              <h3>Inventario del campo</h3>
+              <p class="helper">Ledger por productor: mismo dato detrás del bot y esta web.</p>
+              <div style="margin-bottom: 10px; display: flex; flex-wrap: wrap; gap: 8px">
+                <input id="invLoteNombre" placeholder="Nuevo lote (nombre)" style="flex: 1; min-width: 160px" />
+                <input id="invLoteHa" type="number" step="any" placeholder="ha (opcional)" style="width: 120px" />
+                <button type="button" id="invBtnNuevoLote">Crear lote</button>
+              </div>
+              <div style="margin-bottom: 10px; display: flex; flex-wrap: wrap; gap: 8px">
+                <input id="invCampNombre" placeholder="Nueva campaña (nombre ej. Soja 25/26)" style="flex: 1; min-width: 200px" />
+                <button type="button" id="invBtnNuevaCamp" class="btn-secondary">Crear campaña</button>
+              </div>
+              <div style="margin-bottom: 10px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center">
+                <select id="invDom">
+                  <option value="ganado">Ganado (cabezas)</option>
+                  <option value="cultivo">Cultivo (ha)</option>
+                  <option value="grano">Granos (stock tn)</option>
+                  <option value="insumo">Insumo</option>
+                </select>
+                <select id="invSelLote" style="min-width: 180px"></select>
+                <select id="invSelCamp" style="min-width: 200px">
+                  <option value="">Sin campaña</option>
+                </select>
+                <select id="invEfecto">
+                  <option value="replace">Valor absoluto (reemplazar saldo)</option>
+                  <option value="delta">Ajuste +/- (sumar al saldo)</option>
+                </select>
+                <input id="invGanCat" placeholder="Ej: novillos" style="width: 130px; display: none" />
+                <input id="invGanCab" type="number" placeholder="cab o Δ" style="width: 96px; display: none" />
+                <input id="invCrop" placeholder="Cultivo" style="width: 120px; display: none" />
+                <input id="invCropHa" type="number" step="any" placeholder="ha o Δ" style="width: 92px; display: none" />
+                <input id="invGranoTn" type="number" step="any" placeholder="tn o Δ" style="width: 92px; display: none" />
+                <input id="invInsumProd" placeholder="Producto ej. Glifosato" style="display: none; width: 140px" />
+                <input id="invInsumUn" placeholder="kg, lt…" style="display: none; width: 76px" />
+                <input id="invInsumCant" type="number" step="any" placeholder="cant / Δ" style="display: none; width: 96px" />
+                <button type="button" id="invBtnReg">Registrar</button>
+              </div>
+              <div id="invMsg" class="helper"></div>
+              <table style="margin-top: 8px">
+                <thead>
+                  <tr>
+                    <th>Ítem</th>
+                    <th>Cantidad</th>
+                    <th>Lote</th>
+                    <th>Campaña</th>
+                    <th>Actualizado</th>
+                  </tr>
+                </thead>
+                <tbody id="invSaldosBody"></tbody>
+              </table>
+              <h4>Últimos movimientos</h4>
+              <table style="margin-top: 4px">
+                <thead>
+                  <tr>
+                    <th>Fecha</th>
+                    <th>Dominio</th>
+                    <th>Efecto</th>
+                    <th>Detalle</th>
+                    <th>Lote</th>
+                    <th>Campaña</th>
+                    <th>Canal</th>
+                  </tr>
+                </thead>
+                <tbody id="invMovsBody"></tbody>
+              </table>
+            </div>
+            <div class="card">
+              <h3>Mis cultivos</h3>
+              <div class="mini-grid" id="cultivosCards"></div>
+            </div>
+            <div class="card">
+              <h3>Mis precios actuales</h3>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Cultivo</th>
+                    <th>Mercado</th>
+                    <th>Precio</th>
+                    <th>Moneda</th>
+                    <th>Fecha</th>
+                  </tr>
+                </thead>
+                <tbody id="preciosBody"></tbody>
+              </table>
+            </div>
+            <div class="card">
+              <h3>Mi clima (7 días)</h3>
+              <div class="mini-grid" id="climaCards"></div>
+            </div>
+          </div>
+          <div>
+            <div class="card">
+              <h3>Estado IA personal</h3>
+              <div id="iaBox" class="muted">Sin datos</div>
+            </div>
+            <div class="card">
+              <h3>Últimas consultas</h3>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Fecha</th>
+                    <th>Pregunta</th>
+                    <th>Modo</th>
+                  </tr>
+                </thead>
+                <tbody id="consultasBody"></tbody>
+              </table>
+            </div>
+            <div class="card">
+              <h3>Resúmenes recientes</h3>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Fecha</th>
+                    <th>WP</th>
+                    <th>Tokens</th>
+                  </tr>
+                </thead>
+                <tbody id="resumenesBody"></tbody>
+              </table>
+            </div>
+            <div class="card">
+              <h3>Envíos WhatsApp</h3>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Estado</th>
+                    <th>Error</th>
+                    <th>Fecha</th>
+                  </tr>
+                </thead>
+                <tbody id="enviosBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+      const num = (v) => Number(v || 0).toLocaleString("es-AR");
+      const fmt = (v) => {
+        if (!v) return "s/d";
+        const d = new Date(v);
+        return Number.isNaN(d.getTime()) ? String(v) : d.toLocaleString("es-AR");
+      };
+      const esc = (s) =>
+        String(s ?? "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
+      const moneyAr = (n, moneda) => {
+        if (n == null || n === "" || Number.isNaN(Number(n))) return "—";
+        return `${num(n)} ${moneda || "ARS"}`;
+      };
+      const renderRows = (id, rows, emptyText = "Sin datos") => {
+        const el = $(id);
+        if (!el) return;
+        el.innerHTML = rows.join("") || `<tr><td class="empty" colspan="99">${emptyText}</td></tr>`;
+      };
+      const fmtComercializacion = (v) => {
+        const t = String(v || "").toLowerCase();
+        if (t === "disponible") return "Disponible";
+        if (t === "futuros") return "Futuros";
+        if (t === "mixto") return "Mixto";
+        if (t === "aprender") return "Aprender";
+        return "-";
+      };
+
+      function renderCuentaCards(usuario, sus) {
+        const el = $("cuentaCards");
+        if (!el) return;
+        const cards = [
+          {
+            t: "WhatsApp",
+            v: usuario.whatsapp || "—",
+            s: usuario.whatsapp_jid ? "Con JID" : "",
+          },
+          { t: "Email", v: usuario.email || "No cargado", s: "Pagos / facturación" },
+          {
+            t: "Zona",
+            v: [usuario.provincia, usuario.partido].filter(Boolean).join(" · ") || "—",
+            s: "Clima y contexto",
+          },
+          {
+            t: "Comercialización",
+            v: fmtComercializacion(usuario.tipo_comercializacion),
+            s: "Preferencia declarada",
+          },
+          {
+            t: "Noticias (Pro)",
+            v:
+              usuario.noticias_cantidad_pref != null
+                ? `${usuario.noticias_cantidad_pref} artículos`
+                : "Predeterminado del plan",
+            s: "MIS NOTICIAS n",
+          },
+          {
+            t: "Plan activo hasta",
+            v: usuario.plan_activo_hasta ? fmt(usuario.plan_activo_hasta) : "—",
+            s: "Suscripción / promoción",
+          },
+          sus
+            ? {
+                t: "Mercado Pago",
+                v: `${sus.plan_objetivo || "—"} · ${sus.mp_status || "sin estado"}`,
+                s: sus.actualizado_en ? fmt(sus.actualizado_en) : "",
+              }
+            : null,
+        ].filter(Boolean);
+        el.innerHTML = cards
+          .map(
+            (c) => `
+          <div class="mini-card">
+            <div class="mini-title">${esc(c.t)}</div>
+            <div class="mini-metric" style="color:var(--txt);font-weight:600">${esc(c.v)}</div>
+            ${c.s ? `<div class="mini-meta">${esc(c.s)}</div>` : ""}
+          </div>
+        `
+          )
+          .join("");
+      }
+
+      function renderTipoCambio(rows) {
+        const strip = $("tipoCambioStrip");
+        if (!strip) return;
+        if (!rows?.length) {
+          strip.innerHTML = "";
+          return;
+        }
+        strip.innerHTML = rows
+          .map(
+            (r) =>
+              `<div class="tc-pill"><b>${esc(r.tipo || "")}</b> · ${num(r.valor)} ${r.compra != null ? ` compra ${num(r.compra)}` : ""} · ${esc(
+                String(r.fecha || "")
+              )}</div>`
+          )
+          .join("");
+      }
+
+      function renderAlertas(alertas) {
+        const el = $("alertasCards");
+        if (!el) return;
+        if (!alertas?.length) {
+          el.innerHTML = `<div class="empty-card">No hay alertas. Creá una por WhatsApp, por ejemplo: <span class="mono">ALERTA soja 450000</span></div>`;
+          return;
+        }
+        el.innerHTML = alertas
+          .map(
+            (a) => `
+          <div class="mini-card ${a.activa ? "" : "inactive"}">
+            <div class="mini-title">${esc(a.cultivo)} <span class="muted">· ${esc(a.tipo || "")}</span></div>
+            <div class="mini-metric">${moneyAr(a.valor_objetivo, "ARS")}</div>
+            <div class="mini-meta">
+              ${a.activa ? "Activa" : "Inactiva"}${a.disparada ? " · Disparada" : ""}
+              ${a.disparada_en ? " · " + fmt(a.disparada_en) : ""}
+            </div>
+          </div>
+        `
+          )
+          .join("");
+      }
+
+      function renderGanado(rows) {
+        const el = $("ganadoBox");
+        if (!el) return;
+        if (!rows?.length) {
+          el.innerHTML = 'Sin categorías ganaderas cargadas. Usá <span class="mono">MI GANADO</span> en WhatsApp.';
+          return;
+        }
+        el.innerHTML = `<div class="mini-grid">${rows
+          .map(
+            (g) => `
+          <div class="mini-card">
+            <div class="mini-title">${esc(g.categoria)} <span class="muted">(${esc(g.especie || "")})</span></div>
+            <div class="mini-metric">${g.cantidad_estimada != null ? num(g.cantidad_estimada) + " cab (est.)" : "—"}</div>
+          </div>
+        `
+          )
+          .join("")}</div>`;
+      }
+
+      function renderPerfilProductivo(rows) {
+        const el = $("perfilProdBox");
+        if (!el) return;
+        if (!rows?.length) {
+          el.innerHTML = "Sin registros de perfil productivo extendido.";
+          return;
+        }
+        el.innerHTML = rows.map((p) => `<span class="chip">${esc(p.tipo)}${p.activo === false ? " (off)" : ""}</span>`).join(" ");
+      }
+
+      function renderCultivosCards(rows) {
+        const el = $("cultivosCards");
+        if (!el) return;
+        if (!rows?.length) {
+          el.innerHTML = '<div class="empty-card">Sin cultivos. Cargalos con <span class="mono">MIS CULTIVOS</span> en WhatsApp.</div>';
+          return;
+        }
+        el.innerHTML = rows
+          .map(
+            (c) => `
+          <div class="mini-card">
+            <div class="mini-title">${esc(c.cultivo)}</div>
+            <div class="mini-metric">${c.hectareas != null ? num(c.hectareas) + " ha" : "—"}</div>
+            <div class="mini-meta">
+              Costo/ha: ${c.costo_por_ha != null ? moneyAr(c.costo_por_ha, "ARS") : "—"} · ${c.activo ? "Activo" : "Inactivo"}
+            </div>
+          </div>
+        `
+          )
+          .join("");
+      }
+
+      function renderClimaCards(rows) {
+        const el = $("climaCards");
+        if (!el) return;
+        if (!rows?.length) {
+          el.innerHTML =
+            '<div class="empty-card">Sin pronóstico: verificá que tu perfil tenga ubicación (MI ZONA) o coordenadas en cuenta.</div>';
+          return;
+        }
+        el.innerHTML = rows
+          .map(
+            (c) => `
+          <div class="mini-card">
+            <div class="mini-title">${fmt(c.fecha)}</div>
+            <div class="mini-metric">${c.temp_min ?? "—"}° / ${c.temp_max ?? "—"}°</div>
+            <div class="mini-meta">Lluvia: ${c.precipitacion ?? "—"} mm · ${esc((c.descripcion || "-").slice(0, 80))}</div>
+          </div>
+        `
+          )
+          .join("");
+      }
+
+      function setBotPill(activo) {
+        const p = $("botPill");
+        if (!p) return;
+        p.classList.remove("hide", "ok", "off");
+        p.textContent = activo ? "Bot WhatsApp: activo" : "Bot WhatsApp: pausado";
+        p.classList.add(activo ? "ok" : "off");
+      }
+
+      function renderPerfilEditable(usuario) {
+        $("perfil").innerHTML = `
+          <div class="profile-grid">
+            <div>
+              <label class="profile-label" for="perfilNombre">Nombre</label>
+              <input id="perfilNombre" value="${esc(usuario.nombre || "")}" />
+            </div>
+            <div>
+              <label class="profile-label" for="perfilEmail">Email</label>
+              <input id="perfilEmail" type="email" autocomplete="email" value="${esc(usuario.email || "")}" placeholder="opcional" />
+            </div>
+            <div>
+              <label class="profile-label" for="perfilProvincia">Provincia</label>
+              <input id="perfilProvincia" value="${esc(usuario.provincia || "")}" />
+            </div>
+            <div>
+              <label class="profile-label" for="perfilPartido">Partido/Depto</label>
+              <input id="perfilPartido" value="${esc(usuario.partido || "")}" />
+            </div>
+            <div>
+              <label class="profile-label" for="perfilComercializacion">Comercialización</label>
+              <select id="perfilComercializacion">
+                <option value="disponible" ${usuario.tipo_comercializacion === "disponible" ? "selected" : ""}>Disponible</option>
+                <option value="futuros" ${usuario.tipo_comercializacion === "futuros" ? "selected" : ""}>Futuros</option>
+                <option value="mixto" ${usuario.tipo_comercializacion === "mixto" ? "selected" : ""}>Mixto</option>
+                <option value="aprender" ${usuario.tipo_comercializacion === "aprender" ? "selected" : ""}>Aprender</option>
+              </select>
+            </div>
+          </div>
+          <div class="profile-actions">
+            <button type="button" id="btnGuardarPerfil">Guardar perfil</button>
+            <button type="button" id="btnCancelarPerfil" class="btn-secondary">Restaurar</button>
+          </div>
+          <p class="profile-status">Registro web: ID <b>${usuario.id}</b> · Plan <b>${esc(usuario.plan || "-")}</b> · Cuenta
+            <b>${usuario.activo ? "activa" : "inactiva"}</b></p>
+        `;
+      }
+
+      async function guardarPerfil() {
+        const body = {
+          nombre: $("perfilNombre")?.value?.trim() || "",
+          email: $("perfilEmail")?.value?.trim() || "",
+          provincia: $("perfilProvincia")?.value?.trim() || "",
+          partido: $("perfilPartido")?.value?.trim() || "",
+          tipo_comercializacion: $("perfilComercializacion")?.value || "disponible",
+        };
+        const r = await fetch("/api/dashboard/cliente/perfil", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const d = await r.json();
+        if (!d.ok) return alert(d.error || "No se pudo guardar perfil");
+        await cargar();
+        alert("Perfil actualizado");
+      }
+
+      let catalogoComandosCache = [];
+
+      async function cargarComandosCatalogo() {
+        const grid = $("comandosGrid");
+        if (!grid) return;
+        try {
+          const r = await fetch("/api/comandos");
+          const d = await r.json();
+          const list = d?.data?.whatsappUsuario || [];
+          catalogoComandosCache = list;
+          if (!list.length) {
+            grid.innerHTML = '<div class="empty">No hay comandos configurados.</div>';
+            return;
+          }
+          grid.innerHTML = list
+            .map(
+              (row, i) => `
+            <div class="cmd-card">
+              <div class="cmd-pill">${esc(row.comando)}</div>
+              <p class="cmd-desc">${esc(row.descripcion)}</p>
+              <button type="button" class="btn-copy" data-idx="${i}">Copiar</button>
+            </div>
+          `
+            )
+            .join("");
+          grid.querySelectorAll(".btn-copy").forEach((btn) => {
+            btn.addEventListener("click", () => {
+              const ix = Number(btn.getAttribute("data-idx"));
+              const row = catalogoComandosCache[ix];
+              const t = row?.comando != null ? String(row.comando) : "";
+              navigator.clipboard.writeText(t);
+              const prev = btn.textContent;
+              btn.textContent = "Copiado";
+              setTimeout(() => {
+                btn.textContent = prev;
+              }, 1400);
+            });
+          });
+        } catch (_e) {
+          grid.innerHTML = '<div class="empty">No se pudo cargar el catálogo de comandos.</div>';
+        }
+      }
+
+      async function cargar() {
+        const r = await fetch("/api/dashboard/cliente");
+        const d = await r.json();
+        if (!d.ok && d.code === "PASSWORD_CHANGE_REQUIRED") {
+          $("mustChangeBox").classList.remove("hide");
+          $("panelBody").classList.add("hide");
+          return;
+        }
+        if (!d.ok) return alert(d.error || "No se pudo cargar");
+        const x = d.data;
+        $("panelBody").classList.remove("hide");
+        $("mustChangeBox").classList.add("hide");
+        $("kpis").innerHTML = [
+          { l: "Plan", v: x.usuario.plan || "-" },
+          { l: "Consultas hoy", v: num(x.actividad.consultas_hoy) },
+          { l: "Consultas total", v: num(x.actividad.consultas_total) },
+          { l: "Tokens hoy", v: num(x.actividad.tokens_hoy) },
+          { l: "Tokens total", v: num(x.actividad.tokens_total) },
+          { l: "Última consulta", v: fmt(x.actividad.ultima_consulta) },
+        ]
+          .map((k) => `<div class="kpi"><div class="l">${esc(k.l)}</div><div class="v">${esc(String(k.v))}</div></div>`)
+          .join("");
+        renderTipoCambio(x.tipoCambio || []);
+        setBotPill(x.usuario?.bot_whatsapp_activo !== false);
+        renderCuentaCards(x.usuario, x.suscripcionMp);
+        renderPerfilEditable(x.usuario);
+        $("btnGuardarPerfil")?.addEventListener("click", guardarPerfil);
+        $("btnCancelarPerfil")?.addEventListener("click", () => renderPerfilEditable(x.usuario));
+        $("iaBox").innerHTML = `<p><b>Estado:</b> ${esc(x.ia.estado)}</p><p><b>Orden fallback:</b> ${esc(
+          (x.ia.ordenFallback || []).join(" → ") || "sin proveedores"
+        )}</p>`;
+        renderAlertas(x.alertas || []);
+        renderGanado(x.ganaderiaPerfil || []);
+        renderPerfilProductivo(x.perfilesProductivos || []);
+        renderCultivosCards(x.cultivos || []);
+        renderRows(
+          "preciosBody",
+          (x.precios || []).map(
+            (p) =>
+              `<tr><td>${esc(p.cultivo)}</td><td>${esc(p.mercado)}</td><td>${esc(String(p.precio))}</td><td>${esc(p.moneda)}</td><td>${fmt(p.fecha)}</td></tr>`
+          ),
+          "Sin precios para tus cultivos"
+        );
+        renderClimaCards(x.clima || []);
+        renderRows(
+          "consultasBody",
+          (x.historialConsultas || []).map(
+            (q) =>
+              `<tr><td>${fmt(q.creado_en)}</td><td>${esc(q.pregunta)}</td><td>${q.tokens_usados == null ? "fallback" : "IA"}</td></tr>`
+          ),
+          "Todavía no hiciste consultas"
+        );
+        renderRows(
+          "resumenesBody",
+          (x.resumenes || []).map(
+            (r) =>
+              `<tr><td>${fmt(r.fecha)}</td><td>${r.enviado_wp ? "si" : "no"}</td><td>${r.tokens_usados ?? "-"}</td></tr>`
+          ),
+          "Todavía no hay resúmenes"
+        );
+        renderRows(
+          "enviosBody",
+          (x.enviosWhatsapp || []).map((e) => `<tr><td>${esc(e.estado || "-")}</td><td>${esc(e.error_msg || "-")}</td><td>${fmt(e.creado_en)}</td></tr>`),
+          "Sin historial de envíos"
+        );
+        renderRows(
+          "gastosBody",
+          (x.gastos || []).map(
+            (g) =>
+              `<tr><td>${fmt(g.fecha)}</td><td>${esc(g.categoria || g.perfil || "-")}</td><td>${moneyAr(g.monto, g.moneda)}</td></tr>`
+          ),
+          "Sin gastos registrados"
+        );
+        renderRows(
+          "ventasBody",
+          (x.ventas || []).map(
+            (v) =>
+              `<tr><td>${fmt(v.fecha)}</td><td>${esc(v.producto || v.perfil || "-")}</td><td>${moneyAr(v.monto_total, v.moneda)}</td></tr>`
+          ),
+          "Sin ventas registradas"
+        );
+        await cargarComandosCatalogo();
+        try {
+          await cargarInventarioPanel();
+        } catch (eInv) {
+          $("invMsg").textContent = String(eInv?.message || "").includes("fetch")
+            ? "Sin conexión al inventario."
+            : eInv?.message || "";
+        }
+      }
+
+      function formatoDetalleMov(inv) {
+        const p =
+          typeof inv.payload === "object" && inv.payload && !Array.isArray(inv.payload)
+            ? inv.payload
+            : {};
+        const ef = inv.efecto === "delta" ? "Δ" : "=";
+        if (inv.dominio === "ganado") {
+          const n = ef === "Δ" ? p.delta : p.cantidad;
+          return `${p.categoria || "?"} (${ef}) ${n != null ? n : "?"} cab`;
+        }
+        if (inv.dominio === "cultivo") {
+          const n = ef === "Δ" ? p.delta : p.hectareas;
+          return `${p.cultivo || "?"} (${ef}) ${n != null ? n : "?"} ha`;
+        }
+        if (inv.dominio === "grano") {
+          const n = ef === "Δ" ? p.delta : (p.toneladas ?? p.tn);
+          return `${p.cultivo || "?"} stock (${ef}) ${n != null ? n : "?"} tn`;
+        }
+        if (inv.dominio === "insumo") {
+          const n = ef === "Δ" ? p.delta : p.cantidad;
+          return `${p.producto || "?"} (${ef}) ${n != null ? n : "?"} ${p.unidad || ""}`.trim();
+        }
+        return inv.texto_nl ? String(inv.texto_nl).slice(0, 80) : "—";
+      }
+
+      function syncInvDom() {
+        const d = $("invDom")?.value;
+        const gan = d === "ganado";
+        const cultiv = d === "cultivo";
+        const grain = d === "grano";
+        const ins = d === "insumo";
+        const eff = $("invEfecto")?.value;
+        const showFarm = gan || cultiv || grain || ins;
+        if ($("invEfecto")) $("invEfecto").style.display = showFarm ? "inline-block" : "none";
+        if ($("invGanCat")) $("invGanCat").style.display = gan ? "inline-block" : "none";
+        if ($("invGanCab")) $("invGanCab").style.display = gan ? "inline-block" : "none";
+        if ($("invCrop")) {
+          $("invCrop").style.display = cultiv || grain ? "inline-block" : "none";
+          $("invCrop").placeholder = grain ? "Cultivo (grano)" : "Cultivo";
+        }
+        if ($("invCropHa")) $("invCropHa").style.display = cultiv ? "inline-block" : "none";
+        if ($("invGranoTn")) $("invGranoTn").style.display = grain ? "inline-block" : "none";
+        if ($("invInsumProd")) $("invInsumProd").style.display = ins ? "inline-block" : "none";
+        if ($("invInsumUn")) $("invInsumUn").style.display = ins ? "inline-block" : "none";
+        if ($("invInsumCant")) $("invInsumCant").style.display = ins ? "inline-block" : "none";
+        if (gan && $("invGanCab")) $("invGanCab").placeholder = eff === "delta" ? "Δ cab" : "cab";
+        if (cultiv && $("invCropHa")) $("invCropHa").placeholder = eff === "delta" ? "Δ ha" : "ha";
+        if (grain && $("invGranoTn")) $("invGranoTn").placeholder = eff === "delta" ? "Δ tn" : "tn";
+        if (ins && $("invInsumCant")) $("invInsumCant").placeholder = eff === "delta" ? "Δ" : "cant";
+      }
+
+      async function cargarInventarioPanel() {
+        if (!$("invSaldosBody")) return;
+        $("invMsg").textContent = "";
+        const rl = await fetch("/api/inventario/lotes");
+        const rlD = await rl.json();
+        const rc = await fetch("/api/inventario/campanas");
+        const rcD = await rc.json();
+        const rs = await fetch("/api/inventario/saldos");
+        const rsD = await rs.json();
+        const rm = await fetch("/api/inventario/movimientos?limit=60");
+        const rmD = await rm.json();
+        const sel = $("invSelLote");
+        if (sel && rlD.ok) {
+          const prev = sel.value;
+          sel.innerHTML =
+            `<option value="">Sin lote (establecimiento)</option>` +
+            (rlD.lotes || []).map((l) => `<option value="${l.id}">${esc(l.nombre || "lote " + l.id)}</option>`).join("");
+          if (prev) sel.value = prev;
+        }
+        const selC = $("invSelCamp");
+        if (selC && rcD.ok) {
+          const prevC = selC.value;
+          selC.innerHTML =
+            `<option value="">Sin campaña</option>` +
+            (rcD.campanas || []).map((c) => `<option value="${c.id}">${esc(c.nombre || "campaña " + c.id)}</option>`).join("");
+          if (prevC) selC.value = prevC;
+        }
+        if (!rlD.ok || !rsD.ok || !rcD.ok || !rmD.ok) {
+          $("invMsg").textContent =
+            rlD.error || rsD.error || rcD.error || rmD.error || "No fue posible cargar inventario (¿migración DB?).";
+          return;
+        }
+        renderRows(
+          "invSaldosBody",
+          (rsD.saldos || []).map((s) => {
+            const qty = `${num(s.cantidad)} ${s.unidad || ""}`;
+            const item = s.etiqueta || s.item_clave || "-";
+            const lote = s.lote_nombre || (s.lote_id ? "#" + s.lote_id : "—");
+            const cmp = s.campana_nombre || (s.campana_id ? "#" + s.campana_id : "—");
+            return `<tr><td>${esc(item)}</td><td>${esc(qty)}</td><td>${esc(lote)}</td><td>${esc(cmp)}</td><td>${fmt(s.actualizado_en)}</td></tr>`;
+          }),
+          "Sin saldos de inventario aún"
+        );
+        renderRows(
+          "invMovsBody",
+          (rmD.movimientos || []).map((m) => {
+            const lote = m.lote_nombre || (m.lote_id ? "#" + m.lote_id : "—");
+            const cmp = m.campana_nombre || (m.campana_id ? "#" + m.campana_id : "—");
+            const fe = m.confirmado_en || m.creado_en;
+            return `<tr><td>${fmt(fe)}</td><td>${esc(m.dominio || "—")}</td><td>${esc(m.efecto || "—")}</td><td>${esc(formatoDetalleMov(m))}</td><td>${esc(
+              lote
+            )}</td><td>${esc(cmp)}</td><td>${esc(m.canal || "—")}</td></tr>`;
+          }),
+          "Sin movimientos confirmados"
+        );
+        syncInvDom();
+      }
+
+      async function crearLoteCliente() {
+        const nombre = $("invLoteNombre")?.value?.trim();
+        const haRaw = $("invLoteHa")?.value?.trim();
+        $("invMsg").textContent = "";
+        if (!nombre) return ($("invMsg").textContent = "Completá el nombre del lote.");
+        const body = { nombre, hectareas: haRaw === "" ? null : Number(haRaw.replace(",", ".")) };
+        const r = await fetch("/api/inventario/lotes", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const d = await r.json();
+        if (!d.ok) return ($("invMsg").textContent = d.error || "Error");
+        $("invLoteNombre").value = "";
+        $("invLoteHa").value = "";
+        await cargarInventarioPanel();
+      }
+
+      async function crearCampanaCliente() {
+        const nombre = $("invCampNombre")?.value?.trim();
+        $("invMsg").textContent = "";
+        if (!nombre) return ($("invMsg").textContent = "Completá el nombre de la campaña.");
+        const r = await fetch("/api/inventario/campanas", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ nombre }),
+        });
+        const d = await r.json();
+        if (!d.ok) return ($("invMsg").textContent = d.error || "Error");
+        $("invCampNombre").value = "";
+        await cargarInventarioPanel();
+      }
+
+      async function registrarInvCliente() {
+        $("invMsg").textContent = "";
+        const dom = $("invDom").value;
+        const lid = $("invSelLote").value;
+        const cid = $("invSelCamp").value;
+        const efecto = $("invEfecto").value || "replace";
+        let body = {
+          dominio: dom,
+          efecto,
+          lote_id: lid === "" ? null : Number(lid),
+          campana_id: cid === "" ? null : Number(cid),
+        };
+        if (dom === "ganado") {
+          body.categoria = $("invGanCat").value.trim();
+          body.especie = "vacuno";
+          const gv = Number(($("invGanCab").value || "").replace(",", "."));
+          if (efecto === "delta") body.delta = gv;
+          else body.cantidad = gv;
+        } else if (dom === "cultivo") {
+          body.cultivo = $("invCrop").value.trim();
+          const hv = Number(($("invCropHa").value || "").replace(",", "."));
+          if (efecto === "delta") body.delta = hv;
+          else body.hectareas = hv;
+        } else if (dom === "grano") {
+          body.cultivo = $("invCrop").value.trim();
+          const tv = Number(($("invGranoTn").value || "").replace(",", "."));
+          if (efecto === "delta") body.delta = tv;
+          else body.toneladas = tv;
+        } else {
+          body.producto = $("invInsumProd").value.trim();
+          body.unidad = $("invInsumUn").value.trim() || "un";
+          const iv = Number(($("invInsumCant").value || "").replace(",", "."));
+          if (efecto === "delta") body.delta = iv;
+          else body.cantidad = iv;
+        }
+        const r = await fetch("/api/inventario/registro", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const d = await r.json();
+        if (!d.ok) return ($("invMsg").textContent = d.error || "Error");
+        await cargarInventarioPanel();
+        $("invMsg").textContent = "Registro guardado.";
+      }
+
+      async function checkSession() {
+        const r = await fetch("/api/auth/cliente/session");
+        const d = await r.json();
+        if (!d.ok) {
+          window.location.href = `/dashboard/cliente/login?next=${encodeURIComponent("/dashboard/cliente")}`;
+          return null;
+        }
+        $("sessionMeta").textContent = `${d.session.user?.nombre || "Cliente"} (${d.session.user?.whatsapp || "-"})`;
+        return d.session;
+      }
+
+      async function cambiarPassword() {
+        const passwordActual = $("passwordActual").value.trim();
+        const passwordNueva = $("passwordNueva").value.trim();
+        const msg = $("mustChangeMsg");
+        msg.textContent = "";
+        if (!passwordActual || !passwordNueva || passwordNueva.length < 8) {
+          msg.textContent = "Completá ambos campos y usá al menos 8 caracteres.";
+          return;
+        }
+        const r = await fetch("/api/auth/cliente/password", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ passwordActual, passwordNueva }),
+        });
+        const d = await r.json();
+        if (!d.ok) {
+          msg.textContent = d.error || "No se pudo cambiar la contraseña.";
+          return;
+        }
+        alert("Contraseña actualizada. Volvé a iniciar sesión.");
+        window.location.href = "/dashboard/cliente/login";
+      }
+
+      $("btnLoad").addEventListener("click", cargar);
+      $("btnLogout").addEventListener("click", async () => {
+        await fetch("/api/auth/cliente/logout", { method: "POST" });
+        window.location.href = "/dashboard/cliente/login";
+      });
+      $("btnCambiarPassword").addEventListener("click", cambiarPassword);
+
+      $("invDom")?.addEventListener("change", syncInvDom);
+      $("invEfecto")?.addEventListener("change", syncInvDom);
+      $("invBtnNuevoLote")?.addEventListener("click", crearLoteCliente);
+      $("invBtnNuevaCamp")?.addEventListener("click", crearCampanaCliente);
+      $("invBtnReg")?.addEventListener("click", registrarInvCliente);
+
+      (async () => {
+        const ses = await checkSession();
+        if (!ses) return;
+        if (ses.mustChangePassword) {
+          $("mustChangeBox").classList.remove("hide");
+          $("panelBody").classList.add("hide");
+          return;
+        }
+        await cargar();
+      })();
+    </script>
+  </body>
+</html>

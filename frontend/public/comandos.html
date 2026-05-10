@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AgroHabilis - Comandos</title>
+    <style>
+      :root { --bg:#f3f7ff; --bg-soft:#eef4ff; --panel:#ffffff; --panel-soft:#f7faff; --text:#17233a; --muted:#5f7294; --accent:#2f8bff; --line:#dbe7ff; --shadow:0 12px 30px rgba(39,81,161,.12); }
+      * { box-sizing: border-box; }
+      body { font-family: Inter, Segoe UI, Arial, sans-serif; font-size:15px; margin:0; background: linear-gradient(180deg, var(--bg-soft), var(--bg)); color:var(--text); padding:24px 24px 24px 276px; }
+      .topbar { display:flex; gap:10px; align-items:center; margin-bottom:16px; flex-wrap:wrap; }
+      .nav { position: fixed; left: 18px; top: 18px; width: 230px; display:flex; flex-direction:column; gap:8px; padding:12px; border:1px solid var(--line); border-radius:16px; background:#fff; box-shadow: var(--shadow); margin-bottom:14px; }
+      .nav .brand { display:flex; align-items:center; gap:10px; padding:8px 10px 12px; border-bottom:1px solid #e7efff; margin-bottom:4px; font-weight:800; color:#1e3b6e; }
+      .brand-dot { width:10px; height:10px; border-radius:999px; background:#2f8bff; box-shadow:0 0 0 4px rgba(47,139,255,.12); }
+      .nav a { text-decoration:none; padding:9px 12px; border-radius:10px; border:1px solid #d5e3ff; color:#38507b; background:#fff; font-size:13px; font-weight:600; width:100%; }
+      .nav a.active { background: linear-gradient(180deg, var(--accent), #1f66c9); border:none; color:#fff; font-weight:700; }
+      .card { background: linear-gradient(180deg, var(--panel), var(--panel-soft)); border:1px solid var(--line); border-radius:16px; padding:16px; margin-bottom:14px; box-shadow:var(--shadow); }
+      .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap:10px; }
+      .row { display:grid; grid-template-columns: 1fr 2fr auto; gap:8px; padding:10px 0; border-bottom:1px solid var(--line); align-items:center; }
+      .cmd { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color:#9fe9bf; }
+      .muted { color:var(--muted); }
+      a.btn, button.btn { text-decoration:none; padding:10px 12px; border-radius:8px; background: linear-gradient(180deg, var(--accent), #1f7a3f); color:#07210f; font-weight:700; border:none; cursor:pointer; }
+      input, select { padding:11px 13px; border-radius:10px; border:1px solid #cfddfa; background:#fff; color:#24395f; }
+      .tools { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
+      .empty { color:var(--muted); font-size:12px; padding:8px 0; }
+      .copy-mini { padding:6px 8px; border-radius:6px; border:1px solid #3d5689; background:#0f1930; color:var(--text); cursor:pointer; font-size:12px; }
+      .page-head { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:14px; }
+      .crumb { color:var(--muted); font-size:13px; }
+      @media (max-width: 1100px) {
+        body { padding:16px; }
+        .nav { position: static; width: auto; flex-direction: row; flex-wrap: wrap; }
+      }
+      @media (max-width: 760px) {
+        body { padding: 12px; font-size: 14px; }
+        .card { padding: 12px; border-radius: 12px; }
+        .topbar > * { width: 100%; }
+        .nav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; padding: 10px; border-radius: 12px; }
+        .nav .brand { grid-column: 1 / -1; }
+        .nav a { width: 100%; text-align: center; padding: 8px 10px; font-size: 12px; }
+        .tools > * { width: 100%; }
+        .grid { grid-template-columns: 1fr; }
+        .row { grid-template-columns: 1fr; gap: 6px; }
+        .copy-mini { width: 100%; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="topbar">
+      <h1 style="margin:0;">AgroHabilis - Comandos disponibles</h1>
+      <a class="btn" href="/dashboard/admin">Volver al Control Center</a>
+    </div>
+    <div class="nav">
+      <div class="brand"><span class="brand-dot"></span><span>AgroHabilis Admin</span></div>
+      <a href="/dashboard/admin">🏠 Dashboard</a>
+      <a href="/dashboard/metricas">📊 Métricas</a>
+      <a href="/dashboard/precios">💹 Precios</a>
+      <a href="/dashboard/usuarios">👥 Usuarios</a>
+      <a href="/dashboard/comandos" class="active">⌨️ Comandos</a>
+      <a href="/dashboard/templates">🧩 Templates</a>
+      <a href="/dashboard/cliente">🙍 Cliente</a>
+    </div>
+    <div class="page-head">
+      <div>
+        <div class="crumb">Inicio / Comandos</div>
+        <h3 style="margin:2px 0 0;">Catálogo central de comandos</h3>
+      </div>
+    </div>
+    <div class="card">
+      <div class="tools">
+        <input id="q" placeholder="Buscar comando o descripción" />
+        <select id="scope">
+          <option value="all">Todos</option>
+          <option value="waUser">WhatsApp usuario</option>
+          <option value="waAdmin">WhatsApp admin</option>
+          <option value="apiAdmin">API admin</option>
+        </select>
+      </div>
+      <div class="muted">Buscá, filtrá y copiá comandos rápido.</div>
+    </div>
+    <div class="grid">
+      <div class="card">
+        <h3>WhatsApp - Usuario</h3>
+        <div id="waUser" class="muted">Cargando...</div>
+      </div>
+      <div class="card">
+        <h3>WhatsApp - Administrador</h3>
+        <div id="waAdmin" class="muted">Cargando...</div>
+      </div>
+      <div class="card" style="grid-column: 1 / -1;">
+        <h3>API / Dashboard Admin</h3>
+        <div id="apiAdmin" class="muted">Cargando...</div>
+      </div>
+    </div>
+    <script>
+      const state = { waUser: [], waAdmin: [], apiAdmin: [] };
+      const esc = (s) => String(s ?? "").replace(/"/g, "&quot;");
+      const copyCmd = async (txt) => {
+        try { await navigator.clipboard.writeText(txt); } catch (_e) {}
+      };
+      const renderList = (targetId, rows, formatFn) => {
+        const el = document.getElementById(targetId);
+        if (!rows?.length) { el.innerHTML = '<p class="empty">Sin datos para el filtro actual.</p>'; return; }
+        el.innerHTML = rows.map(formatFn).join("");
+        el.querySelectorAll("button[data-copy]").forEach((b) => {
+          b.addEventListener("click", () => copyCmd(b.getAttribute("data-copy")));
+        });
+      };
+      const rowCmd = (x) => `<div class="row"><div class="cmd">${x.comando}</div><div>${x.descripcion}</div><button class="copy-mini" data-copy="${esc(x.comando)}">Copiar</button></div>`;
+      const rowApi = (x) => {
+        const cmd = `${x.metodo} ${x.endpoint}`;
+        return `<div class="row"><div class="cmd">${cmd}</div><div>${x.descripcion}</div><button class="copy-mini" data-copy="${esc(cmd)}">Copiar</button></div>`;
+      };
+      const filtrar = () => {
+        const q = (document.getElementById("q").value || "").toLowerCase();
+        const scope = document.getElementById("scope").value;
+        const match = (txt) => !q || String(txt).toLowerCase().includes(q);
+        const fCmd = (arr) => arr.filter((x) => match(`${x.comando} ${x.descripcion}`));
+        const fApi = (arr) => arr.filter((x) => match(`${x.metodo} ${x.endpoint} ${x.descripcion}`));
+        renderList("waUser", scope === "all" || scope === "waUser" ? fCmd(state.waUser) : [], rowCmd);
+        renderList("waAdmin", scope === "all" || scope === "waAdmin" ? fCmd(state.waAdmin) : [], rowCmd);
+        renderList("apiAdmin", scope === "all" || scope === "apiAdmin" ? fApi(state.apiAdmin) : [], rowApi);
+      };
+      fetch("/api/comandos")
+        .then((r) => r.json())
+        .then((d) => {
+          const c = d.data || {};
+          state.waUser = c.whatsappUsuario || [];
+          state.waAdmin = c.whatsappAdmin || [];
+          state.apiAdmin = c.apiAdmin || [];
+          filtrar();
+          document.getElementById("q").addEventListener("input", filtrar);
+          document.getElementById("scope").addEventListener("change", filtrar);
+        })
+        .catch((e) => {
+          document.getElementById("waUser").innerHTML = `<p class="muted">Error: ${e.message}</p>`;
+          document.getElementById("waAdmin").innerHTML = `<p class="muted">Error: ${e.message}</p>`;
+          document.getElementById("apiAdmin").innerHTML = `<p class="muted">Error: ${e.message}</p>`;
+        });
+    </script>
+  </body>
+  </html>

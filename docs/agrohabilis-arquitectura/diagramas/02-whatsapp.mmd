@@ -1,0 +1,24 @@
+sequenceDiagram
+  participant U as Usuario WA
+  participant W as whatsapp.js
+  participant O as onboarding.js
+  participant I as intents IA
+  participant C as consultas.js
+  participant T as templates
+  participant G as gemini cadena
+  participant DB as PostgreSQL
+  U->>W: mensaje
+  W->>O: onboarding si aplica
+  alt comando MI RESUMEN u otros
+    W->>T: renderTemplate
+    T->>DB: lecturas
+    W-->>U: respuesta
+  else consulta operativa
+    W->>I: detectarIntencionIA
+    W->>C: procesarConsulta
+    C->>T: template consulta
+    T->>DB: datos
+    T->>G: IA contextual
+    C->>DB: historial_consultas
+    W-->>U: respuesta
+  end

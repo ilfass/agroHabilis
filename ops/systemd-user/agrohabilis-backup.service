@@ -1,0 +1,9 @@
+[Unit]
+Description=AgroHabilis backup (pull VPS + rotación)
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/fabian/Documentos/Agro.habilispro
+ExecStart=/usr/bin/npm run backup:cron
+StandardOutput=append:/home/fabian/Documentos/Agro.habilispro/logs/backup-systemd.log
+StandardError=append:/home/fabian/Documentos/Agro.habilispro/logs/backup-systemd.log

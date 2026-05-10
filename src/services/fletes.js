@@ -128,11 +128,15 @@ async function calcularFlete(origen, destino, tipo_carga = "granos", toneladas =
   const costoTotalArs = Number.isFinite(costoArsTn)
     ? Number((costoArsTn * tns + peajesArs).toFixed(2))
     : peajesArs;
+  /** ARS por tn (coherente con costo_usd_tn); costo_total_ars es el viaje completo a toneladas de referencia. */
+  const costoArsPorTnDesdeTotal =
+    Number.isFinite(costoTotalArs) && tns > 0 ? Number((costoTotalArs / tns).toFixed(2)) : null;
 
   return {
     distancia_km: distanciaKm,
     tarifa_usd_km_tn: tarifaUsdAjustada,
     costo_usd_tn: costoUsdTn,
+    costo_ars_tn: Number.isFinite(costoArsTn) ? costoArsTn : costoArsPorTnDesdeTotal,
     costo_total_usd: costoTotalUsd,
     costo_total_ars: costoTotalArs,
     peajes_ars: peajesArs,
@@ -146,7 +150,8 @@ async function calcularFlete(origen, destino, tipo_carga = "granos", toneladas =
 }
 
 async function obtenerFletesUsuario(usuario) {
-  const origen = usuario?.partido || usuario?.provincia || "Tandil";
+  const origen = usuario?.partido || usuario?.provincia || null;
+  if (!origen) return [];
   const perfil = normalizar(usuario?.perfil_productivo || usuario?.perfil || "");
   const rutas = [];
 

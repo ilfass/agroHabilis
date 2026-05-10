@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AgroHabilis | Casos reales</title>
+    <style>
+      :root {
+        --bg: #f5faf7;
+        --card: #ffffff;
+        --b: #d7e5dc;
+        --text: #192720;
+        --muted: #5f7166;
+        --verde: #2d6a4f;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: Inter, Segoe UI, Arial, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+      }
+      .wrap {
+        width: min(1120px, 92%);
+        margin: 0 auto;
+        padding: 22px 0 44px;
+      }
+      h1 { margin: 0 0 8px; }
+      .muted { color: var(--muted); }
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 14px;
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--b);
+        border-radius: 14px;
+        padding: 14px;
+      }
+      .card h2 {
+        margin: 0 0 10px;
+        color: var(--verde);
+        font-size: 21px;
+      }
+      .pill {
+        display: inline-block;
+        background: #e9f5ee;
+        border: 1px solid #c9e4d4;
+        border-radius: 999px;
+        font-size: 12px;
+        padding: 4px 8px;
+        margin-bottom: 8px;
+      }
+      pre {
+        margin: 0;
+        white-space: pre-wrap;
+        word-break: break-word;
+        background: #f8fcfa;
+        border: 1px solid #d9e9df;
+        border-radius: 10px;
+        padding: 10px;
+        font-size: 13px;
+      }
+      .item {
+        border-top: 1px solid #ebf3ee;
+        padding-top: 10px;
+        margin-top: 10px;
+      }
+      .item:first-child { border-top: 0; padding-top: 0; margin-top: 0; }
+      @media (min-width: 980px) {
+        .grid {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>Casos reales AgroHabilis</h1>
+      <p class="muted">
+        Esta página muestra únicamente información real generada con los datos y herramientas del sistema.
+      </p>
+      <p id="meta" class="muted">Cargando...</p>
+      <div class="grid">
+        <section class="card">
+          <h2>Consulta real por plan</h2>
+          <div id="consultas"></div>
+        </section>
+        <section class="card">
+          <h2>Alertas reales</h2>
+          <div id="alertas"></div>
+        </section>
+        <section class="card">
+          <h2>Resúmenes reales (perfil + región)</h2>
+          <div id="resumenes"></div>
+        </section>
+        <section class="card">
+          <h2>Charlas reales recientes</h2>
+          <div id="conversaciones"></div>
+        </section>
+      </div>
+    </div>
+    <script>
+      const $ = (id) => document.getElementById(id);
+      const fmt = (v) => {
+        if (!v) return "s/d";
+        const d = new Date(v);
+        return Number.isNaN(d.getTime()) ? String(v) : d.toLocaleString("es-AR");
+      };
+      const esc = (v) =>
+        String(v ?? "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
+
+      const renderEmpty = (id, text) => {
+        $(id).innerHTML = `<p class="muted">${esc(text)}</p>`;
+      };
+
+      const renderConsultas = (rows) => {
+        if (!rows?.length) return renderEmpty("consultas", "No hay consultas reales suficientes por plan.");
+        $("consultas").innerHTML = rows
+          .map(
+            (r) => `
+              <div class="item">
+                <span class="pill">Plan ${esc(r.plan_efectivo)}</span>
+                <p><b>${esc(r.nombre || "Usuario")}</b> · ${fmt(r.creado_en)}</p>
+                <p><b>Pregunta:</b> ${esc(r.pregunta)}</p>
+                <pre>${esc(r.respuesta)}</pre>
+              </div>
+            `
+          )
+          .join("");
+      };
+
+      const renderAlertas = (rows) => {
+        if (!rows?.length) return renderEmpty("alertas", "No hay alertas reales registradas.");
+        $("alertas").innerHTML = rows
+          .map(
+            (r) => `
+              <div class="item">
+                <p><b>#${esc(r.id)}</b> ${esc(r.nombre || "-")} · ${esc(r.whatsapp || "-")}</p>
+                <p>${esc(r.tipo)} ${esc(r.cultivo)} objetivo ${esc(r.valor_objetivo)}</p>
+                <p class="muted">Activa: ${r.activa ? "sí" : "no"} · Disparada: ${r.disparada ? "sí" : "no"} · ${fmt(r.disparada_en || r.creado_en)}</p>
+              </div>
+            `
+          )
+          .join("");
+      };
+
+      const renderResumenes = (rows) => {
+        if (!rows?.length) return renderEmpty("resumenes", "No hay resúmenes reales para perfil/región solicitados.");
+        $("resumenes").innerHTML = rows
+          .map(
+            (r) => `
+              <div class="item">
+                <span class="pill">${esc(r.perfil)} · ${esc(r.region)}</span>
+                <p><b>${esc(r.nombre || "Usuario")}</b> · ${fmt(r.creado_en)}</p>
+                <pre>${esc(r.contenido)}</pre>
+              </div>
+            `
+          )
+          .join("");
+      };
+
+      const renderConversaciones = (rows) => {
+        if (!rows?.length) return renderEmpty("conversaciones", "No hay conversaciones reales recientes.");
+        $("conversaciones").innerHTML = rows
+          .map(
+            (r) => `
+              <div class="item">
+                <span class="pill">Plan ${esc(r.plan_efectivo)}</span>
+                <p><b>${esc(r.nombre || "Usuario")}</b> · ${fmt(r.creado_en)}</p>
+                <p><b>Usuario:</b> ${esc(r.pregunta)}</p>
+                <pre>${esc(r.respuesta)}</pre>
+              </div>
+            `
+          )
+          .join("");
+      };
+
+      (async () => {
+        try {
+          const r = await fetch("/api/casos-reales");
+          const j = await r.json();
+          if (!j.ok) throw new Error(j.error || "Error cargando casos reales");
+          const d = j.data;
+          $("meta").textContent = `Generado: ${fmt(d.generadoEn)}`;
+          renderConsultas(d.consultasPorPlan);
+          renderAlertas(d.alertas);
+          renderResumenes(d.resumenesPorPerfilRegion);
+          renderConversaciones(d.conversaciones);
+        } catch (e) {
+          $("meta").textContent = `Error: ${e.message}`;
+          renderEmpty("consultas", "No se pudieron cargar los datos.");
+          renderEmpty("alertas", "No se pudieron cargar los datos.");
+          renderEmpty("resumenes", "No se pudieron cargar los datos.");
+          renderEmpty("conversaciones", "No se pudieron cargar los datos.");
+        }
+      })();
+    </script>
+  </body>
+</html>

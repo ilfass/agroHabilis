@@ -1,0 +1,642 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AgroHabilis | Tu asistente agropecuario por WhatsApp</title>
+    <meta
+      name="description"
+      content="AgroHabilis - Precios de granos, clima y tipo de cambio cada mañana por WhatsApp. Inteligencia agropecuaria personalizada para productores argentinos."
+    />
+    <meta property="og:title" content="AgroHabilis | Tu asistente agropecuario" />
+    <meta
+      property="og:description"
+      content="Precios de granos, clima y decisiones productivas en un solo mensaje, todos los días."
+    />
+    <meta property="og:image" content="https://agro.habilispro.com/og-image.jpg" />
+    <meta property="og:url" content="https://agro.habilispro.com" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --verde: #2d6a4f;
+        --verde-oscuro: #1b4332;
+        --dorado: #e9c46a;
+        --whatsapp: #25d366;
+        --fondo: #f4f8f6;
+        --texto: #18231d;
+        --muted: #5a6c60;
+        --card: #ffffff;
+        --borde: #d7e3db;
+        --sombra: 0 12px 30px rgba(23, 48, 35, 0.08);
+        --radius: 18px;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: "Inter", "Segoe UI", Arial, sans-serif;
+        background: var(--fondo);
+        color: var(--texto);
+        line-height: 1.5;
+      }
+      .container {
+        width: min(1140px, 92%);
+        margin: 0 auto;
+      }
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border-radius: 999px;
+        background: rgba(233, 196, 106, 0.2);
+        color: #ffeec5;
+        border: 1px solid rgba(233, 196, 106, 0.45);
+        padding: 6px 12px;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.4px;
+      }
+      .hero {
+        position: relative;
+        overflow: hidden;
+        background:
+          radial-gradient(circle at 10% 12%, rgba(233, 196, 106, 0.24), transparent 30%),
+          radial-gradient(circle at 90% 78%, rgba(108, 189, 138, 0.26), transparent 34%),
+          linear-gradient(138deg, var(--verde) 0%, var(--verde-oscuro) 82%);
+        color: #fff;
+        padding: 22px 0 72px;
+      }
+      .hero::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(to bottom, transparent 70%, rgba(0, 0, 0, 0.08) 100%);
+        pointer-events: none;
+      }
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        position: relative;
+        z-index: 1;
+      }
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 9px;
+        font-size: 20px;
+        font-weight: 800;
+      }
+      .brand-logo {
+        width: 30px;
+        height: 30px;
+        object-fit: contain;
+        border-radius: 8px;
+      }
+      .brand-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        background: var(--dorado);
+        box-shadow: 0 0 0 4px rgba(233, 196, 106, 0.22);
+      }
+      .hero-content {
+        margin-top: 42px;
+        max-width: 720px;
+        position: relative;
+        z-index: 1;
+      }
+      h1 {
+        margin: 12px 0 12px;
+        font-size: clamp(32px, 5vw, 56px);
+        font-weight: 900;
+        letter-spacing: -0.8px;
+        line-height: 1.1;
+      }
+      .subtitle {
+        margin: 0;
+        color: #dcebe1;
+        font-size: clamp(16px, 2.6vw, 21px);
+      }
+      .hero-kpis {
+        margin-top: 24px;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+        max-width: 650px;
+      }
+      .hero-kpi {
+        background: rgba(255, 255, 255, 0.09);
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        backdrop-filter: blur(3px);
+        border-radius: 14px;
+        padding: 10px 11px;
+        font-size: 12px;
+      }
+      .hero-kpi strong {
+        display: block;
+        color: #fff;
+        margin-top: 2px;
+        font-size: 15px;
+      }
+      .cta,
+      .cta-large {
+        display: inline-block;
+        text-decoration: none;
+        font-weight: 800;
+        border-radius: 999px;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+      }
+      .cta:hover,
+      .cta-large:hover {
+        transform: translateY(-2px);
+      }
+      .cta {
+        background: linear-gradient(180deg, #34e47a 0%, #1fb65d 100%);
+        color: #043f1f;
+        box-shadow: 0 8px 18px rgba(37, 211, 102, 0.3);
+        padding: 12px 21px;
+        font-size: 16px;
+      }
+      .cta-large {
+        background: linear-gradient(180deg, #38e87f 0%, #1fab58 100%);
+        color: #fff;
+        padding: 16px 28px;
+        font-size: 18px;
+        box-shadow: 0 10px 24px rgba(37, 211, 102, 0.35);
+      }
+      .cta-large:focus-visible,
+      .cta:focus-visible {
+        outline: 3px solid rgba(255, 255, 255, 0.6);
+        outline-offset: 3px;
+      }
+      section {
+        padding: 68px 0;
+      }
+      h2 {
+        margin: 0 0 18px;
+        font-size: clamp(26px, 3.3vw, 38px);
+        letter-spacing: -0.4px;
+      }
+      .lead {
+        margin: 0 0 24px;
+        color: var(--muted);
+        max-width: 760px;
+      }
+      .grid-3 {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 15px;
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--borde);
+        border-radius: var(--radius);
+        box-shadow: var(--sombra);
+        padding: 20px;
+      }
+      .icon {
+        font-size: 22px;
+        display: inline-block;
+        margin-bottom: 10px;
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        display: grid;
+        place-items: center;
+        background: linear-gradient(145deg, #eef7f1, #dcebdf);
+      }
+      .card h3 {
+        margin: 0 0 6px;
+        font-size: 20px;
+        letter-spacing: -0.2px;
+      }
+      .card p {
+        margin: 0;
+        color: var(--muted);
+      }
+      .steps {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 14px;
+      }
+      .step {
+        position: relative;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fcfa 100%);
+        border: 1px solid var(--borde);
+        border-radius: 14px;
+        padding: 16px 16px 16px 56px;
+        box-shadow: var(--sombra);
+      }
+      .step::before {
+        content: attr(data-step);
+        position: absolute;
+        left: 14px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 30px;
+        height: 30px;
+        border-radius: 999px;
+        background: var(--dorado);
+        color: #2b2309;
+        display: grid;
+        place-items: center;
+        font-size: 14px;
+        font-weight: 800;
+      }
+      .step strong {
+        display: block;
+      }
+      .audiencia {
+        background: linear-gradient(180deg, #f8fbf9 0%, #f3f8f5 100%);
+      }
+      .audiencia ul {
+        margin: 0;
+        padding-left: 18px;
+      }
+      .audiencia li {
+        margin-bottom: 12px;
+        color: #2b3b31;
+      }
+      .planes .card {
+        border-top: 5px solid var(--verde);
+        position: relative;
+      }
+      .plan-list {
+        margin: 10px 0 0;
+        padding-left: 18px;
+        color: #2f4036;
+      }
+      .plan-list li {
+        margin-bottom: 6px;
+      }
+      .highlight-box {
+        background: linear-gradient(180deg, #ffffff, #f7fbf9);
+        border: 1px solid #d7e5dc;
+        border-radius: 14px;
+        padding: 16px;
+        margin-bottom: 16px;
+      }
+      .highlight-box p {
+        margin: 0;
+        color: #395044;
+      }
+      .badge-popular {
+        position: absolute;
+        top: -13px;
+        right: 14px;
+        background: linear-gradient(180deg, #f7d889, #e9c46a);
+        color: #3d2f08;
+        border-radius: 999px;
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.5px;
+        padding: 6px 10px;
+      }
+      .price {
+        margin: 8px 0;
+        font-size: 28px;
+        font-weight: 800;
+        letter-spacing: -0.6px;
+      }
+      #ejemplo {
+        background:
+          radial-gradient(circle at 90% 20%, rgba(45, 106, 79, 0.08), transparent 28%),
+          #eef6f0;
+      }
+      .wa-example {
+        max-width: 820px;
+        background: #dcf8c6;
+        border: 1px solid #c7eab0;
+        border-radius: 18px;
+        padding: 18px;
+        box-shadow: 0 10px 25px rgba(45, 106, 79, 0.14);
+        font-family: "Cascadia Mono", "Fira Code", "Courier New", monospace;
+        white-space: pre-line;
+        color: #122518;
+      }
+      .final-cta {
+        background: linear-gradient(180deg, #edf6ef 0%, #e4f0e8 100%);
+        border-top: 1px solid #d2e2d7;
+        border-bottom: 1px solid #d2e2d7;
+      }
+      .final-cta-box {
+        text-align: center;
+        background: linear-gradient(180deg, #ffffff, #f9fcfa);
+        border: 1px solid #dce9df;
+        border-radius: 22px;
+        padding: 28px 18px;
+        box-shadow: var(--sombra);
+      }
+      .final-cta-box p {
+        margin: 8px 0 20px;
+        color: var(--muted);
+      }
+      footer {
+        padding: 24px 0 36px;
+        text-align: center;
+        color: #5f6d64;
+        font-size: 13px;
+      }
+      .fade-in {
+        opacity: 0;
+        transform: translateY(14px);
+        transition: opacity 0.5s ease, transform 0.5s ease;
+      }
+      .fade-in.visible {
+        opacity: 1;
+        transform: translateY(0);
+      }
+      @media (min-width: 980px) {
+        .grid-3 {
+          grid-template-columns: repeat(3, 1fr);
+        }
+        .steps {
+          grid-template-columns: repeat(3, 1fr);
+        }
+      }
+      @media (max-width: 979px) {
+        body { font-size: 16px; line-height: 1.58; }
+        .hero {
+          padding: 18px 0 44px;
+          background: linear-gradient(140deg, #1c4f3a 0%, #133226 88%);
+        }
+        .container { width: min(100%, 94%); }
+        section { padding: 46px 0; }
+        .topbar { align-items: center; gap: 10px; }
+      .brand { font-size: 18px; }
+      .brand-logo { width: 28px; height: 28px; border-radius: 7px; }
+        h1 { font-size: clamp(46px, 12vw, 66px); line-height: 1.03; letter-spacing: -0.9px; }
+        h2 { margin-bottom: 12px; font-size: clamp(34px, 9vw, 44px); color: #081a38; line-height: 1.08; }
+        .subtitle { font-size: 23px; line-height: 1.42; color: #e9f4ee; }
+        .lead { margin-bottom: 16px; font-size: 18px; color: #364968; }
+        .cta, .cta-large {
+          width: auto;
+          min-width: 210px;
+          text-align: center;
+          padding: 12px 18px;
+          font-size: 17px;
+        }
+        .hero-kpis { grid-template-columns: 1fr; max-width: 100%; gap: 10px; }
+        .hero-kpi { padding: 12px 14px; border-radius: 12px; font-size: 14px; }
+        .hero-kpi strong { font-size: 20px; }
+        .grid-3 { grid-template-columns: 1fr; gap: 12px; }
+        .steps { grid-template-columns: 1fr; gap: 10px; }
+        .card {
+          padding: 20px 16px;
+          border-radius: 14px;
+          box-shadow: 0 8px 18px rgba(12, 31, 69, 0.08);
+        }
+        .grid-3 .card { min-height: 0; }
+        .card h3 { font-size: 20px; margin-bottom: 6px; line-height: 1.24; color: #081a38; }
+        .card p, .plan-list li { font-size: 17px; line-height: 1.52; color: #3a4c68; }
+        .icon { width: 44px; height: 44px; font-size: 22px; border-radius: 10px; margin-bottom: 10px; }
+        .step {
+          padding: 16px 14px 16px 52px;
+          border-radius: 12px;
+          font-size: 17px;
+          line-height: 1.5;
+          box-shadow: 0 8px 18px rgba(12, 31, 69, 0.08);
+        }
+        .step::before { width: 28px; height: 28px; font-size: 13px; left: 12px; }
+        .highlight-box, .final-cta-box { padding: 16px 14px; border-radius: 12px; }
+        .highlight-box p, .final-cta-box p { font-size: 17px; line-height: 1.5; }
+        .wa-example { font-size: 16px; line-height: 1.6; padding: 16px; border-radius: 16px; }
+        .price { font-size: 32px; }
+        .badge-popular { top: -11px; right: 10px; font-size: 9px; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .fade-in {
+          opacity: 1;
+          transform: none;
+          transition: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="hero fade-in">
+      <div class="container">
+        <div class="topbar">
+          <div class="brand">
+            <img class="brand-logo" src="/logo.png" alt="Logo AgroHabilis" />
+            AgroHabilis 🌾
+          </div>
+          <a
+            class="cta"
+            href="https://wa.me/5492494650386?text=Hola%20AgroHabilis%2C%20quiero%20probarlo%20gratis"
+            target="_blank"
+            rel="noopener noreferrer"
+            >Quiero probarlo gratis</a
+          >
+        </div>
+        <div class="hero-content">
+          <span class="badge">NUEVO · Diseñado para productores argentinos</span>
+          <h1>Tu asistente agropecuario por WhatsApp</h1>
+          <p class="subtitle">
+            Información de mercado, clima y decisiones productivas en un solo mensaje, todos los
+            días.
+          </p>
+          <div class="hero-kpis">
+            <div class="hero-kpi">Actualización <strong>diaria</strong></div>
+            <div class="hero-kpi">Onboarding en <strong>2 minutos</strong></div>
+            <div class="hero-kpi">Atención por <strong>WhatsApp</strong></div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <section class="fade-in">
+      <div class="container">
+        <h2>¿Qué hace AgroHabilis?</h2>
+        <p class="lead">
+          AgroHabilis concentra en WhatsApp la información que un productor necesita para decidir
+          rápido: precios, clima, tipo de cambio, noticias del agro y contexto productivo.
+        </p>
+        <div class="grid-3">
+          <article class="card">
+            <span class="icon">📊</span>
+            <h3>Mercado en un solo lugar</h3>
+            <p>Disponible, dólar y referencias clave para comercialización.</p>
+          </article>
+          <article class="card">
+            <span class="icon">🌤️</span>
+            <h3>Clima de tu zona</h3>
+            <p>Pronóstico de 7 días y alertas para anticiparte.</p>
+          </article>
+          <article class="card">
+            <span class="icon">🤖</span>
+            <h3>Asistente 24/7 por WhatsApp</h3>
+            <p>Preguntás en lenguaje simple y recibís respuesta accionable con resumen de noticias.</p>
+          </article>
+          <article class="card">
+            <span class="icon">🖥️</span>
+            <h3>Dashboard web para Básico y Pro</h3>
+            <p>
+              Además de WhatsApp, tenés una vista visual en web para ver todo lo que podés hacer
+              con comandos y gestionar tu operación de forma más rápida.
+            </p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="fade-in">
+      <div class="container">
+        <h2>¿Cómo funciona?</h2>
+        <div class="highlight-box">
+          <p>
+            <strong>Objetivo del proyecto:</strong> que cada productor pueda decidir mejor sin abrir
+            diez páginas distintas ni perder tiempo buscando datos sueltos.
+          </p>
+        </div>
+        <div class="steps">
+          <div class="step" data-step="1">
+            <strong>1. Escribinos por WhatsApp</strong>
+            Te registramos en 2 minutos.
+          </div>
+          <div class="step" data-step="2">
+            <strong>2. Configurás tu perfil</strong>
+            Cultivos, zona y costos.
+          </div>
+          <div class="step" data-step="3">
+            <strong>3. Recibís tu resumen</strong>
+            Cada mañana, personalizado para vos.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="ejemplo" class="fade-in">
+      <div class="container">
+        <h2>¿Qué recibís cada mañana?</h2>
+        <p class="lead">Este es un ejemplo real del resumen diario:</p>
+        <div class="wa-example">
+🌾 Buenos días, Juan!
+📅 Resumen AgroHabilis - 22/04/2026
+
+💰 PRECIOS DEL DÍA
+Soja: $430.000 ▲ +1,2% / USD 318
+Maíz: $258.000 ▲ +0,8% / USD 191
+Trigo: $265.000 → sin cambios / USD 196
+
+💵 TIPO DE CAMBIO
+Oficial: $1.400 | Blue: $1.410 | MEP: $1.419
+
+🌤️ CLIMA EN TANDIL
+Hoy: 12°C - 17°C | Lluvia leve
+Mañana: 10°C - 19°C | Despejado
+Viernes: 8°C - 21°C | ⚠️ Posible helada
+
+📊 TU SITUACIÓN
+Con soja a $430.000 y tu costo de $450/ha,
+tu margen actual es del 18%.
+
+💡 CONSEJO DEL DÍA
+La lluvia prevista favorece el llenado
+del maíz. Controlá encharcamientos.
+        </div>
+      </div>
+    </section>
+
+    <section class="audiencia fade-in">
+      <div class="container">
+        <h2>¿Para quién es?</h2>
+        <ul>
+          <li>Productores agrícolas (granos)</li>
+          <li>Ganaderos</li>
+          <li>Productores mixtos</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="planes fade-in">
+      <div class="container">
+        <h2>Planes AgroHabilis</h2>
+        <p class="lead">
+          Elegí el nivel según tu operación. Todos incluyen datos en WhatsApp, pero cambia la profundidad del análisis (bloques) y automatizaciones.
+        </p>
+        <div class="grid-3">
+          <article class="card">
+            <h3>Gratis</h3>
+            <p class="price">$0/mes</p>
+            <p>Ideal para empezar y validar valor con un resumen claro.</p>
+            <ul class="plan-list">
+              <li><strong>7 bloques</strong> de información por resumen</li>
+              <li>Resumen 2 veces por semana</li>
+              <li>Hasta <strong>20 consultas por mes</strong></li>
+              <li>Sin alertas automáticas de precio</li>
+            </ul>
+          </article>
+          <article class="card">
+            <span class="badge-popular">MÁS POPULAR</span>
+            <h3>Básico</h3>
+            <p class="price">$9.000/mes</p>
+            <p>Para seguimiento diario con más detalle operativo.</p>
+            <ul class="plan-list">
+              <li><strong>9 bloques</strong> de información por resumen</li>
+              <li>Resumen diario por WhatsApp</li>
+              <li>Resumen de noticias del agro</li>
+              <li>Alertas de precio ilimitadas</li>
+              <li>Consultas ilimitadas</li>
+              <li>Acceso al dashboard web</li>
+            </ul>
+          </article>
+          <article class="card">
+            <h3>Pro</h3>
+            <p class="price">$18.000/mes</p>
+            <p>Gestión integral con foco económico y decisiones avanzadas.</p>
+            <ul class="plan-list">
+              <li><strong>13 bloques</strong> de información por resumen</li>
+              <li>Todo lo de Básico</li>
+              <li>Acceso al dashboard web</li>
+              <li>Registro de gastos y ventas</li>
+              <li>Análisis de margen + recomendaciones procesadas</li>
+              <li>Personalización de cantidad de noticias</li>
+            </ul>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="final-cta fade-in">
+      <div class="container">
+        <div class="final-cta-box">
+          <h2>Empezá ahora</h2>
+          <p>Probalo gratis 15 días, sin tarjeta de crédito.</p>
+          <a
+            class="cta-large"
+            href="https://wa.me/5492494650386?text=Hola%20AgroHabilis%2C%20quiero%20probar%20los%2015%20d%C3%ADas%20gratis"
+            target="_blank"
+            rel="noopener noreferrer"
+            >Quiero probarlo gratis</a
+          >
+        </div>
+      </div>
+    </section>
+
+    <footer class="fade-in">
+      AgroHabilis by HabilisPro<br />
+      agro.habilispro.com
+    </footer>
+    <script>
+      const observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) entry.target.classList.add("visible");
+          });
+        },
+        { threshold: 0.12 }
+      );
+      document.querySelectorAll(".fade-in").forEach((el) => observer.observe(el));
+    </script>
+  </body>
+</html>

@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AgroHabilis - Precios Snapshot</title>
+    <style>
+      :root { --bg:#f3f7ff; --bg-soft:#eef4ff; --panel:#ffffff; --panel-soft:#f7faff; --text:#17233a; --muted:#5f7294; --accent:#2f8bff; --line:#dbe7ff; --shadow:0 12px 30px rgba(39,81,161,.12); }
+      * { box-sizing:border-box; }
+      body { margin:0; font-family:Inter,Segoe UI,Arial,sans-serif; font-size:14px; background:linear-gradient(180deg,var(--bg-soft),var(--bg)); color:var(--text); padding:24px 24px 24px 276px; }
+      .nav { position: fixed; left: 18px; top: 18px; width: 230px; display:flex; flex-direction:column; gap:8px; padding:12px; border:1px solid var(--line); border-radius:16px; background:#fff; box-shadow: var(--shadow); }
+      .nav .brand { display:flex; align-items:center; gap:10px; padding:8px 10px 12px; border-bottom:1px solid #e7efff; margin-bottom:4px; font-weight:800; color:#1e3b6e; }
+      .brand-dot { width:10px; height:10px; border-radius:999px; background:#2f8bff; box-shadow:0 0 0 4px rgba(47,139,255,.12); }
+      .nav a { text-decoration:none; padding:9px 12px; border-radius:10px; border:1px solid #d5e3ff; color:#38507b; background:#fff; font-size:13px; font-weight:600; width:100%; }
+      .nav a.active { background: linear-gradient(180deg, var(--accent), #1f66c9); border:none; color:#fff; font-weight:700; }
+      .card { background: linear-gradient(180deg, var(--panel), var(--panel-soft)); border:1px solid var(--line); border-radius:16px; padding:16px; margin-bottom:14px; box-shadow:var(--shadow); }
+      .top { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:10px; flex-wrap:wrap; }
+      .filters { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
+      input, select, button { padding:10px 12px; border-radius:10px; border:1px solid #cfddfa; background:#fff; color:#24395f; }
+      button { cursor:pointer; background:linear-gradient(180deg,var(--accent),#1f66c9); border:none; color:#fff; font-weight:700; }
+      table { width:100%; border-collapse:collapse; }
+      th, td { border-bottom:1px solid #e4edff; padding:8px 6px; text-align:left; font-size:12px; }
+      th { color:var(--muted); background:#f7faff; position:sticky; top:0; }
+      .table-wrap { max-height:66vh; overflow:auto; border:1px solid #e4edff; border-radius:12px; }
+      .muted { color:var(--muted); font-size:12px; }
+      .pager { display:flex; gap:8px; align-items:center; margin-top:10px; }
+      .matrix-wrap { overflow:auto; border:1px solid #e4edff; border-radius:12px; }
+      .matrix { width:max-content; min-width:100%; border-collapse:collapse; }
+      .matrix th,.matrix td { border-bottom:1px solid #e4edff; border-right:1px solid #eef4ff; padding:7px 8px; text-align:center; font-size:12px; }
+      .matrix th:first-child,.matrix td:first-child { position:sticky; left:0; background:#fff; text-align:left; z-index:1; }
+      .dot { display:inline-flex; width:16px; height:16px; border-radius:999px; align-items:center; justify-content:center; font-size:10px; }
+      .on { background:#dff7e9; color:#217a48; }
+      .off { background:#f3f4f6; color:#7b8797; }
+      .st-ok{color:#1f8f4d}.st-lento{color:#9a6a00}.st-error{color:#a93939}.st-sin_verificar{color:#66788f}
+      .btn-mini { padding:6px 8px; font-size:11px; border-radius:8px; }
+      @media (max-width: 1100px) {
+        body { padding:16px; }
+        .nav { position: static; width: auto; flex-direction: row; flex-wrap: wrap; }
+      }
+      @media (max-width: 760px) {
+        body { padding: 12px; font-size: 13px; }
+        .card { padding: 12px; border-radius: 12px; }
+        h2 { font-size: 20px; }
+        .top { align-items: flex-start; }
+        .filters > * { width: 100%; }
+        .nav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; padding: 10px; border-radius: 12px; }
+        .nav .brand { grid-column: 1 / -1; }
+        .nav a { width: 100%; text-align: center; padding: 8px 10px; font-size: 12px; }
+        .table-wrap { max-height: none; overflow: auto; -webkit-overflow-scrolling: touch; }
+        table { min-width: 980px; }
+        .pager { flex-wrap: wrap; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="nav">
+      <div class="brand"><span class="brand-dot"></span><span>AgroHabilis Admin</span></div>
+      <a href="/dashboard/admin">🏠 Dashboard</a>
+      <a href="/dashboard/metricas">📊 Métricas</a>
+      <a href="/dashboard/precios" class="active">💹 Precios</a>
+      <a href="/dashboard/usuarios">👥 Usuarios</a>
+      <a href="/dashboard/comandos">⌨️ Comandos</a>
+      <a href="/dashboard/templates">🧩 Templates</a>
+      <a href="/dashboard/cliente">🙍 Cliente</a>
+    </div>
+
+    <div class="card">
+      <div class="top">
+        <div>
+          <div class="muted">Matriz de cobertura</div>
+          <h2 style="margin:2px 0 0;">Fuentes x categorías (doble entrada)</h2>
+        </div>
+      </div>
+      <div class="filters">
+        <input id="mxQ" placeholder="Buscar fuente por nombre/id" />
+        <select id="mxActiva">
+          <option value="todas">Todas</option>
+          <option value="si">Solo activas</option>
+          <option value="no">Solo inactivas</option>
+        </select>
+        <span id="mxStatus" class="muted"></span>
+      </div>
+      <div class="matrix-wrap">
+        <table class="matrix">
+          <thead id="mxHead"></thead>
+          <tbody id="mxBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="top">
+        <div>
+          <div class="muted">Inicio / Precios</div>
+          <h2 style="margin:2px 0 0;">Tabla consolidada de precios (snapshot)</h2>
+        </div>
+        <button id="btnReload">Actualizar</button>
+      </div>
+      <div id="snapInfo" class="muted">Cargando snapshot...</div>
+      <div class="filters">
+        <input id="q" placeholder="Buscar producto/plaza/fuente" />
+        <select id="categoria">
+          <option value="">Todas las categorías</option>
+          <option value="granos">granos</option>
+          <option value="futuros">futuros</option>
+          <option value="fletes">fletes</option>
+          <option value="tipo_cambio">tipo_cambio</option>
+          <option value="ganaderia">ganaderia</option>
+          <option value="insumos">insumos</option>
+        </select>
+        <input id="plaza" placeholder="Filtrar por plaza" />
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th><th>Categoría</th><th>Subcat</th><th>Producto</th><th>Plaza</th><th>Región</th>
+              <th>Precio ARS</th><th>Precio USD</th><th>Moneda</th><th>Unidad</th><th>Posición</th>
+              <th>Destino</th><th>Distancia km</th><th>Fuente</th><th>Conf.</th><th>Creado</th>
+            </tr>
+          </thead>
+          <tbody id="body"></tbody>
+        </table>
+      </div>
+      <div class="pager">
+        <button id="prev">Anterior</button>
+        <button id="next">Siguiente</button>
+        <span id="pageInfo" class="muted">-</span>
+      </div>
+    </div>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+      const st = { offset: 0, limit: 250, total: 0 };
+      const stMx = { categorias: [], rows: [] };
+      const num = (v) => v == null ? "-" : Number(v).toLocaleString("es-AR", { maximumFractionDigits: 2 });
+      const esc = (v) => String(v ?? "");
+
+      function renderMatriz() {
+        const categorias = stMx.categorias || [];
+        const q = ($("mxQ").value || "").trim().toLowerCase();
+        const activa = $("mxActiva").value || "todas";
+        const rows = (stMx.rows || []).filter((r) => {
+          const txt = `${r.nombre || ""} ${r.id || ""}`.toLowerCase();
+          const okQ = !q || txt.includes(q);
+          const okA = activa === "todas" || (activa === "si" ? r.activa : !r.activa);
+          return okQ && okA;
+        });
+        $("mxHead").innerHTML = `<tr><th>Fuente</th><th>Estado</th><th>Activa</th><th>Acción</th>${categorias.map((c) => `<th>${esc(c)}</th>`).join("")}</tr>`;
+        $("mxBody").innerHTML = rows.map((row) => `
+          <tr>
+            <td title="${esc(row.url || "")}"><b>${esc(row.nombre)}</b><br><span class="muted">${esc(row.id)}</span></td>
+            <td class="st-${esc(row.status)}">${esc(row.status)}</td>
+            <td>${row.activa ? "sí" : "no"}</td>
+            <td><button class="btn-mini" data-fuente-id="${esc(row.id)}" data-fuente-accion="${row.activa ? "desactivar" : "activar"}">${row.activa ? "Desactivar" : "Activar"}</button></td>
+            ${categorias.map((c) => `<td><span class="dot ${row.categorias?.[c] ? "on" : "off"}">${row.categorias?.[c] ? "✓" : "·"}</span></td>`).join("")}
+          </tr>
+        `).join("") || `<tr><td colspan="${4 + categorias.length}" class="muted">Sin fuentes.</td></tr>`;
+        $("mxStatus").textContent = `${rows.length} de ${(stMx.rows || []).length} fuentes`;
+        $("mxBody").querySelectorAll("button[data-fuente-id]").forEach((b) => {
+          b.addEventListener("click", async () => {
+            const fuenteId = b.getAttribute("data-fuente-id");
+            const accion = b.getAttribute("data-fuente-accion");
+            if (!confirm(`${accion} fuente ${fuenteId}?`)) return;
+            const r = await fetch("/api/dashboard/admin/fuentes-accion", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ fuenteId, accion }),
+            });
+            const d = await r.json();
+            if (!d.ok) return alert(d.error || "No se pudo aplicar acción");
+            await loadMatriz();
+          });
+        });
+      }
+
+      async function loadMatriz() {
+        const r = await fetch("/api/dashboard/admin/fuentes-matriz");
+        const d = await r.json();
+        if (!d.ok) throw new Error(d.error || "No se pudo cargar matriz");
+        stMx.categorias = d.categorias || [];
+        stMx.rows = d.rows || [];
+        renderMatriz();
+      }
+
+      async function load() {
+        const params = new URLSearchParams({
+          limit: String(st.limit),
+          offset: String(st.offset),
+          q: $("q").value.trim(),
+          categoria: $("categoria").value,
+          plaza: $("plaza").value.trim(),
+        });
+        const r = await fetch(`/api/dashboard/admin/precios?${params.toString()}`);
+        const d = await r.json();
+        if (!d.ok) throw new Error(d.error || "No se pudo cargar precios");
+        st.total = Number(d.total || 0);
+        const s = d.snapshot;
+        $("snapInfo").textContent = s
+          ? `Snapshot #${s.id} | fecha ${String(s.fecha).slice(0,10)} ${s.hora} | items: ${Number(s.total_items || 0).toLocaleString("es-AR")} | completos: ${s.datos_completos ? "sí" : "no"}`
+          : "No hay snapshot generado todavía.";
+        $("body").innerHTML = (d.rows || []).map((x) => `
+          <tr>
+            <td>${esc(x.id)}</td><td>${esc(x.categoria)}</td><td>${esc(x.subcategoria)}</td><td>${esc(x.producto)}</td>
+            <td>${esc(x.plaza)}</td><td>${esc(x.region)}</td><td>${num(x.precio)}</td><td>${num(x.precio_usd)}</td>
+            <td>${esc(x.moneda)}</td><td>${esc(x.unidad)}</td><td>${esc(x.posicion)}</td><td>${esc(x.destino)}</td>
+            <td>${esc(x.distancia_km)}</td><td>${esc(x.fuente)}</td><td>${esc(x.confiabilidad)}</td><td>${esc(x.creado_en)}</td>
+          </tr>
+        `).join("") || `<tr><td colspan="16" class="muted">Sin datos para esos filtros.</td></tr>`;
+        const desde = st.total ? st.offset + 1 : 0;
+        const hasta = Math.min(st.offset + st.limit, st.total);
+        $("pageInfo").textContent = `${desde}-${hasta} de ${st.total.toLocaleString("es-AR")}`;
+      }
+
+      $("btnReload").addEventListener("click", () => { st.offset = 0; load().catch((e) => alert(e.message)); });
+      $("prev").addEventListener("click", () => { st.offset = Math.max(0, st.offset - st.limit); load().catch((e) => alert(e.message)); });
+      $("next").addEventListener("click", () => { if (st.offset + st.limit < st.total) st.offset += st.limit; load().catch((e) => alert(e.message)); });
+      ["q","categoria","plaza"].forEach((id) => $(id).addEventListener("change", () => { st.offset = 0; load().catch((e) => alert(e.message)); }));
+      ["mxQ","mxActiva"].forEach((id) => $(id).addEventListener("input", renderMatriz));
+      Promise.all([loadMatriz(), load()]).catch((e) => alert(e.message));
+    </script>
+  </body>
+</html>

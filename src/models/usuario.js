@@ -1,45 +1,65 @@
-const { query } = require("../config/database");
+const { pool, query } = require("../config/database");
+
+const extraerIdentidadWhatsapp = (numeroWhatsapp = "") => {
+  const limpio = String(numeroWhatsapp || "").trim();
+  if (!limpio) {
+    return { jid: null, numero: "", numeroReal: null, esLid: false };
+  }
+  const jid = limpio.includes("@") ? limpio : null;
+  const userPart = jid ? jid.split("@")[0] : limpio;
+  const numero = String(userPart || "").replace(/\D/g, "");
+  const esLid = Boolean(jid && jid.endsWith("@lid"));
+  const numeroReal = !esLid && numero ? numero : null;
+  return { jid, numero, numeroReal, esLid };
+};
 
 const normalizarWhatsapp = (numeroWhatsapp = "") => {
-  const limpio = String(numeroWhatsapp).trim();
-  if (!limpio) return "";
-  if (limpio.includes("@")) {
-    return limpio.split("@")[0].replace(/\D/g, "");
-  }
-  return limpio.replace(/\D/g, "");
+  return extraerIdentidadWhatsapp(numeroWhatsapp).numero;
 };
 
 const buscarPorWhatsapp = async (numeroWhatsapp) => {
-  const whatsapp = normalizarWhatsapp(numeroWhatsapp);
-  if (!whatsapp) return null;
+  const identidad = extraerIdentidadWhatsapp(numeroWhatsapp);
+  if (!identidad.numero && !identidad.jid) return null;
 
   const result = await query(
     `
-      SELECT id, nombre, whatsapp, provincia, partido, lat, lng, plan, activo
+      SELECT id, nombre, email, whatsapp, whatsapp_jid, whatsapp_real, provincia, partido, lat, lng, plan, activo, tipo_comercializacion
       FROM usuarios
-      WHERE regexp_replace(whatsapp, '\\D', '', 'g') = $1
+      WHERE (
+        $1::text <> '' AND (
+          regexp_replace(COALESCE(whatsapp, ''), '\\D', '', 'g') = $1
+          OR regexp_replace(COALESCE(whatsapp_real, ''), '\\D', '', 'g') = $1
+          OR regexp_replace(COALESCE(whatsapp_jid, ''), '\\D', '', 'g') = $1
+        )
+      )
+      OR ($2::text IS NOT NULL AND whatsapp_jid = $2::text)
       LIMIT 1
     `,
-    [whatsapp]
+    [identidad.numero || "", identidad.jid]
   );
 
   return result.rows[0] || null;
 };
 
 const crearUsuario = async (datos) => {
+  const identidad = extraerIdentidadWhatsapp(datos.whatsapp);
+  const whatsappCanon = identidad.numeroReal || identidad.numero;
   const result = await query(
     `
-      INSERT INTO usuarios (nombre, whatsapp, provincia, partido, lat, lng)
-      VALUES ($1, $2, $3, $4, $5, $6)
-      RETURNING id, nombre, whatsapp, provincia, partido, lat, lng, plan, activo
+      INSERT INTO usuarios (nombre, whatsapp, whatsapp_jid, whatsapp_real, provincia, partido, lat, lng, tipo_comercializacion)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      RETURNING id, nombre, email, whatsapp, whatsapp_jid, whatsapp_real, provincia, partido, lat, lng, plan, activo, tipo_comercializacion
     `,
     [
       datos.nombre,
-      normalizarWhatsapp(datos.whatsapp),
+      whatsappCanon,
+      identidad.jid,
+      identidad.numeroReal,
       datos.provincia || null,
       datos.partido || null,
       datos.lat ?? null,
       datos.lng ?? null,
+      datos.tipo_comercializacion || "disponible",
     ]
   );
   return result.rows[0];
@@ -59,18 +79,25 @@ const actualizarUsuario = async (id, datos) => {
   const valueIsSet = (v) => v !== undefined;
 
   pushCampo("nombre", datos.nombre);
+  pushCampo("email", datos.email);
   pushCampo("provincia", datos.provincia);
   pushCampo("partido", datos.partido);
   pushCampo("lat", datos.lat);
   pushCampo("lng", datos.lng);
+  pushCampo("tipo_comercializacion", datos.tipo_comercializacion);
   if (valueIsSet(datos.whatsapp)) {
-    pushCampo("whatsapp", normalizarWhatsapp(datos.whatsapp));
+    const identidad = extraerIdentidadWhatsapp(datos.whatsapp);
+    pushCampo("whatsapp", identidad.numeroReal || identidad.numero);
+    if (identidad.jid) pushCampo("whatsapp_jid", identidad.jid);
+    if (identidad.numeroReal) pushCampo("whatsapp_real", identidad.numeroReal);
   }
+  pushCampo("whatsapp_jid", datos.whatsapp_jid);
+  pushCampo("whatsapp_real", datos.whatsapp_real);
 
   if (!campos.length) {
     const current = await query(
       `
-        SELECT id, nombre, whatsapp, provincia, partido, lat, lng, plan, activo
+        SELECT id, nombre, email, whatsapp, whatsapp_jid, whatsapp_real, provincia, partido, lat, lng, plan, activo, tipo_comercializacion
         FROM usuarios
         WHERE id = $1
       `,
@@ -85,7 +112,7 @@ const actualizarUsuario = async (id, datos) => {
       UPDATE usuarios
       SET ${campos.join(", ")}
       WHERE id = $${valores.length}
-      RETURNING id, nombre, whatsapp, provincia, partido, lat, lng, plan, activo
+      RETURNING id, nombre, email, whatsapp, whatsapp_jid, whatsapp_real, provincia, partido, lat, lng, plan, activo, tipo_comercializacion
     `,
     valores
   );
@@ -130,6 +157,285 @@ const obtenerPerfil = async (numeroWhatsapp) => {
   };
 };
 
+const syncEstadoBotPorWhatsapp = async ({ whatsapp, botActivo }) => {
+  const whatsappNorm = normalizarWhatsapp(whatsapp);
+  if (!whatsappNorm) return;
+  await query(
+    `
+      INSERT INTO whatsapp_bot_control (whatsapp, bot_activo)
+      VALUES ($1, $2)
+      ON CONFLICT (whatsapp)
+      DO UPDATE SET
+        bot_activo = EXCLUDED.bot_activo,
+        actualizado_en = NOW()
+    `,
+    [whatsappNorm, Boolean(botActivo)]
+  );
+};
+
+const registrarIdentidadWhatsapp = async ({ jid, whatsappReal }) => {
+  const identidadJid = extraerIdentidadWhatsapp(jid);
+  const real = normalizarWhatsapp(whatsappReal);
+  const jidNorm = identidadJid.jid;
+  const numeroJid = identidadJid.numero;
+  if (!jidNorm && !numeroJid && !real) return;
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const linkedByJid = jidNorm
+      ? await client.query(
+          `
+            SELECT id
+            FROM usuarios
+            WHERE whatsapp_jid = $1
+            ORDER BY id DESC
+            LIMIT 1
+          `,
+          [jidNorm]
+        )
+      : { rows: [] };
+
+    const linkedByJidNumber = numeroJid
+      ? await client.query(
+          `
+            SELECT id
+            FROM usuarios
+            WHERE regexp_replace(COALESCE(whatsapp, ''), '\\D', '', 'g') = $1
+               OR regexp_replace(COALESCE(whatsapp_real, ''), '\\D', '', 'g') = $1
+            ORDER BY id DESC
+            LIMIT 1
+          `,
+          [numeroJid]
+        )
+      : { rows: [] };
+
+    const linkedByReal = real
+      ? await client.query(
+          `
+            SELECT id
+            FROM usuarios
+            WHERE regexp_replace(COALESCE(whatsapp, ''), '\\D', '', 'g') = $1
+               OR regexp_replace(COALESCE(whatsapp_real, ''), '\\D', '', 'g') = $1
+            ORDER BY id DESC
+            LIMIT 1
+          `,
+          [real]
+        )
+      : { rows: [] };
+
+    const idByJid = linkedByJid.rows[0]?.id || null;
+    const idByJidNumber = linkedByJidNumber.rows[0]?.id || null;
+    const idByReal = linkedByReal.rows[0]?.id || null;
+
+    const targetId = idByReal || idByJid || idByJidNumber || null;
+    const sourceCandidates = [idByJid, idByJidNumber].filter((id) => id && id !== targetId);
+
+    if (targetId && sourceCandidates.length) {
+      const sourceId = sourceCandidates[0];
+      await client.query(
+        `
+          INSERT INTO resumenes (usuario_id, fecha, tipo, contenido, enviado_wp, enviado_en, tokens_usados, creado_en)
+          SELECT $1, fecha, tipo, contenido, enviado_wp, enviado_en, tokens_usados, creado_en
+          FROM resumenes
+          WHERE usuario_id = $2
+          ON CONFLICT (usuario_id, fecha, tipo) DO NOTHING
+        `,
+        [targetId, sourceId]
+      );
+      await client.query(`DELETE FROM resumenes WHERE usuario_id = $1`, [sourceId]);
+
+      const tablasConUsuarioId = [
+        "usuario_cultivos",
+        "envios_whatsapp",
+        "historial_consultas",
+        "alertas",
+        "perfil_productivo",
+        "campanas_agricolas",
+        "lotes",
+        "stock_ganadero",
+        "gastos",
+        "ventas",
+      ];
+      for (const tabla of tablasConUsuarioId) {
+        await client.query(`UPDATE ${tabla} SET usuario_id = $1 WHERE usuario_id = $2`, [
+          targetId,
+          sourceId,
+        ]);
+      }
+      await client.query(`DELETE FROM usuarios WHERE id = $1`, [sourceId]);
+    }
+
+    if (targetId) {
+      await client.query(
+        `
+          UPDATE usuarios
+          SET
+            whatsapp_jid = COALESCE($2::text, whatsapp_jid),
+            whatsapp_real = COALESCE($3::text, whatsapp_real),
+            whatsapp = CASE
+              WHEN $3::text IS NOT NULL AND $3::text <> '' THEN $3::text
+              ELSE whatsapp
+            END
+          WHERE id = $1
+        `,
+        [targetId, jidNorm, real || null]
+      );
+    } else {
+      await client.query(
+        `
+          UPDATE usuarios
+          SET
+            whatsapp_jid = COALESCE($1::text, whatsapp_jid),
+            whatsapp_real = COALESCE($2::text, whatsapp_real),
+            whatsapp = CASE
+              WHEN $2::text IS NOT NULL AND $2::text <> '' THEN $2::text
+              ELSE whatsapp
+            END
+          WHERE
+            ($1::text IS NOT NULL AND whatsapp_jid = $1::text)
+            OR ($3::text <> '' AND regexp_replace(COALESCE(whatsapp, ''), '\\D', '', 'g') = $3::text)
+            OR ($3::text <> '' AND regexp_replace(COALESCE(whatsapp_real, ''), '\\D', '', 'g') = $3::text)
+        `,
+        [jidNorm, real || null, numeroJid || ""]
+      );
+    }
+
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+};
+
+const setActivoUsuario = async (usuarioId, activo) => {
+  const result = await query(
+    `
+      UPDATE usuarios
+      SET activo = $2
+      WHERE id = $1
+      RETURNING id, nombre, whatsapp, plan, activo
+    `,
+    [usuarioId, Boolean(activo)]
+  );
+  const usuario = result.rows[0] || null;
+  if (usuario?.whatsapp) {
+    await syncEstadoBotPorWhatsapp({
+      whatsapp: usuario.whatsapp,
+      botActivo: Boolean(activo),
+    });
+  }
+  return usuario;
+};
+
+const tryQueryOpcional = async (client, text, params) => {
+  try {
+    await client.query(text, params);
+  } catch (err) {
+    if (err && err.code === "42P01") return;
+    throw err;
+  }
+};
+
+const eliminarUsuarioSoft = async (usuarioId) => {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const previo = await client.query(
+      `
+        SELECT id, nombre, whatsapp, whatsapp_real, whatsapp_jid, plan, activo
+        FROM usuarios
+        WHERE id = $1
+        LIMIT 1
+      `,
+      [usuarioId]
+    );
+    const usuario = previo.rows[0] || null;
+    if (!usuario) {
+      await client.query("ROLLBACK");
+      return null;
+    }
+
+    const whatsappNorm = normalizarWhatsapp(usuario.whatsapp);
+    const whatsappRealNorm = normalizarWhatsapp(usuario.whatsapp_real);
+    const whatsappJidNorm = normalizarWhatsapp(usuario.whatsapp_jid);
+
+    if (whatsappNorm) {
+      await tryQueryOpcional(
+        client,
+        `DELETE FROM whatsapp_interaccion_log WHERE whatsapp_norm = $1 OR usuario_id = $2`,
+        [whatsappNorm, usuarioId]
+      );
+      await tryQueryOpcional(
+        client,
+        `
+          DELETE FROM consulta_route_events
+          WHERE regexp_replace(COALESCE(whatsapp, ''), '\\D', '', 'g') = $1
+        `,
+        [whatsappNorm]
+      );
+      await tryQueryOpcional(
+        client,
+        `
+          DELETE FROM alertas_horticolas
+          WHERE regexp_replace(COALESCE(usuario_ref, ''), '\\D', '', 'g') = $1
+             OR BTRIM(usuario_ref) = BTRIM($2::text)
+             OR BTRIM(usuario_ref) = BTRIM($3::text)
+        `,
+        [whatsappNorm, String(usuario.whatsapp || ""), String(usuario.whatsapp_jid || "")]
+      );
+    }
+
+    // Estas dos tablas no tienen ON DELETE CASCADE en todos los entornos.
+    await client.query("DELETE FROM envios_whatsapp WHERE usuario_id = $1", [usuarioId]);
+    await client.query("DELETE FROM historial_consultas WHERE usuario_id = $1", [usuarioId]);
+
+    await client.query("DELETE FROM usuarios WHERE id = $1", [usuarioId]);
+
+    if (whatsappNorm) {
+      await client.query(
+        `DELETE FROM onboarding_estado WHERE regexp_replace(COALESCE(whatsapp,''), '\\D', '', 'g') = $1`,
+        [whatsappNorm]
+      );
+      await client.query(
+        `DELETE FROM whatsapp_bot_control WHERE regexp_replace(COALESCE(whatsapp,''), '\\D', '', 'g') = $1`,
+        [whatsappNorm]
+      );
+    }
+    if (whatsappRealNorm && whatsappRealNorm !== whatsappNorm) {
+      await client.query(
+        `DELETE FROM onboarding_estado WHERE regexp_replace(COALESCE(whatsapp,''), '\\D', '', 'g') = $1`,
+        [whatsappRealNorm]
+      );
+      await client.query(
+        `DELETE FROM whatsapp_bot_control WHERE regexp_replace(COALESCE(whatsapp,''), '\\D', '', 'g') = $1`,
+        [whatsappRealNorm]
+      );
+    }
+    if (whatsappJidNorm && whatsappJidNorm !== whatsappNorm && whatsappJidNorm !== whatsappRealNorm) {
+      await client.query(
+        `DELETE FROM onboarding_estado WHERE regexp_replace(COALESCE(whatsapp,''), '\\D', '', 'g') = $1`,
+        [whatsappJidNorm]
+      );
+      await client.query(
+        `DELETE FROM whatsapp_bot_control WHERE regexp_replace(COALESCE(whatsapp,''), '\\D', '', 'g') = $1`,
+        [whatsappJidNorm]
+      );
+    }
+
+    await client.query("COMMIT");
+    return { ...usuario, activo: false, eliminado: true };
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+};
+
 module.exports = {
   normalizarWhatsapp,
   buscarPorWhatsapp,
@@ -137,4 +443,8 @@ module.exports = {
   actualizarUsuario,
   guardarCultivosUsuario,
   obtenerPerfil,
+  setActivoUsuario,
+  eliminarUsuarioSoft,
+  registrarIdentidadWhatsapp,
+  extraerIdentidadWhatsapp,
 };

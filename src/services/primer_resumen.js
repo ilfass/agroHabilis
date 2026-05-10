@@ -6,6 +6,8 @@ const { resolverPlanEfectivo } = require("./planes");
 const { ejecutarRecolectorDiario } = require("../jobs/recolector");
 const { obtenerMercadosWeb } = require("../scrapers/mercados_web");
 const { obtenerClima } = require("../scrapers/clima");
+const { obtenerTipoCambioDia, asegurarTipoCambioReciente } = require("./tipo_cambio");
+const { obtenerDisponiblePorCultivosPoliticaResumen } = require("./disponible_politica_resumen");
 
 const MESES = {
   ene: 1,
@@ -212,50 +214,8 @@ const obtenerZonasUsuario = async ({ usuarioId, perfil, limite }) => {
   return out.slice(0, limite);
 };
 
-const obtenerDisponiblePorCultivo = async (cultivos = []) => {
-  if (!cultivos.length) return [];
-  const result = await query(
-    `
-      WITH ultima_por_cultivo AS (
-        SELECT LOWER(cultivo) AS cultivo_norm, MAX(fecha) AS fecha
-        FROM precios
-        WHERE LOWER(cultivo) = ANY($1::text[])
-        GROUP BY LOWER(cultivo)
-      ),
-      ranked AS (
-        SELECT
-          p.cultivo,
-          p.mercado,
-          p.precio,
-          p.moneda,
-          p.fecha,
-          ROW_NUMBER() OVER (
-            PARTITION BY LOWER(p.cultivo)
-            ORDER BY
-              CASE
-                WHEN LOWER(p.mercado) LIKE '%rosario%' THEN 0
-                WHEN LOWER(p.mercado) LIKE '%afa%' THEN 1
-                WHEN LOWER(p.mercado) LIKE '%cac%' THEN 2
-                ELSE 3
-              END,
-              CASE WHEN p.moneda = 'USD' THEN 0 ELSE 1 END,
-              p.precio DESC
-          ) AS rn
-        FROM precios p
-        JOIN ultima_por_cultivo u
-          ON LOWER(p.cultivo) = u.cultivo_norm
-         AND p.fecha = u.fecha
-        WHERE LOWER(p.cultivo) = ANY($1::text[])
-      )
-      SELECT cultivo, mercado, precio, moneda, fecha
-      FROM ranked
-      WHERE rn = 1
-      ORDER BY cultivo
-    `,
-    [cultivos.map((c) => normalizarTexto(c))]
-  );
-  return result.rows;
-};
+const obtenerDisponiblePorCultivo = async (cultivos = []) =>
+  obtenerDisponiblePorCultivosPoliticaResumen(cultivos);
 
 const completarDisponibleConWebFallback = async ({ cultivos = [], disponible = [] }) => {
   const existentes = new Set((disponible || []).map((x) => normalizarTexto(x.cultivo)));
@@ -400,18 +360,6 @@ const obtenerTendencia7Dias = async (cultivo) => {
   return Number((((last - first) / first) * 100).toFixed(1));
 };
 
-const obtenerTipoCambioDia = async () => {
-  const result = await query(
-    `
-      SELECT DISTINCT ON (tipo) tipo, valor, fecha
-      FROM tipo_cambio
-      WHERE fecha >= CURRENT_DATE - INTERVAL '7 days'
-      ORDER BY tipo, fecha DESC
-    `
-  );
-  return result.rows;
-};
-
 const obtenerEstadoTipoCambio = async (tipo = "oficial") => {
   const result = await query(
     `
@@ -500,6 +448,7 @@ const construirDatoIA = async ({ cultivos, zona, disponible, futuros, tendencias
 
 const obtenerNoticiasRecientes = async ({ maxNoticias = 2, cultivos = [], zonaTxt = "" } = {}) => {
   const max = Math.max(1, Math.min(15, Number(maxNoticias) || 2));
+  const perfilPapa = cultivos.some((c) => ["papa", "patata"].includes(normalizarTexto(c)));
   const keywords = Array.from(
     new Set([
       ...cultivos.map((c) => normalizarTexto(c)).filter(Boolean),
@@ -512,7 +461,7 @@ const obtenerNoticiasRecientes = async ({ maxNoticias = 2, cultivos = [], zonaTx
 
   const result = await query(
     `
-      SELECT fuente, titulo, publicado_en
+      SELECT fuente, categoria, titulo, publicado_en
       FROM noticias_agro
       ORDER BY COALESCE(publicado_en, creado_en) DESC
       LIMIT 80
@@ -536,14 +485,36 @@ const obtenerNoticiasRecientes = async ({ maxNoticias = 2, cultivos = [], zonaTx
     .map((n) => {
       const limpio = limpiarTitulo(n.titulo);
       const t = normalizarTexto(limpio);
+      const categoriaNorm = normalizarTexto(n.categoria || "");
       const related = keywords.some((k) => t.includes(k));
       const scoreMercado = /(precio|rosario|maiz|soja|trigo|girasol|hacienda|granos)/.test(t) ? 1 : 0;
+      const scoreHorticolaPapa =
+        perfilPapa &&
+        (categoriaNorm.includes("horticola_contexto") ||
+          (normalizarTexto(n.fuente).includes("inta") && /(papa|hortic)/.test(t)))
+          ? 2
+          : 0;
       const penalidad = esIrrelevante(t) ? 1 : 0;
-      return { ...n, titulo: limpio, __related: related, __scoreMercado: scoreMercado, __penalidad: penalidad };
+      return {
+        ...n,
+        titulo: limpio,
+        __related: related,
+        __scoreMercado: scoreMercado,
+        __scoreHorticolaPapa: scoreHorticolaPapa,
+        __penalidad: penalidad,
+      };
     })
     .sort((a, b) => {
-      const sa = (a.__related ? 2 : 0) + (a.__scoreMercado ? 1 : 0) - (a.__penalidad ? 2 : 0);
-      const sb = (b.__related ? 2 : 0) + (b.__scoreMercado ? 1 : 0) - (b.__penalidad ? 2 : 0);
+      const sa =
+        (a.__related ? 2 : 0) +
+        (a.__scoreMercado ? 1 : 0) +
+        (a.__scoreHorticolaPapa || 0) -
+        (a.__penalidad ? 2 : 0);
+      const sb =
+        (b.__related ? 2 : 0) +
+        (b.__scoreMercado ? 1 : 0) +
+        (b.__scoreHorticolaPapa || 0) -
+        (b.__penalidad ? 2 : 0);
       if (sa !== sb) return sb - sa;
       const ta = new Date(a.publicado_en || 0).getTime();
       const tb = new Date(b.publicado_en || 0).getTime();
@@ -1100,10 +1071,12 @@ const generarPrimerResumen = async (usuario, opts = {}) => {
     ? zonasUsuario.map((z) => nombreZona(z)).join(" | ")
     : `${perfil.partido || "tu zona"}, ${perfil.provincia || "Argentina"}`;
 
+  await asegurarTipoCambioReciente();
+
   const [disponibleRaw, futuros, tipoCambio, mercadosGanaderos, noticias, estadoCultivos, tcOficial, fechaHacienda, perfilGanadero] = await Promise.all([
     obtenerDisponiblePorCultivo(cultivos),
     obtenerFuturoMasCercano(cultivos),
-    obtenerTipoCambioDia(),
+    obtenerTipoCambioDia().then((d) => d.items || []),
     obtenerMercadosGanaderos(),
     obtenerNoticiasRecientes({ maxNoticias: noticiasPorPlan, cultivos, zonaTxt: zona }),
     obtenerEstadoDisponibilidadCultivos(cultivos),

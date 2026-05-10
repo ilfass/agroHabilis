@@ -1,0 +1,70 @@
+{
+  "cases": [
+    {
+      "id": "alias-mi-perfil",
+      "kind": "alias",
+      "title": "Alias MI PERFIL resuelve VER MI PERFIL",
+      "input": "Mí perfil",
+      "expectedAlias": "VER MI PERFIL"
+    },
+    {
+      "id": "alias-mis-productos",
+      "kind": "alias",
+      "title": "Alias MIS PRODUCTOS resuelve VER MI PERFIL",
+      "input": "Cuáles son mis productos",
+      "expectedAlias": "VER MI PERFIL"
+    },
+    {
+      "id": "intent-insumos",
+      "kind": "intent",
+      "title": "Intención natural ver insumos",
+      "input": "ver insumos",
+      "expectedIntent": "__INSUMOS__"
+    },
+    {
+      "id": "sanitize-boxed",
+      "kind": "sanitize",
+      "title": "Limpia tags boxed y request_fx",
+      "input": "\\boxed{Processed}\nsin datos en base\nrequest_fx('/v1/param?key=x')",
+      "forbid": [
+        "\\boxed{",
+        "request_fx("
+      ]
+    },
+    {
+      "id": "suggestion-no-hacienda-operativa",
+      "kind": "suggestion",
+      "title": "No sugerir comando cuando consulta ternero operativa",
+      "input": "Tengo terneros para vender ahora, ¿conviene vender ya o esperar un poco?",
+      "expectedNull": true
+    },
+    {
+      "id": "suggestion-si-comando-alerta",
+      "kind": "suggestion",
+      "title": "Sugerir alerta para texto ambiguo de alerta",
+      "input": "quiero una alerta de precio de soja",
+      "expectedContains": "ALERTA"
+    },
+    {
+      "id": "suggestion-no-mi-ganado-con-pregunta",
+      "kind": "suggestion",
+      "title": "No sugerir comando si MI GANADO viene en consulta natural larga",
+      "input": "Ay no, MI GANADO vacuno cria, terneros. Ahora si, me podes decir cuanto esta el ternero y si conviene vender o esperar?",
+      "expectedNull": true
+    },
+    {
+      "id": "suggestion-no-hacienda-con-precio",
+      "kind": "suggestion",
+      "title": "No sugerir comando en pregunta natural de precio hacienda",
+      "input": "Tenes precio de ternero de invernada y si esta firme o flojo?",
+      "expectedNull": true
+    },
+    {
+      "id": "suggestion-no-limones-operativa",
+      "kind": "suggestion",
+      "title": "No sugerir comando en consulta abierta de producto no mapeado",
+      "input": "Y los limones?",
+      "expectedNull": true
+    }
+  ]
+}
