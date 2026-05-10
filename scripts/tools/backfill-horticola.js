@@ -1,6 +1,6 @@
 require("dotenv").config();
-const { query, pool, testConnection } = require("../src/config/database");
-const { registrarPrecioPapaDesdeCanon, upsertAnalisisPapa } = require("../src/services/horticola");
+const { query, pool, testConnection } = require("../../src/config/database");
+const { registrarPrecioPapaDesdeCanon, upsertAnalisisPapa } = require("../../src/services/horticola");
 
 async function run() {
   await testConnection();

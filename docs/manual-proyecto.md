@@ -22,7 +22,7 @@ El sistema combina:
 - `src/services/consultas.js`: procesa consultas de WhatsApp.
 - `src/config/whatsapp.js`: cliente WhatsApp Web y enrutamiento de mensajes.
 - `src/services/fuentes_monitor.js`: chequeo tecnico de disponibilidad de fuentes.
-- `scripts/setup-db.js`: alta/actualizacion de tablas.
+- `scripts/db/setup-db.js`: alta/actualizacion de tablas.
 
 Stack principal:
 
@@ -202,7 +202,7 @@ Dashboard:
 ### Arranque rapido
 
 1. configurar `.env`
-2. `node scripts/setup-db.js`
+2. `node scripts/db/setup-db.js`
 3. `npm start`
 4. validar `GET /api/health`
 
@@ -225,7 +225,7 @@ Dashboard:
 ### Errores de DB (credenciales)
 
 - revisar `DATABASE_URL` en entorno.
-- validar conexion con `node scripts/setup-db.js`.
+- validar conexion con `node scripts/db/setup-db.js`.
 
 ---
 

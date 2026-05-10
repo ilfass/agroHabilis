@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${ROOT_DIR}"
 
 CURRENT_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
@@ -22,4 +22,4 @@ echo "==> Publicando cambios"
 git push origin main
 
 echo "==> Ejecutando deploy a VPS"
-"${ROOT_DIR}/scripts/deploy-vps.sh"
+"${ROOT_DIR}/scripts/deploy/deploy-vps.sh"

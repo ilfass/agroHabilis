@@ -4,14 +4,14 @@
  * preview de respuesta + último historial_consultas (ia_provider_trace).
  *
  * Uso:
- *   node scripts/prueba-consultas-traza.js
- *   TEST_WHATSAPP=5491123456789 node scripts/prueba-consultas-traza.js
+ *   node scripts/tools/prueba-consultas-traza.js
+ *   TEST_WHATSAPP=5491123456789 node scripts/tools/prueba-consultas-traza.js
  */
 require("dotenv").config();
 
-const { procesarConsulta } = require("../src/services/consultas");
-const { query } = require("../src/config/database");
-const { normalizarWhatsapp } = require("../src/models/usuario");
+const { procesarConsulta } = require("../../src/services/consultas");
+const { query } = require("../../src/config/database");
+const { normalizarWhatsapp } = require("../../src/models/usuario");
 
 const PREGUNTAS_DEFAULT = [
   "Precio de la soja",

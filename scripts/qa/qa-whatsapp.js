@@ -5,11 +5,11 @@ const {
   inferirComandoNatural,
   resolverComandoAlias,
   sugerirComandoPorTexto,
-} = require("../src/services/whatsapp_intents");
-const consultaTpl = require("../src/templates/consulta");
+} = require("../../src/services/whatsapp_intents");
+const consultaTpl = require("../../src/templates/consulta");
 
 const CASES_PATH = path.join(__dirname, "qa-whatsapp-cases.json");
-const REPORT_MD_PATH = path.join(__dirname, "..", "docs", "operacion", "qa-whatsapp-report.md");
+const REPORT_MD_PATH = path.join(__dirname, "..", "..", "docs", "operacion", "qa-whatsapp-report.md");
 const REPORT_JSON_PATH = path.join(__dirname, "qa-whatsapp-last.json");
 
 const readCases = () => {
@@ -122,7 +122,7 @@ const cmdAdd = () => {
   const title = parseArg("title", "").trim();
   const input = parseArg("input", "").trim();
   if (!title || !input) {
-        console.error("Uso: node scripts/qa-whatsapp.js add --kind=intent|alias|sanitize|suggestion --title=\"...\" --input=\"...\" [--expected=...] [--forbid=a,b] [--expectedNull=true]");
+        console.error("Uso: node scripts/qa/qa-whatsapp.js add --kind=intent|alias|sanitize|suggestion --title=\"...\" --input=\"...\" [--expected=...] [--forbid=a,b] [--expectedNull=true]");
     process.exit(1);
   }
   const id = `${Date.now()}-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")}`;

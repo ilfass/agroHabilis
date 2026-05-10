@@ -3,6 +3,8 @@
  * Desde tu PC: ejecuta pg_dump en el VPS vía SSH y guarda el .dump localmente.
  * Requiere en .env (solo en tu máquina): BACKUP_SSH_TARGET, BACKUP_REMOTE_APP_DIR
  * Opcional: BACKUP_LOCAL_DIR, BACKUP_SSH_EXTRA (args extra para ssh, ej. -i ~/.ssh/id_ed25519)
+ *
+ * En el VPS debe existir `scripts/backup/backup-dump.js` (misma versión que este repo; corré deploy tras cambios de rutas).
  */
 require("dotenv").config();
 const fs = require("fs");
@@ -32,7 +34,7 @@ function main() {
   const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
   const outFile = path.join(localDir, `agrohabilis_vps_${stamp}.dump`);
 
-  const remoteCmd = `cd ${shellQuote(remoteDir)} && node scripts/backup-dump.js --stdout`;
+  const remoteCmd = `cd ${shellQuote(remoteDir)} && node scripts/backup/backup-dump.js --stdout`;
   const sshArgs = [...parseSshArgs(sshExtra), sshTarget, remoteCmd];
 
   console.error("[backup-pull] SSH →", sshTarget, "cwd remoto:", remoteDir);

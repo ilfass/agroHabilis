@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 require("dotenv").config();
 
-const { detectarIntencionIA, inferirComandoNatural } = require("../src/services/whatsapp_intents");
-const { procesarConsulta } = require("../src/services/consultas");
+const { detectarIntencionIA, inferirComandoNatural } = require("../../../src/services/whatsapp_intents");
+const { procesarConsulta } = require("../../../src/services/consultas");
 
 const TEST_WHATSAPP = process.env.TEST_WHATSAPP || "5490000000000";
 

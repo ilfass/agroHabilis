@@ -43,7 +43,7 @@
 
 ## Score automatico por productor (0-100)
 
-- Script: [`scripts/score-simulacion.js`](../../scripts/score-simulacion.js).
+- Script: [`scripts/tools/score-simulacion.js`](../../scripts/tools/score-simulacion.js).
 - Ejecución: `npm run score:sim` (abarca todos los `simulacion-7-productores*.json` en `docs/operacion/`).
 - Salida consolidada: [`scores-simulacion-comparativo-2026-05-04.json`](scores-simulacion-comparativo-2026-05-04.json) (`runs`, comparativo **v2↔v3** y **v3↔v4**).
 

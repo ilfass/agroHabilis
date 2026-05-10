@@ -1,15 +1,15 @@
 # Scripts
 
-Todo lo ejecutable desde `npm run` está en `package.json`. El resto se invoca con `node scripts/<archivo>.js`.
+Los comandos habituales están en `package.json` (`npm run`). Las rutas están agrupadas por tema.
 
-| Área | Archivos |
-|------|----------|
-| Deploy / VPS | `deploy-vps.sh`, `diff-env-vps.sh`, `release-vps.sh`, `vps-install-chromium-deps.sh`, `vps-whatsapp-logs.sh` |
-| Base de datos | `setup-db.js`, `migrate-db.js`, `migrations/*.sql` |
-| Backups PostgreSQL | `backup-dump.js`, `backup-pull-local.js`, `backup-rotate.js`, `backup-cron.sh` |
-| WhatsApp / operación | `wa-qr-terminal.js`, `ver-estado-chat-whatsapp.js`, `validate-ai-context.js` |
-| Datos / backfill | `backfill-*.js` |
-| QA y simulaciones | `qa-whatsapp.js`, `score-simulacion.js`, `simular-productor-papa.js`, `test-*.js`, `inventario-prueba-grano.js` |
-| Análisis / export | `export-interacciones-captura.js`, `watch-historial-consultas.js`, `report-onboarding-usuarios.js`, `prueba-consultas-traza.js`, `seed-casos-reales.js` |
+| Carpeta | Contenido |
+|---------|-----------|
+| `deploy/` | `deploy-vps.sh`, `diff-env-vps.sh`, `release-vps.sh`, `vps-install-chromium-deps.sh`, `vps-whatsapp-logs.sh` |
+| `db/` | `setup-db.js`, `migrate-db.js`, `validate-ai-context.js`, `migrations/*.sql` |
+| `backup/` | Dump/pull/rotación PostgreSQL (`backup-dump.js`, etc.) |
+| `whatsapp/` | QR en terminal y diagnóstico de estado de chat |
+| `qa/` | Casos y runner `qa-whatsapp.js` |
+| `tools/` | Backfills, export, simulaciones, scores, pruebas puntuales |
+| `deprecated/` | Herramientas viejas conservadas por historial; no forman parte del flujo estándar |
 
-Los artefactos de deploy tipo capturas de `nginx -t` no se versionan: usá `.deploy-backups/` en local (ignorado por git).
+Los artefactos de deploy (capturas de `nginx -t`, etc.) van en `.deploy-backups/` en local (ignorado por git).

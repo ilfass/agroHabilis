@@ -2,12 +2,12 @@
 set -euo pipefail
 #
 # Compara .env del VPS con el .env local (mismas variables por defecto que deploy-vps.sh).
-# Uso: bash scripts/diff-env-vps.sh
-#      VPS_HOST=... VPS_USER=... VPS_PATH=... bash scripts/diff-env-vps.sh
+# Uso: bash scripts/deploy/diff-env-vps.sh
+#      VPS_HOST=... VPS_USER=... VPS_PATH=... bash scripts/deploy/diff-env-vps.sh
 #
 # diff devuelve 0 si son iguales, 1 si difieren, >1 error.
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 VPS_HOST="${VPS_HOST:-147.93.36.212}"
 VPS_USER="${VPS_USER:-root}"
 VPS_PATH="${VPS_PATH:-/var/www/agro.habilispro.com}"

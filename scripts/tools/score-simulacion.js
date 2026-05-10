@@ -12,9 +12,9 @@
  * Opcional: bonus plan (+5 máx.) si aparece confirmación explícita de cambio de plan.
  *
  * Uso:
- *   node scripts/score-simulacion.js docs/operacion/simulacion-7-productores-onboarding-v4-realista-2026-05-04.json
- *   node scripts/score-simulacion.js --all
- *   node scripts/score-simulacion.js --compare docs/operacion/simulacion-7-productores-onboarding-v2-2026-05-04.json docs/operacion/simulacion-7-productores-onboarding-v3-post-fixes-2026-05-04.json
+ *   node scripts/tools/score-simulacion.js docs/operacion/simulacion-7-productores-onboarding-v4-realista-2026-05-04.json
+ *   node scripts/tools/score-simulacion.js --all
+ *   node scripts/tools/score-simulacion.js --compare docs/operacion/simulacion-7-productores-onboarding-v2-2026-05-04.json docs/operacion/simulacion-7-productores-onboarding-v3-post-fixes-2026-05-04.json
  */
 
 const fs = require("fs");
@@ -195,7 +195,7 @@ function findSimulacionFiles(root) {
 
 function main() {
   const argv = process.argv.slice(2);
-  const root = path.join(__dirname, "..");
+  const root = path.join(__dirname, "..", "..");
 
   if (argv[0] === "--compare" && argv.length >= 3) {
     const out = compareFiles(argv[1], argv[2]);
@@ -212,7 +212,7 @@ function main() {
 
   if (!files.length) {
     console.error(
-      "Uso: node scripts/score-simulacion.js <archivo.json> | --all | --compare a.json b.json",
+      "Uso: node scripts/tools/score-simulacion.js <archivo.json> | --all | --compare a.json b.json",
     );
     process.exit(1);
   }

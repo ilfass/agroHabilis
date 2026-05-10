@@ -11,12 +11,14 @@ async function main() {
   const { testConnection } = require(path.join(
     __dirname,
     "..",
+    "..",
     "src",
     "config",
     "database"
   ));
   const { initializeWhatsApp, estaListo } = require(path.join(
     __dirname,
+    "..",
     "..",
     "src",
     "config",

@@ -3,8 +3,8 @@
  * Simulación de un productor de papa: onboarding + consultas (misma ruta que WhatsApp).
  *
  * Uso:
- *   node scripts/simular-productor-papa.js
- *   SIM_PAPA_WHATSAPP=5491199820999 node scripts/simular-productor-papa.js --clean
+ *   node scripts/tools/simular-productor-papa.js
+ *   SIM_PAPA_WHATSAPP=5491199820999 node scripts/tools/simular-productor-papa.js --clean
  *
  * Solo permite --clean si el número coincide con el prefijo de prueba (54911998209...) por seguridad.
  */
@@ -12,10 +12,10 @@ require("dotenv").config();
 
 const fs = require("fs");
 const path = require("path");
-const { query } = require("../src/config/database");
-const { normalizarWhatsapp } = require("../src/models/usuario");
-const { gestionarOnboarding } = require("../src/services/onboarding");
-const { procesarConsulta } = require("../src/services/consultas");
+const { query } = require("../../src/config/database");
+const { normalizarWhatsapp } = require("../../src/models/usuario");
+const { gestionarOnboarding } = require("../../src/services/onboarding");
+const { procesarConsulta } = require("../../src/services/consultas");
 
 const DEFAULT_WA = process.env.SIM_PAPA_WHATSAPP || "5491199820999";
 

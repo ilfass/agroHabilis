@@ -2,9 +2,9 @@
 /**
  * Dump lógico PostgreSQL (formato custom -Fc).
  * Uso en la máquina donde vive DATABASE_URL (local o VPS):
- *   node scripts/backup-dump.js
- *   node scripts/backup-dump.js --out /ruta/archivo.dump
- *   node scripts/backup-dump.js --stdout   # para pipe/SSH (npm run backup:pull)
+ *   node scripts/backup/backup-dump.js
+ *   node scripts/backup/backup-dump.js --out /ruta/archivo.dump
+ *   node scripts/backup/backup-dump.js --stdout   # para pipe/SSH (npm run backup:pull)
  */
 require("dotenv").config();
 const fs = require("fs");

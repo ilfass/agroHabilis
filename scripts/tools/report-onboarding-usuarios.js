@@ -3,12 +3,12 @@
  * Lista usuarios y si quedan equivalentes a "fuera de onboarding" según la misma idea
  * que gestionarOnboarding (estado completado en BD o perfil mínimo operativo).
  *
- * Uso: node scripts/report-onboarding-usuarios.js
- *        DATABASE_URL=... node scripts/report-onboarding-usuarios.js   # otra BD
+ * Uso: node scripts/tools/report-onboarding-usuarios.js
+ *        DATABASE_URL=... node scripts/tools/report-onboarding-usuarios.js   # otra BD
  */
 require("dotenv").config();
 const path = require("path");
-const { query, pool } = require(path.join(__dirname, "..", "src", "config", "database"));
+const { query, pool } = require(path.join(__dirname, "..", "..", "src", "config", "database"));
 
 const soloDigitos = (t) => String(t || "").replace(/\D/g, "") || null;
 

@@ -2,12 +2,12 @@
 /**
  * Resumen de en qué quedó el “chat” de un número (BD): usuario, onboarding, bot, historial.
  *
- * Uso: node scripts/ver-estado-chat-whatsapp.js 5492494308376
- *      WHATSAPP_VER=549... node scripts/ver-estado-chat-whatsapp.js
+ * Uso: node scripts/whatsapp/ver-estado-chat-whatsapp.js 5492494308376
+ *      WHATSAPP_VER=549... node scripts/whatsapp/ver-estado-chat-whatsapp.js
  */
 require("dotenv").config();
 const path = require("path");
-const { query, pool } = require(path.join(__dirname, "..", "src", "config", "database"));
+const { query, pool } = require(path.join(__dirname, "..", "..", "src", "config", "database"));
 
 const waArg =
   process.argv[2] ||
@@ -21,7 +21,7 @@ const trunc = (s, n = 400) => {
 
 const main = async () => {
   if (!waArg || waArg.length < 8) {
-    console.error("Uso: node scripts/ver-estado-chat-whatsapp.js <solo_digitos>");
+    console.error("Uso: node scripts/whatsapp/ver-estado-chat-whatsapp.js <solo_digitos>");
     process.exit(1);
   }
   const wa = waArg.replace(/\D/g, "");

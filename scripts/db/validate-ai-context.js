@@ -6,7 +6,7 @@
 const fs = require("fs");
 const path = require("path");
 
-const root = path.join(__dirname, "..");
+const root = path.join(__dirname, "..", "..");
 const required = [
   "docs/fuentes/fuentes-curadas.md",
   "docs/contexto-ia/guia-respuestas.md",

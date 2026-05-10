@@ -62,8 +62,8 @@ Archivo: `src/templates/index.js`
 
 ## Tests de cumplimiento por plan
 
-- Script: `scripts/test-template-plan-rules.js`
-- Verifica automáticamente que:
+- El script histórico `scripts/test-template-plan-rules.js` ya no está en el repo; para regresiones de intención/comando usá `npm run qa:whatsapp` y el informe en `docs/operacion/qa-whatsapp-report.md`.
+- Criterios que conviene verificar manualmente o vía QA:
   - `gratis` no muestre bloques de `pro`
   - `basico` no muestre bloques exclusivos `pro`
   - `pro` pueda mostrar todos los bloques

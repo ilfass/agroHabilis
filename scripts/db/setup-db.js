@@ -1,5 +1,5 @@
 require("dotenv").config();
-const { query, pool, testConnection } = require("../src/config/database");
+const { query, pool, testConnection } = require("../../src/config/database");
 
 const createTablesSQL = `
 CREATE TABLE IF NOT EXISTS usuarios (

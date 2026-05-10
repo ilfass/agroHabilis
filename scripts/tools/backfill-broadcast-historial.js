@@ -5,18 +5,18 @@
  * No modela un “segundo masivo”: si hubo un recordatorio corto aparte, no hace falta duplicarlo en historial.
  *
  * Uso:
- *   node scripts/backfill-broadcast-historial.js --dry-run
- *   node scripts/backfill-broadcast-historial.js
- *   node scripts/backfill-broadcast-historial.js --desde=2026-05-09 --hasta=2026-05-11
+ *   node scripts/tools/backfill-broadcast-historial.js --dry-run
+ *   node scripts/tools/backfill-broadcast-historial.js
+ *   node scripts/tools/backfill-broadcast-historial.js --desde=2026-05-09 --hasta=2026-05-11
  *
  * La primera ejecución real con batch nuevo borra filas del backfill anterior de dos plantillas
  * (lote `20260509-masivos`) y reemplaza por una sola fila por usuario con texto TEMPLATE_CAMPAÑA.
  */
 require("dotenv").config();
-const { query, pool } = require("../src/config/database");
-const { normalizarWhatsapp } = require("../src/models/usuario");
-const { interpolarMensajeMasivo } = require("../src/utils/interpolar_mensaje_masivo");
-const { PREGUNTA_MARCADOR_BROADCAST } = require("../src/services/broadcast_historial");
+const { query, pool } = require("../../src/config/database");
+const { normalizarWhatsapp } = require("../../src/models/usuario");
+const { interpolarMensajeMasivo } = require("../../src/utils/interpolar_mensaje_masivo");
+const { PREGUNTA_MARCADOR_BROADCAST } = require("../../src/services/broadcast_historial");
 
 const BACKFILL_BATCH_V1_DOS_PLANTILLAS = "20260509-masivos";
 const BACKFILL_BATCH = "20260509-campaña-sola";

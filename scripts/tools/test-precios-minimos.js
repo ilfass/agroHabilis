@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 require("dotenv").config();
 
-const { procesarConsulta } = require("../src/services/consultas");
-const { normalizarWhatsapp } = require("../src/models/usuario");
+const { procesarConsulta } = require("../../src/services/consultas");
+const { normalizarWhatsapp } = require("../../src/models/usuario");
 
 const TEST_WHATSAPP = normalizarWhatsapp(process.env.TEST_WHATSAPP || "5490000000000");
 const PREGUNTAS = process.env.PREGUNTAS_PRECIOS

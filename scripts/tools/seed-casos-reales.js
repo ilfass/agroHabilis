@@ -1,9 +1,9 @@
 require("dotenv").config();
 
-const { query, pool } = require("../src/config/database");
-const { procesarConsulta } = require("../src/services/consultas");
-const { generarResumen } = require("../src/services/resumen");
-const { configurarAlerta, verificarAlertas } = require("../src/services/alertas");
+const { query, pool } = require("../../src/config/database");
+const { procesarConsulta } = require("../../src/services/consultas");
+const { generarResumen } = require("../../src/services/resumen");
+const { configurarAlerta, verificarAlertas } = require("../../src/services/alertas");
 
 const USUARIOS = [
   // Agricultura: sur/centro/norte

@@ -5,8 +5,8 @@
  * y lista saldos y últimos movimientos.
  *
  * Uso:
- *   node scripts/inventario-prueba-grano.js
- *   INV_TEST_USUARIO_ID=123 node scripts/inventario-prueba-grano.js
+ *   node scripts/tools/inventario-prueba-grano.js
+ *   INV_TEST_USUARIO_ID=123 node scripts/tools/inventario-prueba-grano.js
  *
  * Requiere: DATABASE_URL, migraciones inventario aplicadas (incl. dominio grano).
  */
@@ -14,8 +14,8 @@
 
 require("dotenv").config();
 
-const { pool, query } = require("../src/config/database");
-const { registroConfirmadoDirecto, listarSaldos, listarMovimientos } = require("../src/services/inventario/core");
+const { pool, query } = require("../../src/config/database");
+const { registroConfirmadoDirecto, listarSaldos, listarMovimientos } = require("../../src/services/inventario/core");
 
 async function resolverUsuarioId() {
   const raw = process.env.INV_TEST_USUARIO_ID;

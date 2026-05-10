@@ -4,9 +4,9 @@
  * (Markdown por número, orden cronológico).
  *
  * Uso:
- *   node scripts/export-interacciones-captura.js
- *   node scripts/export-interacciones-captura.js --dias 14
- *   node scripts/export-interacciones-captura.js --whatsapp 5491112223333
+ *   node scripts/tools/export-interacciones-captura.js
+ *   node scripts/tools/export-interacciones-captura.js --dias 14
+ *   node scripts/tools/export-interacciones-captura.js --whatsapp 5491112223333
  *
  * Si no pasás --whatsapp, usa CAPTURA_HILO_WHATSAPP del .env; si tampoco hay,
  * exporta los 12 números con más filas en el rango de días.
@@ -14,8 +14,8 @@
 require("dotenv").config();
 const fs = require("fs");
 const path = require("path");
-const { query, pool } = require("../src/config/database");
-const capturaMod = require("../src/services/interacciones_captura");
+const { query, pool } = require("../../src/config/database");
+const capturaMod = require("../../src/services/interacciones_captura");
 
 const OUT_DIR = path.resolve(__dirname, "../exports/interacciones");
 

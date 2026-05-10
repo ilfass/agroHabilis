@@ -7,8 +7,9 @@ AgroHabilis es una plataforma Node.js pensada para centralizar informacion agrop
 | Ruta | Contenido |
 |------|-----------|
 | `src/` | Backend (Express, jobs, servicios, scrapers, plantillas). |
-| `scripts/` | Utilidades de deploy, migraciones SQL, backups, QA y tareas puntuales (`npm run` en `package.json`). |
+| `scripts/` | Subcarpetas: `deploy/`, `db/` (setup + migraciones), `backup/`, `whatsapp/`, `qa/`, `tools/`, `deprecated/`. Los `npm run` apuntan a estas rutas. |
 | `docs/` | Producto, operación, roadmap, contexto para IA y fuentes. |
+| `GLOBAL-VPS-MULTISITIO.md` | Puntero a repo y rutas del multisitio (health check, `/opt/vps-multisitio`). |
 | `frontend/public/` | HTML estáticos del panel y páginas públicas. |
 | `ops/` | Plantillas operativas (p. ej. systemd usuario para backups). |
 | `imagenes/` | Recursos gráficos referenciados por plantillas o web. |
@@ -38,7 +39,7 @@ AgroHabilis es una plataforma Node.js pensada para centralizar informacion agrop
 
 - `npm start`: inicia la API (`src/index.js`).
 - `npm run dev`: inicia la API en modo watch.
-- `node scripts/setup-db.js`: crea/verifica las tablas en PostgreSQL y el usuario interno `whatsapp = ahbl:sistema` para guardar resumenes del boletin.
+- `node scripts/db/setup-db.js`: crea/verifica las tablas en PostgreSQL y el usuario interno `whatsapp = ahbl:sistema` para guardar resumenes del boletin.
 - `npm run deploy:vps`: despliega a la VPS con rsync + npm ci + pm2 restart.
 - `npm run release:vps`: hace `git pull --rebase`, `git push` y despliegue en un solo flujo.
 
@@ -47,7 +48,7 @@ AgroHabilis es una plataforma Node.js pensada para centralizar informacion agrop
 1. Copiar `.env.example` a `.env`.
 2. Completar credenciales y variables requeridas.
    - Opcional para fallback de precipitaciones: `WEATHERAPI_KEY` (si falla Open-Meteo).
-3. Ejecutar `node scripts/setup-db.js` para inicializar base de datos.
+3. Ejecutar `node scripts/db/setup-db.js` para inicializar base de datos.
 4. Levantar el servidor con `npm start`.
 
 ## Jobs y endpoints utiles (MVP)
@@ -97,8 +98,8 @@ Actualizacion: deploy automatico configurado con GitHub Actions.
 
 1. **PostgreSQL** en el servidor: crear base y usuario; en `.env` del servidor definir `DATABASE_URL`.
 2. **`.env` en el servidor** (no se sube con rsync): copiar desde `.env.example` y completar `DATABASE_URL`, `GEMINI_API_KEY` u `OPENROUTER_API_KEY`, `PORT`, `WHATSAPP_SESSION_PATH`, etc.
-3. **Tablas**: una vez con `DATABASE_URL` correcto, en el servidor: `cd /var/www/.habilispro.com && node scripts/setup-db.js`.
-4. **Chromium / WhatsApp**: en Ubuntu/Debian ejecutar en la VPS `bash scripts/vps-install-chromium-deps.sh`. Si el Chrome embebido de Puppeteer sigue fallando, en `.env` poner `PUPPETEER_EXECUTABLE_PATH` apuntando al `chromium` del sistema (`command -v chromium`).
+3. **Tablas**: una vez con `DATABASE_URL` correcto, en el servidor: `cd /var/www/agro.habilispro.com && node scripts/db/setup-db.js`.
+4. **Chromium / WhatsApp**: en Ubuntu/Debian ejecutar en la VPS `bash scripts/deploy/vps-install-chromium-deps.sh`. Si el Chrome embebido de Puppeteer sigue fallando, en `.env` poner `PUPPETEER_EXECUTABLE_PATH` apuntando al `chromium` del sistema (`command -v chromium`).
 5. **Sesión WhatsApp**: no reutilizar la misma carpeta de sesion en dos máquinas a la vez. En servidor usar:
    - `WHATSAPP_SESSION_PATH=/var/lib/agrohabilis/whatsapp-session`
    - `WHATSAPP_CLIENT_ID=agrohabilis-vps`

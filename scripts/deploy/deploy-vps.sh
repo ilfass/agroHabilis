@@ -5,9 +5,9 @@ set -euo pipefail
 #   SYNC_ENV=1   Copia .env local al VPS antes de migraciones y PM2 (requiere scp).
 #   VPS_HOST, VPS_USER, VPS_PATH, APP_NAME, HEALTH_HOST_HEADER
 #
-# Antes de SYNC_ENV=1 se muestra un aviso y el diff contra el .env remoto; ver scripts/diff-env-vps.sh
+# Antes de SYNC_ENV=1 se muestra un aviso y el diff contra el .env remoto; ver scripts/deploy/diff-env-vps.sh
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 VPS_HOST="${VPS_HOST:-147.93.36.212}"
 VPS_USER="${VPS_USER:-root}"
@@ -66,7 +66,7 @@ if sync_env_enabled; then
   echo "* Revisa el diff siguiente antes de continuar (contiene secretos)."
   echo "**********************************************************************"
   echo ""
-  bash "${ROOT_DIR}/scripts/diff-env-vps.sh" || true
+  bash "${ROOT_DIR}/scripts/deploy/diff-env-vps.sh" || true
   echo ""
   echo "==> Subiendo .env (SYNC_ENV=1) -> ${VPS_PATH}/.env"
   scp "${ROOT_DIR}/.env" "${VPS_USER}@${VPS_HOST}:${VPS_PATH}/.env"
@@ -76,9 +76,9 @@ ssh "${VPS_USER}@${VPS_HOST}" "\
   cd '${VPS_PATH}' && \
   npm ci --omit=dev && \
   echo '==> Validando contexto IA requerido' && \
-  node scripts/validate-ai-context.js && \
+  node scripts/db/validate-ai-context.js && \
   echo '==> Ejecutando migraciones DB (setup-db.js)' && \
-  node scripts/setup-db.js && \
+  node scripts/db/setup-db.js && \
   echo '==> Ejecutando migraciones versionadas (db:migrate)' && \
   npm run db:migrate && \
   echo '==> Verificando tabla usuario_ganaderia_perfil' && \

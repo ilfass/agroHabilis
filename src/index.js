@@ -805,7 +805,7 @@ app.post("/ai/resumen-mercado", async (req, res) => {
       const usuarioId = await obtenerUsuarioSistemaId();
       if (!usuarioId) {
         throw new Error(
-          "No hay usuario sistema para guardar resumenes. Ejecuta: node scripts/setup-db.js"
+          "No hay usuario sistema para guardar resumenes. Ejecuta: node scripts/db/setup-db.js"
         );
       }
       persistido = await upsertResumenPorFechaMercado({

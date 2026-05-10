@@ -4,14 +4,14 @@
  * Sirve para analizar conversación con el bot y pegar tramos en Cursor.
  *
  * Uso:
- *   node scripts/watch-historial-consultas.js --whatsapp 5492494468949
- *   node scripts/watch-historial-consultas.js --whatsapp 5492494468949 --interval 4000 --bootstrap 12
+ *   node scripts/tools/watch-historial-consultas.js --whatsapp 5492494468949
+ *   node scripts/tools/watch-historial-consultas.js --whatsapp 5492494468949 --interval 4000 --bootstrap 12
  *
  * Requiere DATABASE_URL en .env (misma que el API). Ctrl+C cierra el pool y sale.
  */
 require("dotenv").config();
 
-const { query, pool } = require("../src/config/database");
+const { query, pool } = require("../../src/config/database");
 
 const normDigits = (w) => String(w || "").replace(/\D/g, "");
 
@@ -65,7 +65,7 @@ function printRow(row) {
 async function main() {
   const { whatsapp, intervalMs, bootstrap } = parseArgs();
   if (!whatsapp || whatsapp.length < 8) {
-    console.error("Uso: node scripts/watch-historial-consultas.js --whatsapp 5492494468949 [--interval 5000] [--bootstrap 8]");
+    console.error("Uso: node scripts/tools/watch-historial-consultas.js --whatsapp 5492494468949 [--interval 5000] [--bootstrap 8]");
     process.exit(1);
   }
   if (!process.env.DATABASE_URL?.trim()) {
