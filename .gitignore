@@ -1,5 +1,6 @@
 node_modules/
 .env
+.deploy-backups/
 logs/
 *.log
 .DS_Store

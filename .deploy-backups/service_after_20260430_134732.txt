@@ -1,6 +1,0 @@
-● site-agro.service - Site service agro.habilispro.com
-     Loaded: loaded (/etc/systemd/system/site-agro.service; enabled; preset: enabled)
-     Active: activating (auto-restart) (Result: exit-code) since Thu 2026-04-30 16:49:16 UTC; 1s ago
-    Process: 1233235 ExecStart=/usr/bin/node src/index.js (code=exited, status=1/FAILURE)
-   Main PID: 1233235 (code=exited, status=1/FAILURE)
-        CPU: 1.017s

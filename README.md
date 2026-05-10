@@ -2,6 +2,17 @@
 
 AgroHabilis es una plataforma Node.js pensada para centralizar informacion agropecuaria (precios, clima, resumenes y mensajeria) y habilitar automatizaciones sobre datos productivos.
 
+## Estructura del repositorio
+
+| Ruta | Contenido |
+|------|-----------|
+| `src/` | Backend (Express, jobs, servicios, scrapers, plantillas). |
+| `scripts/` | Utilidades de deploy, migraciones SQL, backups, QA y tareas puntuales (`npm run` en `package.json`). |
+| `docs/` | Producto, operación, roadmap, contexto para IA y fuentes. |
+| `frontend/public/` | HTML estáticos del panel y páginas públicas. |
+| `ops/` | Plantillas operativas (p. ej. systemd usuario para backups). |
+| `imagenes/` | Recursos gráficos referenciados por plantillas o web. |
+
 ## Definicion de producto
 
 - Ver `docs/producto.md` para la definicion oficial del producto, fases y backlog por sprints.

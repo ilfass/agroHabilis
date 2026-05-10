@@ -2,7 +2,26 @@
 
 Checklist operativo breve para actualizar un sitio sin afectar los demás.
 
-Guia complementaria de hardening: `/home/fabian/Documentos/vps-multisitio/README.md`
+## Referencia global (fuera de este repo)
+
+La configuración global del multisitio vive en el repo **vps-multisitio**, no en AgroHabilis:
+
+- Desarrollo local típico: `/home/fabian/Documentos/vps-multisitio`
+- En VPS suele publicarse en: `/opt/vps-multisitio`
+
+Health check de todos los dominios del registro:
+
+```bash
+bash /home/fabian/Documentos/vps-multisitio/health-check.sh
+```
+
+En el VPS, con prueba por `Host` contra localhost:
+
+```bash
+CHECK_LOCAL_HTTP=1 bash /opt/vps-multisitio/health-check.sh --local-http
+```
+
+Guía complementaria de hardening: `/home/fabian/Documentos/vps-multisitio/README.md`
 
 ## 1) Confirmar alcance antes de tocar nada
 
