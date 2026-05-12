@@ -21,6 +21,7 @@ const { handlerBotPausado } = require("./bot_pausado");
 const { handlerCupoExcedido } = require("./cupo_excedido");
 const { handlerCmdBorrarCuenta } = require("./cmd_borrar_cuenta");
 const { handlerCmdCompletarPerfil } = require("./cmd_completar_perfil");
+const { handlerCmdPerfilDirecto } = require("./cmd_perfil_directo");
 
 /**
  * Mapeo id → función. Acá agregamos los pasos siguientes a medida que
@@ -32,7 +33,7 @@ const HANDLERS = {
   cmd_resumen: handlerCmdResumen,
   cmd_alertas: handlerCmdAlertas,
   cmd_finanzas: handlerCmdFinanzas,
-  /* TODO paso F */ cmd_perfil_directo: null,
+  cmd_perfil_directo: handlerCmdPerfilDirecto,
   /* TODO paso G */ cmd_cambio_plan: null,
   cmd_borrar_cuenta: handlerCmdBorrarCuenta,
   /* TODO paso I */ cmd_admin: null,

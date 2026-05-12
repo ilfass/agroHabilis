@@ -70,6 +70,18 @@ const {
   esSaludoSocialCorto,
   esPreguntaAyudaComandosOMenu,
 } = require("../services/whatsapp_intents");
+const {
+  parseZonas,
+  parseCultivos,
+  parseEmail,
+  esLineaSolamenteCorreo,
+  parseGanaderiaEstructurada,
+} = require("../services/whatsapp_parsers");
+const {
+  guardarPerfilGanaderoUsuario,
+  upsertPerfilProductivo,
+  obtenerTextoPerfilUsuario,
+} = require("../services/perfil_usuario");
 const { generarConPromptLibre } = require("../services/gemini");
 const COMANDOS = require("./comandos");
 const capturaInteraccion = require("../services/interacciones_captura");
@@ -98,46 +110,10 @@ const envFlagOn = (key, defaultOn = true) => {
   return !["0", "false", "off", "no"].includes(v);
 };
 
-const parseProvinciaPartido = (texto = "") => {
-  const parts = String(texto)
-    .split(",")
-    .map((x) => x.trim())
-    .filter(Boolean);
-  if (parts.length < 2) return null;
-  return { provincia: parts[0], partido: parts.slice(1).join(", ") };
-};
-
-const parseZonas = (texto = "") =>
-  String(texto)
-    .split(/\s*-\s*/)
-    .map((x) => x.trim())
-    .filter(Boolean)
-    .map((bloque) => parseProvinciaPartido(bloque))
-    .filter(Boolean);
-
-
-const parseCultivos = (texto = "") =>
-  String(texto)
-    .split(",")
-    .map((x) => x.trim())
-    .filter(Boolean)
-    .map((x) => x.charAt(0).toUpperCase() + x.slice(1).toLowerCase());
-
-const parseCategoriasGanaderas = (texto = "") =>
-  String(texto)
-    .split(",")
-    .map((x) => x.trim().toLowerCase())
-    .filter(Boolean);
-
 const parseComandoFlete = (texto = "") => {
   const m = String(texto || "").match(/^FLETE\s+(.+?)\s+A\s+(.+)$/i);
   if (!m) return null;
   return { origen: m[1].trim(), destino: m[2].trim() };
-};
-
-const parseEmail = (texto = "") => {
-  const m = String(texto || "").trim().match(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i);
-  return m ? m[0].toLowerCase() : null;
 };
 
 /** Normaliza espacios (incl. NBSP / varios Unicode) para que rutas tipo "MI EMAIL x" no fallen por Typo invisible. */
@@ -149,15 +125,6 @@ const normalizarParaComandoRuteo = (texto = "") =>
     .replace(/\s+/g, " ")
     .trim()
     .toUpperCase();
-
-/** Mensaje de una sola línea que es únicamente un correo (p. ej. tras pedir MI EMAIL para suscripción). */
-const esLineaSolamenteCorreo = (texto = "") => {
-  const t = String(texto || "").trim();
-  if (!t || /[\r\n]/.test(t)) return null;
-  const email = parseEmail(t);
-  if (!email) return null;
-  return t.replace(/\s+/g, "").toLowerCase() === email ? email : null;
-};
 
 const formatearFechasTextoArg = (texto = "") =>
   String(texto || "").replace(/\b(20\d{2})-(\d{2})-(\d{2})\b/g, (_m, y, mm, dd) => `${dd}/${mm}/${y}`);
@@ -353,134 +320,6 @@ const pareceComandoExplicito = (consulta = "", comando = "") => {
     "RESET ONBOARDING",
   ];
   return starts.some((s) => c.startsWith(s));
-};
-
-const ESPECIES_GANADERAS = [
-  { especie: "vacuno", keys: ["vacuno", "bovino", "novillo", "ternero", "vaca", "vaquillona", "toro"] },
-  { especie: "porcino", keys: ["porcino", "cerdo", "lechon", "lechón", "chancho"] },
-  { especie: "ovino", keys: ["ovino", "oveja", "cordero", "carnero"] },
-  { especie: "caprino", keys: ["caprino", "cabra", "chivo"] },
-  { especie: "camelido", keys: ["llama", "alpaca", "guanaco", "vicuña", "vicuna", "camelido"] },
-  { especie: "equino", keys: ["equino", "caballo", "yegua"] },
-  { especie: "avicola", keys: ["avicola", "avícola", "pollo", "gallina", "ponedora"] },
-];
-
-const inferirEspecieGanadera = (categoria = "") => {
-  const t = normalizarTexto(categoria);
-  const hit = ESPECIES_GANADERAS.find((e) => e.keys.some((k) => t.includes(normalizarTexto(k))));
-  return hit?.especie || "otra";
-};
-
-const parseGanaderiaEstructurada = (texto = "") => {
-  const categorias = parseCategoriasGanaderas(texto);
-  const perfiles = categorias.map((c) => ({
-    especie: inferirEspecieGanadera(c),
-    categoria: c.slice(0, 60),
-  }));
-  return { categorias, perfiles };
-};
-
-const guardarPerfilGanaderoUsuario = async ({ usuarioId, perfiles = [] }) => {
-  await query("DELETE FROM usuario_ganaderia_perfil WHERE usuario_id = $1", [usuarioId]);
-  for (const p of perfiles) {
-    await query(
-      `
-        INSERT INTO usuario_ganaderia_perfil (usuario_id, especie, categoria, cantidad_estimada, activo)
-        VALUES ($1, $2, $3, $4, true)
-        ON CONFLICT (usuario_id, especie, categoria)
-        DO UPDATE SET cantidad_estimada = EXCLUDED.cantidad_estimada, activo = true
-      `,
-      [usuarioId, p.especie, p.categoria, 1]
-    );
-  }
-};
-
-const upsertPerfilProductivo = async (usuarioId, tipo) => {
-  const current = await query(
-    `
-      SELECT id
-      FROM perfil_productivo
-      WHERE usuario_id = $1
-      ORDER BY id DESC
-      LIMIT 1
-    `,
-    [usuarioId]
-  );
-  if (current.rows[0]) {
-    await query(
-      `
-        UPDATE perfil_productivo
-        SET tipo = $2, activo = true
-        WHERE id = $1
-      `,
-      [current.rows[0].id, tipo]
-    );
-    return;
-  }
-  await query(
-    `
-      INSERT INTO perfil_productivo (usuario_id, tipo, activo)
-      VALUES ($1, $2, true)
-    `,
-    [usuarioId, tipo]
-  );
-};
-
-const obtenerTextoPerfilUsuario = async (usuarioId) => {
-  const usuarioResult = await query(
-    `
-      SELECT nombre, provincia, partido, plan, tipo_comercializacion
-      FROM usuarios
-      WHERE id = $1
-      LIMIT 1
-    `,
-    [usuarioId]
-  );
-  const usuario = usuarioResult.rows[0];
-  if (!usuario) return "No encontré tu perfil.";
-  const cultivosResult = await query(
-    `
-      SELECT cultivo
-      FROM usuario_cultivos
-      WHERE usuario_id = $1 AND activo = true
-      ORDER BY cultivo
-    `,
-    [usuarioId]
-  );
-  const perfilResult = await query(
-    `
-      SELECT tipo
-      FROM perfil_productivo
-      WHERE usuario_id = $1 AND activo = true
-      ORDER BY id DESC
-      LIMIT 1
-    `,
-    [usuarioId]
-  );
-  const stock = await query(
-    `
-      SELECT categoria, cantidad
-      FROM stock_ganadero
-      WHERE usuario_id = $1
-        AND fecha = (SELECT MAX(fecha) FROM stock_ganadero WHERE usuario_id = $1)
-      ORDER BY categoria
-    `,
-    [usuarioId]
-  );
-  const cultivos = cultivosResult.rows.map((r) => r.cultivo);
-  const stockTxt = stock.rows.length
-    ? stock.rows.map((s) => `${s.categoria}:${s.cantidad}`).join(", ")
-    : "sin datos";
-  return [
-    "👤 *Tu perfil actual*",
-    `Nombre: ${usuario.nombre || "-"}`,
-    `Zona: ${usuario.provincia || "-"}, ${usuario.partido || "-"}`,
-    `Plan: ${String(usuario.plan || "gratis").toUpperCase()}`,
-    `Comercialización: ${usuario.tipo_comercializacion || "disponible"}`,
-    `Perfil productivo: ${perfilResult.rows[0]?.tipo || "agricultura"}`,
-    `Cultivos: ${cultivos.length ? cultivos.join(", ") : "sin cultivos"}`,
-    `Ganado (último stock): ${stockTxt}`,
-  ].join("\n");
 };
 
 const sessionPath = process.env.WHATSAPP_SESSION_PATH || "./.wwebjs_auth";

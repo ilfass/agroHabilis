@@ -1,58 +1,62 @@
 # Propuesta: centralizar controlador de turno (P2#10)
 
-> **Estado:** EN EJECUCIÓN — 9/17 handlers migrados, infraestructura
-> completa, deployado en producción con feature flag OFF (comportamiento
-> idéntico al anterior). Cada paso es un PR/commit pequeño con QA propio.
+> **Estado:** EN EJECUCIÓN — 10/17 handlers migrados, infraestructura
+> completa, deployado en producción. Flag activado con whitelist
+> `cmd_flete` en producción desde 2026-05-12.
 >
-> **Progreso (al 2026-05-12):**
+> **Progreso:**
 >
 > | Paso | Handler(s) | Estado | Commit |
 > |------|-----------|--------|--------|
 > | A | infra (`run` + flag + whitelist) | ✅ | `f2ff8ed` |
-> | B | `cmd_flete` | ✅ | `f2ff8ed` |
+> | B | `cmd_flete` | ✅ activo en prod | `f2ff8ed` |
 > | C | `cmd_resumen` | ✅ | `7d99dd0` |
 > | D | `cmd_alertas` (4 ramas) | ✅ | `d0f432d` |
 > | E | `cmd_finanzas` (6 ramas) | ✅ | `2513bce` |
 > | K | `strict_suggestion` + `bot_pausado` + `cupo_excedido` | ✅ | `6636ea1` |
 > | H | `cmd_borrar_cuenta` | ✅ | `4caf48d` |
 > | J | `cmd_completar_perfil` (parcial) | ✅ | `4caf48d` |
-> | F | `cmd_perfil_directo` | ⛔ bloqueado | — |
+> | F | `cmd_perfil_directo` (8 ramas) | ✅ | _en curso_ |
 > | G | `cmd_cambio_plan` | ⛔ bloqueado | — |
 > | I | `cmd_admin` | ⛔ bloqueado | — |
 > | L | `onboarding`, `resumen_interactivo`, `inventario_pendiente`, `cmd_bot_control`, `pipeline_agente` | ⏳ stateful | — |
 >
-> **Bloqueos identificados** (requieren tarea previa):
+> **Extractos preparatorios completados (paso F):**
 >
-> - **Paso F (`cmd_perfil_directo`)**: ~8 funciones LOCALES de whatsapp.js
->   no exportadas (`parseEmail`, `esLineaSolamenteCorreo`, `parseZonas`,
->   `parseCultivos`, `parseGanaderiaEstructurada`,
->   `guardarPerfilGanaderoUsuario`, `upsertPerfilProductivo`,
->   `obtenerTextoPerfilUsuario`). Previo: extraer a
->   `src/services/whatsapp_parsers.js` y `src/services/perfil_usuario/...`.
-> - **Paso G (`cmd_cambio_plan`)**: lógica de suscripciones MP y planes
->   está mezclada con UI text en whatsapp.js. Previo: extraer
->   `aplicarCambioPlanWhatsapp` a `services/planes/cambio.js`.
+> - `src/services/whatsapp_parsers.js` — `parseZonas`, `parseCultivos`,
+>   `parseEmail`, `esLineaSolamenteCorreo`, `parseGanaderiaEstructurada`,
+>   `inferirEspecieGanadera`, `parseCategoriasGanaderas`,
+>   `parseProvinciaPartido`, `ESPECIES_GANADERAS`.
+> - `src/services/perfil_usuario.js` — `guardarPerfilGanaderoUsuario`,
+>   `upsertPerfilProductivo`, `obtenerTextoPerfilUsuario`.
+> - `whatsapp.js` ahora importa estos módulos en lugar de definirlos
+>   localmente. La carga del módulo sigue verde, sin regresiones.
+>
+> **Bloqueos restantes:**
+>
+> - **Paso G (`cmd_cambio_plan`)**: `resolverCambioPlanConPago` y
+>   `mensajeErrorCambioPlan` son locales en whatsapp.js, además hay 4
+>   puntos de entrada (alias QUIERO PLAN, natural, parametrizado, etc.).
+>   Previo: extraer a `services/planes/cambio_plan.js`.
 > - **Paso I (`cmd_admin`)**: `responderComandoAdmin` y
->   `resetOnboardingNumero` son funciones locales de whatsapp.js con
->   deps anidadas (`normalizarNumero`, `formatearFecha`,
->   `estadoProveedorIA`, `obtenerEstadoSistemaTexto`,
->   `resumenFuentesWhatsapp`). Previo: mover a `services/admin/comandos.js`.
-> - **Paso L (stateful)**: handlers con estado conversacional crítico —
->   tocar onboarding puede romper alta de productores. Requiere QA con
->   números reales en staging antes de migrar.
+>   `resetOnboardingNumero` son locales con deps anidadas
+>   (`normalizarNumero`, `formatearFecha`, `estadoProveedorIA`,
+>   `obtenerEstadoSistemaTexto`, `resumenFuentesWhatsapp`). Previo:
+>   mover a `services/admin/comandos.js`.
+> - **Paso L (stateful)**: handlers con estado conversacional crítico.
+>   Requiere QA dedicada con números reales en staging.
 >
 > **Próximos pasos recomendados:**
 >
-> 1. Activar `AGENT_TURN_CONTROLLER=1 AGENT_TURN_CONTROLLER_HANDLERS=cmd_flete`
->    en producción y validar 24h.
-> 2. Ir agregando handlers a la whitelist uno por uno; con `cmd_flete`,
->    `cmd_resumen`, `cmd_alertas`, `cmd_finanzas`, `cmd_borrar_cuenta`,
->    `cmd_completar_perfil`, `strict_suggestion`, `bot_pausado` y
->    `cupo_excedido` ya validados, **eliminar el código viejo de
->    whatsapp.js** correspondiente (esto es el paso "13" del plan).
-> 3. PR de extracción de funciones locales (preparatorio para F/G/I).
-> 4. Migrar F, G, I detrás de flag.
-> 5. Migrar paso L (stateful) con QA dedicada en staging.
+> 1. Validar `cmd_flete` en producción 24h (flag ya activo).
+> 2. Sumar a whitelist `cmd_resumen, cmd_alertas, cmd_finanzas,
+>    cmd_borrar_cuenta, cmd_completar_perfil, strict_suggestion,
+>    bot_pausado, cupo_excedido, cmd_perfil_directo`.
+> 3. Cuando todos confirmen, **eliminar el código viejo de whatsapp.js**
+>    correspondiente (paso M del plan).
+> 4. Atacar G (cambio_plan): extraer + migrar.
+> 5. Atacar I (admin): extraer + migrar.
+> 6. Migrar paso L (stateful) con QA dedicada en staging.
 
 ## 1. Por qué
 
