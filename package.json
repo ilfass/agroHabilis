@@ -39,6 +39,8 @@
     "test:handler:mini": "node scripts/test-handler-mini-snapshot.js",
     "test:handler:borrar-completar": "node scripts/test-handler-borrar-completar-snapshot.js",
     "test:handler:perfil-directo": "node scripts/test-handler-perfil-directo-snapshot.js",
+    "test:handler:cambio-plan": "node scripts/test-handler-cambio-plan-snapshot.js",
+    "test:handler:admin": "node scripts/test-handler-admin-snapshot.js",
     "test:precios:minimos": "node scripts/tools/test-precios-minimos.js",
     "test:inventario:grano": "node scripts/tools/inventario-prueba-grano.js",
     "test:inventario:wa:ganado-multiple": "node scripts/tools/inventario-prueba-whatsapp-ganado-multiple.js",

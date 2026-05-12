@@ -88,9 +88,9 @@ npm run test:handler:flete
 | `cmd_alertas` | whatsapp.js ~1721/1734/1746/1402 | ✅ migrado (paso D) |
 | `cmd_finanzas` | whatsapp.js ~1759/1778/1795/1806/1817 | ✅ migrado (paso E) |
 | `cmd_perfil_directo` | whatsapp.js ~1393–1556 (8 ramas) | ✅ migrado (paso F) |
-| `cmd_cambio_plan` | whatsapp.js ~1138 | ⏳ pendiente (paso G) |
+| `cmd_cambio_plan` | whatsapp.js ~977/1006/1137/1401 (4 ramas) | ✅ migrado (paso G) |
 | `cmd_borrar_cuenta` | whatsapp.js ~1293/1315 | ✅ migrado (paso H) |
-| `cmd_admin` | whatsapp.js ~1589 | ⏳ pendiente (paso I) |
+| `cmd_admin` | whatsapp.js ~1239 + RESET ONBOARDING | ✅ migrado (paso I) |
 | `cmd_completar_perfil` | whatsapp.js ~1337 | ✅ migrado (paso J — solo rama "iniciar por intent") |
 | `strict_suggestion` | whatsapp.js ~1886 | ✅ migrado (paso K) |
 | `bot_pausado` | whatsapp.js ~1900 | ✅ migrado (paso K) |

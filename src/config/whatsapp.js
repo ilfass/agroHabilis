@@ -55,7 +55,6 @@ const {
   cancelarSuscripcionMpPorWhatsapp,
   solicitarCancelacionSuscripcionMpPorWhatsapp,
 } = require("../services/mercado_pago");
-const { resumenFuentesWhatsapp } = require("../services/fuentes_monitor");
 const { calcularFlete } = require("../services/fletes");
 const { fechaISOArgentina } = require("../utils/fecha_ar");
 const { enriquecerTextoWhatsApp } = require("../utils/whatsapp_enriquecer");
@@ -82,6 +81,14 @@ const {
   upsertPerfilProductivo,
   obtenerTextoPerfilUsuario,
 } = require("../services/perfil_usuario");
+const {
+  resolverCambioPlanConPago,
+  mensajeErrorCambioPlan,
+} = require("../services/cambio_plan");
+const {
+  responderComandoAdmin,
+  resetOnboardingNumero,
+} = require("../services/admin_comandos");
 const { generarConPromptLibre } = require("../services/gemini");
 const COMANDOS = require("./comandos");
 const capturaInteraccion = require("../services/interacciones_captura");
@@ -128,58 +135,6 @@ const normalizarParaComandoRuteo = (texto = "") =>
 
 const formatearFechasTextoArg = (texto = "") =>
   String(texto || "").replace(/\b(20\d{2})-(\d{2})-(\d{2})\b/g, (_m, y, mm, dd) => `${dd}/${mm}/${y}`);
-
-const resolverCambioPlanConPago = async ({ whatsapp, planObjetivo }) => {
-  if (["basico", "pro"].includes(planObjetivo)) {
-    const pago = await crearLinkSuscripcionParaUsuario({
-      whatsapp,
-      planObjetivo,
-    });
-    return [
-      `Perfecto. Para activar *${String(pago.planNombre || planObjetivo).toUpperCase()}* completá la suscripción acá:`,
-      `${pago.initPoint}`,
-      "",
-      "Cuando Mercado Pago confirme el cobro, te activo el plan automáticamente.",
-    ].join("\n");
-  }
-  const cancelReq = await solicitarCancelacionSuscripcionMpPorWhatsapp({ whatsapp });
-  const actualizado = await actualizarPlanPorWhatsapp({ whatsapp, plan: "gratis" });
-  const txtPlan = String(actualizado?.plan || "gratis").toUpperCase();
-  if (cancelReq?.enProceso) {
-    return [
-      `✅ Plan actualizado: *${txtPlan}*.`,
-      "Estamos procesando la desuscripción en Mercado Pago.",
-      "Cuando se confirme, te vamos a avisar por este chat.",
-      "Incluye resumen semanal y consultas limitadas.",
-    ].join("\n");
-  }
-  if (cancelReq?.reason === "sin_suscripcion_activa") {
-    return [
-      `✅ Plan actualizado: *${txtPlan}*.`,
-      "No encontré una suscripción activa en MP para cancelar.",
-      "Si querés, podés verificarlo en Mercado Pago > Suscripciones.",
-      "Incluye resumen semanal y consultas limitadas.",
-    ].join("\n");
-  }
-  return [
-    `✅ Plan actualizado: *${txtPlan}*.`,
-    "No pude iniciar la cancelación automática en MP ahora.",
-    "Podés intentar de nuevo en unos minutos.",
-    "Podés cancelarla manualmente en Mercado Pago > Suscripciones.",
-    "Incluye resumen semanal y consultas limitadas.",
-  ].join("\n");
-};
-
-const mensajeErrorCambioPlan = (error) => {
-  const msg = String(error?.message || "");
-  if (/falta email/i.test(msg)) {
-    return (
-      "Para activar Plan Básico o Pro primero necesito tu email.\n" +
-      "Podés usar: *MI EMAIL tucorreo@dominio.com* o mandar solo *tucorreo@dominio.com*"
-    );
-  }
-  return "No pude gestionar tu cambio de plan ahora 😓. Probá de nuevo en unos minutos.";
-};
 
 const formatearRespuestaAmigable = (texto = "") => {
   let t = String(texto || "").trim();
@@ -469,72 +424,6 @@ const esAdminWhatsapp = (from) => {
   return obtenerAdminsWhatsapp().includes(numero);
 };
 
-const formatearFecha = (valor) => {
-  if (!valor) return "s/d";
-  const d = new Date(valor);
-  if (Number.isNaN(d.getTime())) return String(valor);
-  return d.toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires" });
-};
-
-const estadoProveedorIA = () => {
-  const disponibles = [];
-  if (process.env.OPENROUTER_API_KEY?.trim()) {
-    disponibles.push(`OpenRouter(${process.env.OPENROUTER_MODEL || "openrouter/free"})`);
-  }
-  if (process.env.GROQ_API_KEY?.trim()) {
-    disponibles.push(`Groq(${process.env.GROQ_MODEL || "llama-3.1-8b-instant"})`);
-  }
-  if (process.env.GEMINI_API_KEY?.trim()) {
-    disponibles.push(`Gemini(${process.env.GEMINI_MODEL || "gemini-flash-latest"})`);
-  }
-  if (!disponibles.length) return "sin proveedores configurados";
-  return disponibles.join(" -> ");
-};
-
-const obtenerEstadoSistemaTexto = async () => {
-  const [ultimaRecoleccion, ultimaCotizacion, ultimaConsulta, dbNow, usuarios, planes] =
-    await Promise.all([
-      query("SELECT MAX(creado_en) AS ts FROM precios"),
-      query("SELECT MAX(fecha) AS fecha FROM tipo_cambio"),
-      query("SELECT MAX(creado_en) AS ts FROM historial_consultas"),
-      query("SELECT NOW() AS now"),
-      query(
-        `
-          SELECT
-            COUNT(*)::int AS total,
-            COUNT(*) FILTER (WHERE activo = true)::int AS activos
-          FROM usuarios
-        `
-      ),
-      query(
-        `
-          SELECT plan, COUNT(*)::int AS total
-          FROM usuarios
-          GROUP BY plan
-          ORDER BY total DESC
-        `
-      ),
-    ]);
-
-  const dbOk = Boolean(dbNow.rows[0]?.now);
-  const resumenPlanes = planes.rows.length
-    ? planes.rows.map((p) => `${p.plan || "sin_plan"}:${p.total}`).join(", ")
-    : "sin usuarios";
-
-  return [
-    "📊 *Estado AgroHabilis*",
-    `- WhatsApp: ${obtenerEstadoWhatsapp()}`,
-    `- IA (orden): ${estadoProveedorIA()}`,
-    `- Base de datos: ${dbOk ? "OK" : "ERROR"}`,
-    `- DB time: ${formatearFecha(dbNow.rows[0]?.now)}`,
-    `- Última recolección precios: ${formatearFecha(ultimaRecoleccion.rows[0]?.ts)}`,
-    `- Último tipo de cambio: ${formatearFecha(ultimaCotizacion.rows[0]?.fecha)}`,
-    `- Última consulta recibida: ${formatearFecha(ultimaConsulta.rows[0]?.ts)}`,
-    `- Usuarios registrados: ${usuarios.rows[0]?.total || 0}`,
-    `- Usuarios activos: ${usuarios.rows[0]?.activos || 0}`,
-    `- Planes: ${resumenPlanes}`,
-  ].join("\n");
-};
 
 const obtenerTextoComandosUsuario = () => {
   const lista = Array.isArray(COMANDOS?.whatsappUsuario) ? COMANDOS.whatsappUsuario : [];
@@ -543,135 +432,6 @@ const obtenerTextoComandosUsuario = () => {
     "📚 *Comandos disponibles*",
     ...lista.map((c) => `- *${c.comando}*: ${c.descripcion}`),
   ].join("\n");
-};
-
-const responderComandoAdmin = async (from, comando) => {
-  const cmd = String(comando || "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .trim()
-    .toUpperCase();
-
-  if (!["ESTADO", "ESTADO SISTEMA", "ESTADO IA", "ESTADO DB", "USUARIOS", "FUENTES"].includes(cmd)) {
-    return null;
-  }
-  if (!esAdminWhatsapp(from)) {
-    return "Este comando es solo para administradores.";
-  }
-
-  if (cmd === "ESTADO IA") {
-    return `🧠 IA (orden de fallback): ${estadoProveedorIA()}`;
-  }
-
-  if (cmd === "ESTADO DB") {
-    const db = await query("SELECT NOW() AS now");
-    const ultimaRecoleccion = await query("SELECT MAX(creado_en) AS ts FROM precios");
-    return [
-      "🗄️ Estado DB",
-      `- Conexión: ${db.rows[0]?.now ? "OK" : "ERROR"}`,
-      `- Hora DB: ${formatearFecha(db.rows[0]?.now)}`,
-      `- Última actualización precios: ${formatearFecha(ultimaRecoleccion.rows[0]?.ts)}`,
-    ].join("\n");
-  }
-
-  if (cmd === "USUARIOS") {
-    const usuarios = await query(
-      `
-        SELECT
-          COUNT(*)::int AS total,
-          COUNT(*) FILTER (WHERE activo = true)::int AS activos
-        FROM usuarios
-      `
-    );
-    const ultimos = await query(
-      `
-        SELECT nombre, whatsapp, activo, creado_en
-        FROM usuarios
-        ORDER BY creado_en DESC
-        LIMIT 5
-      `
-    );
-    const lista =
-      ultimos.rows
-        .map(
-          (u) =>
-            `- ${u.nombre || "sin_nombre"} (${u.whatsapp}) ${u.activo ? "activo" : "inactivo"}`
-        )
-        .join("\n") || "- Sin registros";
-    return [
-      "👥 Usuarios",
-      `- Registrados: ${usuarios.rows[0]?.total || 0}`,
-      `- Activos: ${usuarios.rows[0]?.activos || 0}`,
-      "- Últimos 5:",
-      lista,
-    ].join("\n");
-  }
-
-  if (cmd === "FUENTES") {
-    return resumenFuentesWhatsapp();
-  }
-
-  return obtenerEstadoSistemaTexto();
-};
-
-const resetOnboardingNumero = async (numeroInput = "") => {
-  const numero = normalizarNumero(numeroInput);
-  if (!numero) {
-    return { ok: false, error: "Número inválido. Usá: RESET ONBOARDING 549XXXXXXXXXX" };
-  }
-
-  const borradoOnboarding = await query(
-    `
-      DELETE FROM onboarding_estado
-      WHERE
-        regexp_replace(COALESCE(whatsapp, ''), '\\D', '', 'g') = $1
-        OR whatsapp = ($1 || '@lid')
-        OR whatsapp = ($1 || '@c.us')
-    `,
-    [numero]
-  );
-
-  const borradoBotControl = await query(
-    `
-      DELETE FROM whatsapp_bot_control
-      WHERE regexp_replace(COALESCE(whatsapp, ''), '\\D', '', 'g') = $1
-    `,
-    [numero]
-  );
-
-  const limpiadoConsultasNull = await query(
-    `
-      DELETE FROM historial_consultas
-      WHERE usuario_id IS NULL
-        AND regexp_replace(COALESCE(whatsapp, ''), '\\D', '', 'g') = $1
-    `,
-    [numero]
-  );
-
-  const usuariosCoincidentes = await query(
-    `
-      SELECT id
-      FROM usuarios
-      WHERE regexp_replace(COALESCE(whatsapp, ''), '\\D', '', 'g') = $1
-         OR regexp_replace(COALESCE(whatsapp_real, ''), '\\D', '', 'g') = $1
-         OR regexp_replace(COALESCE(whatsapp_jid, ''), '\\D', '', 'g') = $1
-    `,
-    [numero]
-  );
-  let usuariosEliminados = 0;
-  for (const row of usuariosCoincidentes.rows || []) {
-    const eliminado = await eliminarUsuarioSoft(row.id);
-    if (eliminado) usuariosEliminados += 1;
-  }
-
-  return {
-    ok: true,
-    numero,
-    onboarding: borradoOnboarding.rowCount || 0,
-    botControl: borradoBotControl.rowCount || 0,
-    consultasNull: limpiadoConsultasNull.rowCount || 0,
-    usuariosEliminados,
-  };
 };
 
 const initializeWhatsApp = async () => {
@@ -934,6 +694,7 @@ const procesarMensajeEntranteWhatsapp = async (msg) => {
           send: (texto) => client.sendMessage(msg.from, texto),
           emitCaptura: emitCapturaSalida,
           esAdmin: esAdminWhatsapp(msg.from),
+          getEstadoWhatsapp: obtenerEstadoWhatsapp,
           flags: {
             asyncCola: !["0", "false", "off", "no", ""].includes(
               String(process.env.AGENT_CONSULTA_ASYNC ?? "").trim().toLowerCase()
@@ -1473,7 +1234,10 @@ const procesarMensajeEntranteWhatsapp = async (msg) => {
       return;
     }
 
-    const respuestaAdmin = await responderComandoAdmin(msg.from, comandoAlias);
+    const respuestaAdmin = await responderComandoAdmin(msg.from, comandoAlias, {
+      esAdmin: esAdminWhatsapp(msg.from),
+      getEstadoWhatsapp: obtenerEstadoWhatsapp,
+    });
     if (respuestaAdmin) {
       await msg.reply(respuestaAdmin);
       console.log(`[WhatsApp] Comando admin aplicado para ${msg.from}: ${comando}`);
