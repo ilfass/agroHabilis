@@ -31,9 +31,12 @@
     "backup:cron": "bash scripts/backup/backup-cron.sh",
     "validate:ia-context": "node scripts/db/validate-ai-context.js",
     "test:clasificador": "node scripts/test-clasificador.js",
+    "test:clasificador:snapshot": "node scripts/test-clasificador-snapshot.js",
     "test:precios:minimos": "node scripts/tools/test-precios-minimos.js",
     "test:inventario:grano": "node scripts/tools/inventario-prueba-grano.js",
     "test:inventario:wa:ganado-multiple": "node scripts/tools/inventario-prueba-whatsapp-ganado-multiple.js",
+    "test:ollama": "node scripts/tools/test-ollama.js",
+    "agent:cola-once": "node scripts/jobs/agent-cola-drenar-once.js",
     "test": "echo \"Sin tests configurados\" && exit 0"
   },
   "keywords": [],

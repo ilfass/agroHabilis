@@ -12,6 +12,60 @@ const norm = (s = "") =>
 
 const CULTIVOS = /\b(soja|ma[ií]z|trigo|girasol|sorgo|cebada|papa|patata|arroz|cebolla|pastura[s]?|alfa(?:lfa)?)\w*\b/i;
 
+/**
+ * Vocabulario de animales (en singular y plural) reconocido como categoría ganadera.
+ * Se usa para decidir si una palabra numérica («un», «una», «dos»…) está cuantificando ganado
+ * y por lo tanto puede reemplazarse por un dígito antes del resto del parsing.
+ */
+const ANIMAL_TOKEN_RE =
+  /^(vacas?|vaquillonas?|novillos?|novillitos?|terneros?|terneras?|toros?|cabezas?|cabs?|cabras?|chivos?|ovejas?|corderos?|caballos?|yeguas?|cerdos?|chanchos?|lechones?)$/i;
+
+const NUM_PALABRAS_HASTA_VEINTE = {
+  un: 1,
+  uno: 1,
+  una: 1,
+  dos: 2,
+  tres: 3,
+  cuatro: 4,
+  cinco: 5,
+  seis: 6,
+  siete: 7,
+  ocho: 8,
+  nueve: 9,
+  diez: 10,
+  once: 11,
+  doce: 12,
+  trece: 13,
+  catorce: 14,
+  quince: 15,
+  dieciseis: 16,
+  diecisiete: 17,
+  dieciocho: 18,
+  diecinueve: 19,
+  veinte: 20,
+};
+
+/**
+ * Convierte palabras numéricas (`un ternero`, `una cabra`, `dos toros`) a dígitos
+ * cuando la siguiente palabra es claramente un animal, para que el resto del parser
+ * (que asume dígitos) las reconozca como cantidades.
+ *
+ * Usa lookahead para no consumir la segunda palabra y poder encadenar reemplazos
+ * (`un toro y una cabra` → `1 toro y 1 cabra`).
+ */
+function normalizarNumeralesAntesDeGanado(texto = "") {
+  const raw = String(texto || "");
+  if (!raw) return raw;
+  return raw.replace(/\b([a-záéíóúñ]+)(\s+)(?=([a-záéíóúñ]+)\b)/gi, (match, p1, sep, p2) => {
+    const key = norm(p1);
+    const num = NUM_PALABRAS_HASTA_VEINTE[key];
+    if (num != null && ANIMAL_TOKEN_RE.test(p2)) {
+      return `${num}${sep}`;
+    }
+    return match;
+  });
+}
+
 /** Cantidad de hectáreas expresada en dígitos o en palabra (diez, veinte…) antes de ha/hectáreas. */
 function parseSpanishNumberPhrase(frase = "") {
   const BAS = {
@@ -109,7 +163,7 @@ function numeroAntesGanadoDesdeTexto(textoOriginal = "") {
   const s = String(textoOriginal || "").trim();
   if (!s) return null;
   const sufijoGan =
-    "(?:novillos|novillo|vacas|vaca|terneros|ternero|cabezas|cabs?\\.?)";
+    "(?:novillos|novillo|vacas|vaca|vaquillonas|vaquillona|terneros|ternero|terneras|ternera|toros|toro|cabezas|cabs?\\.?|cabras|cabra|chivos|chivo|ovejas|oveja|corderos|cordero|caballos|caballo|yeguas|yegua|cerdos|cerdo|chanchos|chancho|lechones|lechon)";
   const digitBefore = new RegExp(`\\b(\\d+[.,]?\\d*)\\s+${sufijoGan}\\b`, "i");
   const mDig = s.match(digitBefore);
   if (mDig) {
@@ -151,6 +205,7 @@ const detectarConsultaInventario = (texto = "") => {
 };
 
 const detectarAltaInventario = (texto = "") => {
+  if (esPlanillaCatalogoLotesMultiples(texto)) return false;
   const t = norm(texto);
   if (!t || t === "si" || t === "no") return false;
   const hectasPalabraOdigito = numeroAntesHaDesdeTexto(texto) != null;
@@ -191,15 +246,121 @@ const detectarRegistroInsumo = (texto = "") =>
 const parecePedidoInformacion = (texto = "") => {
   const t = norm(texto);
   if (!t) return false;
-  if (/\?/.test(String(texto || ""))) return true;
-  const anclaInventario = /\b(inventario|stock|lote|campo|parcela|establecimiento|saldos?|existencias?)\b/.test(t);
-  if (/\b(cuanto|cuantos|cual|cuales|que|como|cuando|donde)\b/.test(t) && /\b(tengo|hay|esta|estan|quedo|quedaron)\b/.test(t))
+  /** Decisión de mercado / timing de venta: no es consulta de inventario aunque lleve «?». */
+  if (/\b(me\s+)?conviene\s+vender\b|\bvender\s+o\s+esperar\b|\bdebo\s+vender\b/.test(t)) return false;
+  /** Ancla amplia a vocabulario operativo (inventario / hacienda / labores). */
+  const anclaInventario =
+    /\b(inventario|stock|lote|campo|parcela|establecimiento|saldos?|existencias?|animales?|cabezas?|vacas?|terneros?|novillos?|vaquillonas?|toros?|hacienda|insumos?|herbicidas?|fertilizantes?|semillas?|silos?|fardos?|kg|ha|hect[aá]reas?)\b/.test(
+      t
+    );
+  /** "cuánto/cuántos + tengo/hay/está…" SÓLO si hay ancla operativa,
+   *  para no atrapar precios ("cuánto está la soja"). */
+  if (
+    /\b(cuanto|cuantos|cual|cuales|que|como|cuando|donde)\b/.test(t) &&
+    /\b(tengo|hay|esta|estan|quedo|quedaron)\b/.test(t) &&
+    anclaInventario
+  ) {
     return true;
+  }
   if (/\b(mostra|decime|quiero saber|consultar)\b/.test(t) && anclaInventario) return true;
   return false;
 };
 
+/**
+ * Listado tipo remate / planilla: varias líneas "Lote 1.", "Lote 2a.", etc.
+ * No es un comando único de alta en inventario; si lo tratamos como registro,
+ * `extraerNombreLote` toma el primer número y ofrece crear un lote inexistente.
+ */
+function esPlanillaCatalogoLotesMultiples(texto = "") {
+  const raw = String(texto || "");
+  if (!raw.trim()) return false;
+  const reLinea = /^\s*lote\s+\d{1,4}[a-z]?\s*[\.\:\-–—]/gim;
+  const porLinea = raw.match(reLinea);
+  if ((porLinea?.length ?? 0) >= 2) return true;
+  const reGlobal = /\blote\s+\d{1,4}[a-z]?\s*\./gi;
+  const todas = raw.match(reGlobal);
+  return (todas?.length ?? 0) >= 2;
+}
+
+/**
+ * Particiona un texto en bloques por hitos «Lote N» / «Campo N» / «Parcela N».
+ * Devuelve `[{ lote_nombre, fragmento }]` con el texto que pertenece a cada lote.
+ * Solo retorna >=2 ítems cuando hay realmente múltiples menciones distintas; si no, retorna `[]`.
+ *
+ * Caso de uso: `Lote 9 20 vaquillonas y un ternero\nLote 14 4 novillos y un toro`
+ *   → [{ lote_nombre: "9", fragmento: "Lote 9 20 vaquillonas y un ternero" },
+ *      { lote_nombre: "14", fragmento: "Lote 14 4 novillos y un toro" }]
+ */
+function particionarPorLotes(texto = "") {
+  const raw = String(texto || "");
+  if (!raw.trim()) return [];
+  const reHito = /\b(?:lote|campo|parcela)\s+(\d{1,4}[a-z]?)\b/gi;
+  const hits = [];
+  let m;
+  while ((m = reHito.exec(raw)) !== null) {
+    hits.push({ idx: m.index, lote_nombre: String(m[1]).trim() });
+  }
+  if (hits.length < 2) return [];
+  const nombresDistintos = new Set(hits.map((h) => h.lote_nombre.toLowerCase()));
+  if (nombresDistintos.size < 2) return [];
+  const bloques = [];
+  for (let i = 0; i < hits.length; i += 1) {
+    const desde = hits[i].idx;
+    const hasta = i + 1 < hits.length ? hits[i + 1].idx : raw.length;
+    const fragmento = raw.slice(desde, hasta).trim();
+    if (!fragmento) continue;
+    bloques.push({ lote_nombre: hits[i].lote_nombre, fragmento });
+  }
+  return bloques;
+}
+
+/**
+ * Si al particionar por lotes detectamos que **al menos 2** bloques tienen datos cargables
+ * (número de cabezas, hectáreas, etc.), el mensaje es una *carga múltiple* — no una planilla
+ * meramente descriptiva tipo «Lote 1. Sin hacienda».
+ *
+ * Devolvemos:
+ * - `bloques`: SOLO los que tienen cantidad detectable (lo que el flow va a procesar).
+ * - `bloques_sin_carga`: los que se descartan (típicamente «Sin hacienda», líneas en blanco).
+ * - `bloques_originales`: todos, para diagnóstico.
+ */
+function detectarCargaMultiLote(texto = "") {
+  const bloques = particionarPorLotes(texto);
+  if (bloques.length < 2) return null;
+  const conDatos = [];
+  const sinDatos = [];
+  for (const b of bloques) {
+    const cant = extraerCantidadUniversal(b.fragmento);
+    if (cant && Number.isFinite(cant.valor) && cant.valor > 0) {
+      conDatos.push(b);
+    } else {
+      sinDatos.push(b);
+    }
+  }
+  if (conDatos.length < 2) return null;
+  return {
+    tipo: "multi_lote",
+    bloques: conDatos,
+    bloques_sin_carga: sinDatos,
+    bloques_originales: bloques,
+  };
+}
+
 const parseIntentInventario = (texto = "") => {
+  /**
+   * Antes de descartar planillas, chequeamos si en realidad es una carga MÚLTIPLE
+   * (varios lotes con cabezas/hectáreas) y la entregamos particionada al flow.
+   */
+  const multi = detectarCargaMultiLote(texto);
+  if (multi) {
+    return {
+      clase: "multi_lote",
+      bloques: multi.bloques,
+      bloques_sin_carga: multi.bloques_sin_carga || [],
+    };
+  }
+
+  if (esPlanillaCatalogoLotesMultiples(texto)) return null;
   const consulta = detectarConsultaInventario(texto) || parecePedidoInformacion(texto);
   const registro = detectarAltaInventario(texto) || detectarRegistroInsumo(texto);
   if (consulta && registro) return { clase: "ambiguo" };
@@ -322,6 +483,7 @@ function extraerNombreCampanaTxt(texto = "") {
 }
 
 function extraerNombreLote(texto = "") {
+  if (esPlanillaCatalogoLotesMultiples(texto)) return null;
   const s = String(texto || "").replace(/\s+/g, " ").trim();
   const limpiarNombreLote = (raw = "") =>
     String(raw || "")
@@ -348,15 +510,28 @@ function extraerNombreLote(texto = "") {
 }
 
 function extraerCantidadUniversal(texto = "") {
-  const s = String(texto || "").replace(",", ".");
+  /** Normalizamos «un ternero» → «1 ternero» antes de medir cantidades. */
+  const textoNorm = normalizarNumeralesAntesDeGanado(String(texto || ""));
+  const s = textoNorm.replace(",", ".");
   const mCab = s.match(/\b(\d+[.,]?\d*)\s*(?:cabez|cabs?\.?|cabezas)\b/i);
   if (mCab) return { valor: Number(mCab[1].replace(",", ".")), clase: "ganado" };
-  const mNum = s.match(/\b(\d+[.,]?\d*)\s*(?:novillos|vacas|terneros|cabezas|cabs?\.?)?/i);
-  if (/\b(novillo|vacas|terneros|cabezas|cab)\b/i.test(s) && mNum && Number.isFinite(Number(mNum[1].replace(",", ".")))) {
+  /**
+   * El animal ya debe estar pegado al número (sin tokens intermedios), si no «Lote 5 30 vacas»
+   * tomaba el `5` del nombre del lote como cantidad y mezclaba todo. Confirmado por usuario.
+   */
+  const mNum = s.match(
+    /\b(\d+[.,]?\d*)\s+(?:novillos?|vacas?|vaquillonas?|terneros?|toros?|cabezas?|cabs?\.?|cabras?|chivos?|ovejas?|corderos?|caballos?|yeguas?|cerdos?|chanchos?|lechones?)\b/i
+  );
+  if (mNum && Number.isFinite(Number(mNum[1].replace(",", ".")))) {
     return { valor: Number(mNum[1].replace(",", ".")), clase: "ganado_letras" };
   }
-  const nGanPal = numeroAntesGanadoDesdeTexto(texto);
-  if (nGanPal != null && /\b(?:novillo|vacas|vaca|terneros|ternero|cabezas|cab)\b/i.test(s)) {
+  const nGanPal = numeroAntesGanadoDesdeTexto(textoNorm);
+  if (
+    nGanPal != null &&
+    /\b(?:novillo|vacas|vaca|vaquillona|terneros?|toros?|cabezas|cab|cabra|chivo|oveja|cordero|caballo|yegua|cerdo|chancho|lechon)\w*\b/i.test(
+      s
+    )
+  ) {
     return { valor: nGanPal, clase: "ganado_letras" };
   }
   const mTn = s.match(/\b([-+]?\d+[.,]?\d*)\s*(?:tn\b|toneladas?\b)/i);
@@ -418,14 +593,23 @@ function normalizarCategoriaGanadoCategoria(base = "", extra = "") {
   const e = String(extra || "").trim().toLowerCase();
   if (!b && !e) return "";
   if (!e) return b;
+  /** «vaquillonas y», «novillos en», etc. — descarte de conjunciones/preposiciones que
+   *  el regex glob acarrea como tercer token y ensucian la categoría guardada. */
+  if (/^(y|e|o|u|en|del|de|al|con|para|por|los|las|el|la|un|una)$/i.test(e)) return b;
   return `${b} ${e}`.replace(/\s+/g, " ").trim();
 }
 
 function parseRegistroGanadoMultipleHeuristic(textoOriginal = "") {
-  const s = String(textoOriginal || "").replace(/\s+/g, " ").trim();
+  /**
+   * Antes de cualquier regex, normalizamos numerales para no perder cantidades como
+   * «un ternero», «una cabra», «dos toros».
+   */
+  const sNorm = normalizarNumeralesAntesDeGanado(String(textoOriginal || ""));
+  const s = sNorm.replace(/\s+/g, " ").trim();
   if (!s) return null;
-  if (!/\by\b/i.test(s)) return null;
-  if (!/\b(vaca|novillo|ternero|toro|vaquillona|cabeza|cab)\w*\b/i.test(s)) return null;
+  if (!/\by\b/i.test(s) && !/[,;]/.test(s)) return null;
+  if (!/\b(vaca|novillo|ternero|toro|vaquillona|cabeza|cab|cabra|chivo|oveja|cordero|caballo|yegua|cerdo|chancho|lechon)\w*\b/i.test(s))
+    return null;
 
   const re = /(?:^|[\s,;]|y\s+)(\d+[.,]?\d*)\s+([a-záéíóúñ]+)(?:\s+([a-záéíóúñ]+))?/gi;
   let m;
@@ -524,6 +708,7 @@ function detectarMixtoCultivoInsumoSinHa(textoOriginal = "", borradorInsumo = nu
 
 /** No resuelve lote_id aquí (lo hace el capa whatsapp/API con tus lotes reales). */
 function construirBorradorRegistro(textoOriginal = "", intentLiteOverride = null) {
+  if (esPlanillaCatalogoLotesMultiples(textoOriginal)) return null;
   const claseIntent = intentLiteOverride || parseIntentInventario(textoOriginal);
   if (!claseIntent || claseIntent.clase !== "registro") return null;
 
@@ -623,4 +808,8 @@ module.exports = {
   extraerHectareasDesdeTexto,
   extraerNombreLote,
   extraerNombreCampanaTxt,
+  esPlanillaCatalogoLotesMultiples,
+  particionarPorLotes,
+  detectarCargaMultiLote,
+  normalizarNumeralesAntesDeGanado,
 };

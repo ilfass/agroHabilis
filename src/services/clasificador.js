@@ -1,7 +1,45 @@
 "use strict";
 
+/**
+ * # Clasificador de intenciones — rol en la arquitectura de agente
+ *
+ * Este módulo NO es la fuente de verdad de la decisión del turno. Es la **primera
+ * capa** de un pipeline tipo agente (estilo Cursor / OpenAI tool-use):
+ *
+ *   1) Clasificador (acá)
+ *      - Devuelve un *hint* de intención: `precio`, `clima`, `registrar`, etc.
+ *      - Usa heurística primero (rápida, gratis, determinista) y solo recurre
+ *        a IA (Groq → Gemini) cuando la heurística no alcanza.
+ *      - Recibe historial reciente para entender mensajes ambiguos en contexto.
+ *
+ *   2) Refuerzos (en el pipeline)
+ *      - `aplicarRefuerzoRegistroInventario`: si el mensaje habla de inventario,
+ *        el intent se fuerza a `registrar` aunque la IA haya dicho otra cosa.
+ *      - `aplicarRefuerzoSeguimientoHistorial`: si el mensaje es seguimiento
+ *        ("y el resto?") y el último turno fue inventario, se fuerza `registrar`.
+ *
+ *   3) Gates (`agent/gates/*`)
+ *      - Hilo de registro: ¿el productor en realidad quería gasto/registro?
+ *      - Dominio del turno: ¿esto es agro o estamos fuera de foco?
+ *
+ *   4) Scout (`agent/ia/tool_loop_scout`)
+ *      - IA con *tool calls* que va a buscar datos (lotes, saldos, precios)
+ *        antes de decidir la respuesta. Aquí está lo más "agente puro".
+ *
+ *   5) Observe-Act-Verify chain (`agent/plan/oav_chain`)
+ *      - Ejecuta `router` con reintentos verificados. Si la primera respuesta
+ *        no pasa verify, vuelve a intentar con más contexto.
+ *
+ * **Por qué no IA libre:** en un canal WhatsApp con productores, latencia +
+ * costo + determinismo de comandos (`MI RESUMEN`, `PLANES`) y confirmaciones
+ * de inventario (`SI/NO`) requieren *fast-path* heurístico. El LLM trabaja
+ * libre en el scout y el router; el clasificador solo decide a *qué ruta*
+ * mandar el turno.
+ */
+
 const { generarChatGroq } = require("./groq");
 const { generarTextoClasificadorRapido } = require("./gemini");
+const { hayProveedorIa } = require("./agent/ia/json_chain");
 const { esConsultaDolarRapida, tieneTemaOperativoSaludo } = require("./intent_classifier");
 const { esConsultaInsumos } = require("./consultas/precios");
 const { esConsultaHaciendaVenta } = require("./consultas/hacienda");
@@ -17,6 +55,7 @@ const INTENCIONES = new Set([
   "agro_general",
   "no_agro",
   "saludo",
+  "small_talk",
   "comando",
 ]);
 
@@ -31,6 +70,7 @@ const ETIQUETAS_INTENCION_PROMPT = [
   "agro_general",
   "no_agro",
   "saludo",
+  "small_talk",
   "comando",
 ];
 
@@ -62,6 +102,21 @@ const defaultsClasificacion = () => ({
   ayuda_recurso: null,
   meta_consulta: null,
 });
+
+/** Si la IA del clasificador falla y hay proveedores configurados: sin heurística (router + agent_turn dominan). */
+const clasificadorFallbackUsaHeuristica = () => {
+  if (!hayProveedorIa()) return true;
+  const fb = String(process.env.CLASSIFIER_FALLBACK || "")
+    .trim()
+    .toLowerCase();
+  return fb === "heuristica" || fb === "hibrido";
+};
+
+const fallbackClasificacionIaAgotada = () =>
+  normalizarClasificacion({
+    intencion: "agro_general",
+    confianza: "baja",
+  });
 
 /**
  * Preferencia: Groq llama-3.1-8b-instant → Gemini Flash → fallo.
@@ -106,6 +161,10 @@ const llamarIAClasificador = async (promptCompleto) => {
 const aplicarRefuerzoRegistroInventario = (mensaje, clasificacion) => {
   if (!clasificacion || typeof clasificacion !== "object") return clasificacion;
   try {
+    const tn = norm(mensaje);
+    if (/\b(me\s+)?conviene\s+vender\b|\bvender\s+o\s+esperar\b|\bdebo\s+vender\b/.test(tn)) {
+      return clasificacion;
+    }
     const inv = parseIntentInventario(mensaje);
     if (inv?.clase !== "registro" && inv?.clase !== "consulta") return clasificacion;
     if (inv?.clase === "ambiguo") return clasificacion;
@@ -129,6 +188,50 @@ const aplicarRefuerzoRegistroInventario = (mensaje, clasificacion) => {
   } catch (_e) {
     return clasificacion;
   }
+};
+
+/**
+ * Si el mensaje es un *seguimiento corto* ("y el resto?", "y los demás?",
+ * "agregamos también...") y el último turno del bot fue claramente de
+ * inventario (confirmación o pedido de aclaración), forzamos `registrar`
+ * para que el pipeline retome la carga en vez de derivar a precios/clima.
+ *
+ * Esta heurística corre **además del refuerzo IA** y cubre el caso sin
+ * LLM disponible.
+ */
+const aplicarRefuerzoSeguimientoHistorial = (mensaje, clasificacion, historial) => {
+  if (!clasificacion || typeof clasificacion !== "object") return clasificacion;
+  if (!Array.isArray(historial) || !historial.length) return clasificacion;
+  const tn = norm(mensaje);
+  if (!tn || tn.length > 80) return clasificacion;
+
+  const esSeguimiento =
+    /\by\s+(el|los|las)\s+(resto|demas|otros|otras)\b/.test(tn) ||
+    /\b(el|los|las)\s+(resto|demas|otros|otras)\b/.test(tn) ||
+    /^y\s+(?:el\s+)?resto\??$/.test(tn) ||
+    /\b(agregamos|agreguemos|agregale|agrego|sumamos|sumale|tambien\s+(estos|los|las|cargamos|guardamos))\b/.test(tn) ||
+    /\b(seguimos|continuamos|continuar|seguir)\s+(cargando|con\s+los|con\s+las)\b/.test(tn);
+  if (!esSeguimiento) return clasificacion;
+
+  const ultimaRespBot = String(historial[0]?.respuesta || "");
+  const tBot = norm(ultimaRespBot);
+  const ultimoTurnoFueInventario =
+    /guardado\s+en\s+inventario/.test(tBot) ||
+    /confirma\s+el\s+ingreso\s+al\s+inventario/.test(tBot) ||
+    /(no\s+pude\s+interpretar|cantidad\s+y\s+categoria)/.test(tBot) ||
+    /no\s+encontre\s+el\s+lote/.test(tBot) ||
+    /lote\s+\w+\s+creado/.test(tBot);
+
+  if (!ultimoTurnoFueInventario) return clasificacion;
+  if (clasificacion.intencion === "registrar") return clasificacion;
+
+  return {
+    ...clasificacion,
+    intencion: "registrar",
+    confianza: clasificacion.confianza || "media",
+    requiere_datos_propios: false,
+    _refuerzoSeguimientoHistorial: true,
+  };
 };
 
 const clasificarHeuristica = (mensaje = "") => {
@@ -158,6 +261,12 @@ const clasificarHeuristica = (mensaje = "") => {
 
   if (/\b(avisame|av[ií]same|avisar\s+cuando)\b/i.test(t) && /\d/.test(t)) {
     out.intencion = "comando";
+    out.confianza = "media";
+    return out;
+  }
+
+  if (/\b(conviene\s+vender|vender\s+o\s+esperar|debo\s+vender)\b/.test(t)) {
+    out.intencion = "analisis_mercado";
     out.confianza = "media";
     return out;
   }
@@ -209,15 +318,33 @@ const clasificarHeuristica = (mensaje = "") => {
     return out;
   }
 
-  if (/\b(con\s+mis\s+costos|mis\s+costos|me\s+da\s+con\s+mis\s+costos)\b/.test(t)) {
-    out.intencion = "analisis_interno";
-    out.requiere_datos_propios = true;
+  /**
+   * Small talk: charla social sin pedido operativo (estados de ánimo, OK breve,
+   * confirmaciones de aire, risas, agradecimientos enmascarados). No es saludo
+   * propiamente dicho, pero tampoco hay que rechazarlo con el gate de dominio.
+   *
+   * Cuidado: NO debe pisar mensajes con números (suelen ser cargas) ni con tema
+   * agro operativo (precio, lote, etc.).
+   */
+  const mensajeTrim = String(mensaje || "").trim();
+  const smallTalkExacto =
+    /^(?:ok|okey|dale|listo|perfecto|buenisimo|buen[ií]simo|genial|barbaro|excelente|de\s+nada|(?:j[aeiAEI]){2,}|si\s*si|claro|tal\s+cual|seguro|cuando\s+quieras|copiado)\W*$/i;
+  const estadoAnimo =
+    /\b(tengo\s+sue[nñ]o|estoy\s+cansad[oa]|que\s+(pena|bueno|lindo|lastima|mal)|me\s+aburro|estoy\s+aburrid[oa]|me\s+da\s+(risa|pena|bronca)|que\s+onda|todo\s+bien|c[oó]mo\s+andas|c[oó]mo\s+va|que\s+haces|que\s+tal|que\s+frio|que\s+calor)\b/;
+  if (
+    (smallTalkExacto.test(mensajeTrim) || estadoAnimo.test(t)) &&
+    t.length < 60 &&
+    !/\d/.test(t) &&
+    !tieneTemaOperativoSaludo(t)
+  ) {
+    out.intencion = "small_talk";
     out.confianza = "media";
     return out;
   }
 
-  if (/\b(conviene\s+vender|vender\s+o\s+esperar|debo\s+vender)\b/.test(t)) {
-    out.intencion = "analisis_mercado";
+  if (/\b(con\s+mis\s+costos|mis\s+costos|me\s+da\s+con\s+mis\s+costos)\b/.test(t)) {
+    out.intencion = "analisis_interno";
+    out.requiere_datos_propios = true;
     out.confianza = "media";
     return out;
   }
@@ -289,8 +416,25 @@ const normalizarClasificacion = (obj) => {
   };
 };
 
-const clasificarMensaje = async (mensaje, usuario) => {
+const formatearHistorialParaClasificador = (historial = []) => {
+  const filas = Array.isArray(historial) ? historial.slice(0, 5) : [];
+  if (!filas.length) return "";
+  /** Más antiguo arriba, último intercambio abajo (lo más relevante para el seguimiento). */
+  const ordenado = [...filas].reverse();
+  const lineas = ordenado.map((row, i) => {
+    const p = String(row?.pregunta || "").replace(/\s+/g, " ").trim().slice(0, 220);
+    const r = String(row?.respuesta || "").replace(/\s+/g, " ").trim().slice(0, 220);
+    return [`(Turno ${i + 1}) Usuario: ${p}`, `(Turno ${i + 1}) Asistente: ${r}`].join("\n");
+  });
+  return lineas.join("\n\n");
+};
+
+const clasificarMensaje = async (mensaje, usuario, opciones = {}) => {
   const listaEtiquetas = ETIQUETAS_INTENCION_PROMPT.map((e, i) => `${i + 1}. \`${e}\``).join("\n");
+  const historialTxt = formatearHistorialParaClasificador(opciones?.historial || []);
+  const bloqueHistorial = historialTxt
+    ? `\n## Conversación previa en este mismo chat (más antiguo arriba)\n${historialTxt}\n\n### Cómo usar el historial\n- Si el mensaje nuevo es **corto o ambiguo** ("y el resto?", "podés procesar varios a la vez?", "y mañana?"), interpretalo **como seguimiento del mismo tema** del último turno (precio del cultivo X, registro de inventario, alerta, etc.) y elegí esa intención.\n- Si el último turno fue un **pedido de carga al inventario** y el mensaje nuevo dice "varios", "el resto", "los otros", "todos juntos" → casi seguro la intención es \`registrar\`.\n- No cambies el tema salvo que el usuario lo aclare con palabras explícitas de otro dominio.`
+    : "";
   const prompt = `
 ## Tarea
 Leé el **MENSAJE** del productor y decidí **cuál de las intenciones de la lista cerrada** describe mejor lo que quiere hacer **en este mensaje**. Tenés que elegir **exactamente una** etiqueta: copiá el identificador tal cual (mismo texto, sin mayúsculas inventadas ni sinónimos).
@@ -298,7 +442,7 @@ Leé el **MENSAJE** del productor y decidí **cuál de las intenciones de la lis
 ## Contexto del perfil (solo para ayudarte a decidir)
 - Cultivos declarados: ${(usuario?.cultivos || []).map((c) => c.cultivo).join(", ") || "no informados"}
 - Tiene datos propios cargados (gastos/ventas/movimientos): ${usuario?.tiene_datos ? "sí" : "no"}
-
+${bloqueHistorial}
 ## Lista cerrada de intenciones (elegí UNA; el JSON debe llevar esa misma cadena en \`intencion\`)
 ${listaEtiquetas}
 
@@ -314,6 +458,7 @@ Usá esta guía para mapear el mensaje a **una** etiqueta de la lista de arriba.
 - \`agro_general\`: pregunta de **conocimiento agro** (técnica, cultivo, norma, “qué es el FAS”, épocas de siembra en general, etc.) **sin** pedir precio puntual ni análisis de mercado personalizado ni comando del bot.
 - \`no_agro\`: pregunta que **no tiene que ver con el agro** operativo del productor (cultura general, deportes, etc.).
 - \`saludo\`: **saludo, despedida o agradecimiento** sin un pedido concreto de datos o acción en el mismo mensaje (o el pedido es trivialmente social).
+- \`small_talk\`: **charla breve sin pedido operativo** (estados de ánimo: "tengo sueño", "qué frío"; confirmaciones cortas como "dale", "perfecto"; risas, etc.). Diferencia con \`saludo\`: no es saludo/despedida, pero tampoco trae un pedido concreto. Si hay números o tema agro operativo, **no** uses small_talk.
 - \`comando\`: pide ejecutar una **función explícita del bot** (MI RESUMEN, MIS ALERTAS, MI MARGEN, PLANES, VER COMANDOS, “avisame cuando la soja supere X”, etc.).
 
 ### Desempates (muy importante)
@@ -349,9 +494,18 @@ Campos extra:
     return aplicarRefuerzoRegistroInventario(mensaje, c);
   } catch (e) {
     if (process.env.NODE_ENV !== "test") {
-      console.warn("[clasificador] fallback heurístico:", e.message);
+      console.warn(
+        clasificadorFallbackUsaHeuristica()
+          ? "[clasificador] fallback heurístico:"
+          : "[clasificador] IA agotada, fallback agro_general (CLASSIFIER_FALLBACK=heuristica para heurística):",
+        e.message
+      );
     }
-    const c = normalizarClasificacion(clasificarHeuristica(mensaje));
+    if (clasificadorFallbackUsaHeuristica()) {
+      const c = normalizarClasificacion(clasificarHeuristica(mensaje));
+      return aplicarRefuerzoRegistroInventario(mensaje, c);
+    }
+    const c = fallbackClasificacionIaAgotada();
     return aplicarRefuerzoRegistroInventario(mensaje, c);
   }
 };
@@ -363,6 +517,7 @@ module.exports = {
   clasificarHeuristica,
   normalizarClasificacion,
   aplicarRefuerzoRegistroInventario,
+  aplicarRefuerzoSeguimientoHistorial,
   INTENCIONES,
   ETIQUETAS_INTENCION_PROMPT,
 };

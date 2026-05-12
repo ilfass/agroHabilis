@@ -47,6 +47,14 @@ const routear = async ({ clasificacion, mensaje, usuario, numeroWhatsapp }) => {
     case "saludo":
       return rutaSaludo({ usuario, mensaje });
 
+    case "small_talk":
+      /**
+       * Charla breve: re-usamos `rutaSaludo` que ya genera respuesta amigable
+       * y reorienta a temas agro. Evita que el gate de dominio rechace al
+       * usuario con "queda fuera de lo que puedo resolver".
+       */
+      return rutaSaludo({ usuario, mensaje });
+
     case "comando":
       return rutaComando({ clasificacion, mensaje, usuario, numeroWhatsapp });
 

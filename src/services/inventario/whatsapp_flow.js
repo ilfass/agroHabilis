@@ -1,5 +1,39 @@
 "use strict";
 
+/**
+ * # WhatsApp inventory flow — rol en la arquitectura de agente
+ *
+ * Esta capa es la **state-machine mínima** alrededor de operaciones que
+ * **requieren confirmación humana explícita** (`SI` / `NO`). NO es un
+ * sustituto del LLM: convive con él.
+ *
+ * ¿Por qué no dejar al LLM hacerlo todo libremente?
+ *
+ *  - El productor manda «4 novillos en lote 9» a las 23:50 y queda dormido.
+ *    Si lo guardamos sin pedir SÍ, no hay vuelta atrás.
+ *  - Multi-lote: «Lote 2b 60 vaq, Lote 4 100 vaq, Lote 6 106 vacas»
+ *    requiere preguntar lote por lote (no se confirma en bloque ciegamente).
+ *  - Confirmaciones sobreviven entre turnos en `conversacion_estado` para
+ *    que el productor pueda contestar `SI` 5 minutos después sin perder
+ *    el contexto.
+ *
+ * El LLM trabaja en dos lugares dentro de este flow:
+ *
+ *   1) `borradorRegistroDesdeLlm` y `interpretarInventarioAgenteWhatsApp`
+ *      en `nl_llm.js`: interpretan mensajes libres ("puse algunos animales
+ *      en el norte") cuando la heurística no llega.
+ *
+ *   2) `agent/ia/tool_loop_scout` (corre ANTES de esta capa, en el pipeline):
+ *      decide si el mensaje es inventario o no consultando lotes/saldos.
+ *
+ * Esta capa solo:
+ *   a) Detecta intent inventario (registro / consulta / multi-lote / ambiguo).
+ *   b) Crea borrador pendiente que pide confirmación.
+ *   c) Procesa SI/NO y maneja la cola multi-lote.
+ *
+ * Cada rama está documentada en su sitio.
+ */
+
 const {
   obtenerPendiente,
   crearRegistroPendiente,
@@ -21,9 +55,18 @@ const {
 } = require("./nl_heuristica");
 const {
   borradorRegistroDesdeLlm,
+  interpretarInventarioAgenteWhatsApp,
   permiteIntentarLlmTrasFalloHeuristica,
   inventarioLlmHabilitado,
 } = require("./nl_llm");
+const conversacionEstadoService = require("../conversacion_estado");
+
+/**
+ * Cola de bloques pendientes cuando el usuario manda varios «Lote N» en un solo mensaje.
+ * Se persiste en `conversacion_estado` para sobrevivir entre confirmación y confirmación.
+ */
+const FLUJO_COLA_MULTI_LOTE = "inventario_cola_lotes";
+const HORAS_EXPIRACION_COLA_MULTI_LOTE = 2;
 
 const normTxt = (s = "") =>
   String(s || "")
@@ -174,8 +217,47 @@ async function lineasAclaracionRegistroGanado(usuarioId, borrador) {
   return bloques.length ? `\n${bloques.join("\n\n")}\n` : "";
 }
 
+async function leerColaMultiLote(numeroWhatsapp) {
+  if (!numeroWhatsapp) return null;
+  const est = await conversacionEstadoService.obtenerEstado(numeroWhatsapp);
+  if (!est || est.flujo !== FLUJO_COLA_MULTI_LOTE) return null;
+  const ctx = typeof est.contexto === "object" && est.contexto ? est.contexto : {};
+  const restantes = Array.isArray(ctx.restantes) ? ctx.restantes : [];
+  const totalInicial = Number(ctx.total_inicial) || restantes.length + 1;
+  return {
+    restantes,
+    totalInicial,
+    indiceActual: Number(ctx.indice_actual) || 1,
+    etapa: String(est.etapa || ""),
+  };
+}
+
+async function escribirColaMultiLote(numeroWhatsapp, { restantes, totalInicial, indiceActual }) {
+  if (!numeroWhatsapp) return;
+  const tieneRestantes = Array.isArray(restantes) && restantes.length > 0;
+  /**
+   * Si NO quedan restantes pero la planilla tenía 2+ lotes, conservamos el estado
+   * en `esperando_ultimo` para poder mostrar un mensaje de cierre cuando el
+   * productor confirme el último ítem (memoria del remanente).
+   */
+  const etapa = tieneRestantes ? "esperando_confirmacion_actual" : "esperando_ultimo";
+  await conversacionEstadoService.guardarEstado(
+    numeroWhatsapp,
+    FLUJO_COLA_MULTI_LOTE,
+    etapa,
+    { restantes: tieneRestantes ? restantes : [], total_inicial: totalInicial, indice_actual: indiceActual },
+    HORAS_EXPIRACION_COLA_MULTI_LOTE
+  );
+}
+
+async function descartarColaMultiLote(numeroWhatsapp) {
+  if (!numeroWhatsapp) return;
+  await conversacionEstadoService.limpiarEstado(numeroWhatsapp);
+}
+
 /**
- * Inventario WhatsApp — confirmaciones y NL heurístico.
+ * Inventario WhatsApp — confirmaciones; con Gemini: agente unificado (intención + extracción + respuesta guía);
+ * sin API: heurística y extracción estrecha como respaldo.
  * @returns {{ manejado: boolean, respuesta?: string }}
  */
 async function manejarInventarioWhatsapp({ texto = "", usuarioId, numeroWhatsapp, opciones = {} }) {
@@ -313,43 +395,157 @@ async function manejarInventarioWhatsapp({ texto = "", usuarioId, numeroWhatsapp
     if (esAfirmacion(tr)) {
       const ok = await confirmarMovimientoPorId(pendiente.id, usuarioId);
       if (!ok) return { manejado: true, respuesta: "El borrador caducó o ya no existe. Intentá cargar los datos de nuevo." };
-      return {
-        manejado: true,
-        respuesta: `✅ *Listo, guardado en inventario.*\n_${resumenMovimientoParaHumano(
-          ok,
-          await obtenerNombreLote(usuarioId, ok.lote_id),
-          await obtenerNombreCampana(usuarioId, ok.campana_id)
-        )}_`,
-      };
+      const resumenOk = `✅ *Listo, guardado en inventario.*\n_${resumenMovimientoParaHumano(
+        ok,
+        await obtenerNombreLote(usuarioId, ok.lote_id),
+        await obtenerNombreCampana(usuarioId, ok.campana_id)
+      )}_`;
+      const cola = await leerColaMultiLote(numeroWhatsapp);
+      if (cola && cola.etapa === "esperando_ultimo" && cola.restantes.length === 0) {
+        /** Confirmación del **último** lote de la planilla: cerramos con mensaje de cierre. */
+        await descartarColaMultiLote(numeroWhatsapp);
+        const total = cola.totalInicial || 1;
+        return {
+          manejado: true,
+          respuesta: `${resumenOk}\n\n🎉 *Terminé tu planilla.* Cargué *${total} lote(s)* en total.\n_Cuando quieras seguir, mandame los próximos._`,
+        };
+      }
+      if (cola && cola.restantes.length > 0) {
+        const siguiente = cola.restantes[0];
+        const nuevosRestantes = cola.restantes.slice(1);
+        const r = await manejarInventarioWhatsapp({
+          texto: siguiente.fragmento,
+          usuarioId,
+          numeroWhatsapp,
+          opciones: { ...opciones, _saltarMultiLote: true },
+        });
+        const indiceNuevo = (cola.indiceActual || 1) + 1;
+        if (r?.manejado) {
+          await escribirColaMultiLote(numeroWhatsapp, {
+            restantes: nuevosRestantes,
+            totalInicial: cola.totalInicial,
+            indiceActual: indiceNuevo,
+          });
+          const colaTxt = nuevosRestantes.length
+            ? `\n\n_Después seguimos con: ${nuevosRestantes.map((b) => `Lote ${b.lote_nombre}`).join(", ")}._`
+            : "";
+          return {
+            manejado: true,
+            respuesta: [
+              resumenOk,
+              "",
+              `*Lote ${siguiente.lote_nombre}* (${indiceNuevo}/${cola.totalInicial}):`,
+              "━━━━━━━━━━━━━━━━━",
+              r.respuesta || "",
+              colaTxt,
+            ]
+              .filter((x) => x !== undefined && x !== null)
+              .join("\n"),
+          };
+        }
+        await descartarColaMultiLote(numeroWhatsapp);
+        return {
+          manejado: true,
+          respuesta:
+            `${resumenOk}\n\n` +
+            `⚠️ No pude interpretar el siguiente lote (Lote ${siguiente.lote_nombre}). Cancelé la cola; mandalos separados de a uno.`,
+        };
+      }
+      return { manejado: true, respuesta: resumenOk };
     }
     await rechazarMovimientoPorId(pendiente.id, usuarioId);
+    const cola = await leerColaMultiLote(numeroWhatsapp);
+    if (cola && cola.etapa === "esperando_ultimo" && cola.restantes.length === 0) {
+      await descartarColaMultiLote(numeroWhatsapp);
+      const cargadosPrevios = Math.max(0, (cola.totalInicial || 1) - 1);
+      return {
+        manejado: true,
+        respuesta:
+          `Dale, *no guardé el último*. Quedaron cargados los *${cargadosPrevios} lote(s)* anteriores.\n` +
+          "Cuando quieras volver a cargar el que cancelamos, mandámelo.",
+      };
+    }
+    if (cola && cola.restantes.length > 0) {
+      await descartarColaMultiLote(numeroWhatsapp);
+      const lista = cola.restantes.map((b) => `Lote ${b.lote_nombre}`).join(", ");
+      return {
+        manejado: true,
+        respuesta:
+          "Dale, *no guardé nada* y cancelé la cola pendiente.\n" +
+          `_Quedaban sin procesar: ${lista}._\n` +
+          "Cuando quieras volver a cargarlos, mandámelos.",
+      };
+    }
     return { manejado: true, respuesta: "Dale, *no guardé nada*. Escribí de nuevo cuando quieras." };
   }
 
-  let intentLite = parseIntentInventario(texto);
   let intentForced = null;
   if (forzarCapaUsuarioLlm && capaGemini?.capa === "inventario") {
     const modo = capaGemini.inventario_modo === "consulta" ? "consulta" : "registro";
-    intentLite = { clase: modo };
     intentForced = { clase: modo };
   }
+  const consultaInventarioForzada = intentForced?.clase === "consulta";
 
-  /* Sin señal heurística: si INVENTARIO_NL_LLM está activo, que Gemini decida si es registro. */
+  let intentLite = null;
   let borradorPrefetchDesdeLlm = null;
   let intentInventarioInferidoSoloLlm = false;
-  if (!intentLite && inventarioLlmHabilitado()) {
+  let intentoAgenteUnificado = false;
+
+  const llmInventarioDisponible =
+    inventarioLlmHabilitado() || (forzarCapaUsuarioLlm && Boolean(process.env.GEMINI_API_KEY?.trim()));
+
+  let agenteInv = null;
+  if (llmInventarioDisponible && !consultaInventarioForzada) {
+    intentoAgenteUnificado = true;
     const lotesPrefetch = await listarLotesUsuario(usuarioId);
     const campPrefetch = await listarCampanasUsuario(usuarioId);
-    borradorPrefetchDesdeLlm = await borradorRegistroDesdeLlm(texto, {
+    agenteInv = await interpretarInventarioAgenteWhatsApp(texto, {
       lotes: lotesPrefetch,
       campanas: campPrefetch,
-      forzarCapaUsuario: false,
+      forzarCapaUsuario: forzarCapaUsuarioLlm,
+      modoForzado: intentForced?.clase === "registro" ? "registro" : null,
     });
-    if (borradorPrefetchDesdeLlm) {
-      intentLite = { clase: "registro" };
-      intentInventarioInferidoSoloLlm = true;
+
+    if (
+      intentForced?.clase === "registro" &&
+      agenteInv &&
+      (agenteInv.accion === "no_inventario" || agenteInv.accion === "consulta")
+    ) {
+      agenteInv = null;
+    }
+
+    if (agenteInv) {
+      if (agenteInv.accion === "no_inventario") return { manejado: false };
+      if (agenteInv.accion === "conversacion") {
+        return { manejado: true, respuesta: agenteInv.respuesta };
+      }
+      if (agenteInv.accion === "consulta") {
+        const bd = {
+          tipo: "consulta",
+          lote_nombre: agenteInv.consulta_filtro_lote,
+          texto_original: texto,
+        };
+        let cuerpo = await responderConsultaInventario(usuarioId, bd, numeroWhatsapp);
+        if (agenteInv.mensaje_preludio) cuerpo = `${agenteInv.mensaje_preludio}\n\n${cuerpo}`;
+        return { manejado: true, respuesta: cuerpo };
+      }
+      if (agenteInv.accion === "registro") {
+        borradorPrefetchDesdeLlm = agenteInv.borrador;
+        intentLite = { clase: "registro" };
+        intentInventarioInferidoSoloLlm = true;
+      }
     }
   }
+
+  if (intentForced) {
+    intentLite = intentForced;
+    if (consultaInventarioForzada) {
+      borradorPrefetchDesdeLlm = null;
+      intentInventarioInferidoSoloLlm = false;
+    }
+  }
+
+  if (!intentLite) intentLite = parseIntentInventario(texto);
 
   if (!intentLite) return { manejado: false };
   if (intentLite.clase === "ambiguo") {
@@ -360,6 +556,63 @@ async function manejarInventarioWhatsapp({ texto = "", usuarioId, numeroWhatsapp
         "Mandalo separado en dos mensajes:\n" +
         "• consulta: «¿qué hay en inventario del lote La Elisa?»\n" +
         "• registro: «registrá 20 lt de herbicida en lote La Elisa»",
+    };
+  }
+
+  if (intentLite.clase === "multi_lote" && Array.isArray(intentLite.bloques) && intentLite.bloques.length >= 2 && !opciones?._saltarMultiLote) {
+    const bloques = intentLite.bloques;
+    const sinCarga = Array.isArray(intentLite.bloques_sin_carga) ? intentLite.bloques_sin_carga : [];
+    const primero = bloques[0];
+    const restantes = bloques.slice(1).map((b) => ({ lote_nombre: b.lote_nombre, fragmento: b.fragmento }));
+
+    const r = await manejarInventarioWhatsapp({
+      texto: primero.fragmento,
+      usuarioId,
+      numeroWhatsapp,
+      opciones: { ...opciones, _saltarMultiLote: true },
+    });
+
+    if (!r?.manejado) {
+      return {
+        manejado: true,
+        respuesta:
+          `📋 Detecté *${bloques.length} lotes con carga* en tu mensaje pero no pude interpretar el primero (Lote ${primero.lote_nombre}).\n` +
+          "Mandalo en mensajes separados, uno por lote, con cantidad y categoría clara.",
+      };
+    }
+
+    await escribirColaMultiLote(numeroWhatsapp, {
+      restantes,
+      totalInicial: bloques.length,
+      indiceActual: 1,
+    });
+
+    /**
+     * Informamos al productor:
+     * - Cuántos lotes con carga detectamos (los que vamos a procesar).
+     * - Cuántos «sin hacienda» encontramos (los descartamos, no es error).
+     */
+    const lineasSinCarga = sinCarga.length
+      ? [
+          `_También vi ${sinCarga.length} lote(s) sin hacienda (los ignoro): ${sinCarga
+            .slice(0, 6)
+            .map((b) => `Lote ${b.lote_nombre}`)
+            .join(", ")}${sinCarga.length > 6 ? "…" : ""}._`,
+        ]
+      : [];
+
+    const cabecera = [
+      `📋 Detecté *${bloques.length} lotes con carga* en tu mensaje. Los voy a procesar uno por uno.`,
+      ...lineasSinCarga,
+      `*Lote ${primero.lote_nombre}* (1/${bloques.length}):`,
+      "━━━━━━━━━━━━━━━━━",
+    ].join("\n");
+    const colaTxt = restantes.length
+      ? `\n\n_Después seguimos con: ${restantes.map((b) => `Lote ${b.lote_nombre}`).join(", ")}._`
+      : "";
+    return {
+      manejado: true,
+      respuesta: `${cabecera}\n${r.respuesta || ""}${colaTxt}`,
     };
   }
 
@@ -375,6 +628,7 @@ async function manejarInventarioWhatsapp({ texto = "", usuarioId, numeroWhatsapp
     !borrador &&
     intentLite.clase === "registro" &&
     !intentInventarioInferidoSoloLlm &&
+    (!intentoAgenteUnificado || agenteInv == null) &&
     (permiteIntentarLlmTrasFalloHeuristica(texto) || forzarCapaUsuarioLlm || inventarioLlmHabilitado())
   ) {
     const lotes = await listarLotesUsuario(usuarioId);
@@ -534,7 +788,9 @@ async function manejarInventarioWhatsapp({ texto = "", usuarioId, numeroWhatsapp
       !borrador.lote_nombre_fragmento
         ? "⚠️ Sin *lote* en la frase → queda a nivel *establecimiento*. Para asignar un campo cargá antes el *lote* desde Mi Panel (web).\n"
         : "",
-      borrador._via_llm ? "_Interpretado con modelo de lenguaje; revisá antes de confirmar._\n" : "",
+      borrador._via_llm
+        ? "_Interpretado con el asistente (IA); revisá los números antes de confirmar._\n"
+        : "",
       "Respondé *SI* para confirmar o *NO* para cancelar.",
     ]
       .filter((x) => String(x || "").trim() !== "")
