@@ -690,6 +690,21 @@ const procesarMensajeEntranteWhatsapp = async (msg) => {
           },
         };
         const outTC = await turnController.run(turnCtx);
+        /**
+         * Trazabilidad estilo Cursor: imprimimos el `turnTrace` cuando hay
+         * más de un handler evaluado o cuando el resultado no fue
+         * manejado. Esto permite ver en logs qué handlers se evaluaron
+         * en cada turno, en qué ms cada uno, y cuál ganó. Si el array
+         * está vacío (flag OFF o whitelist vacía) no logueamos nada.
+         */
+        if (Array.isArray(outTC?.turnTrace) && outTC.turnTrace.length) {
+          const traceResumen = outTC.turnTrace
+            .map((t) => `${t.id}=${t.ms}ms${t._error ? "[ERR]" : ""}`)
+            .join(" → ");
+          console.log(
+            `[TurnController] from=${msg.from} manejado=${Boolean(outTC?.manejado)} trace: ${traceResumen}${outTC?.route ? ` (route=${outTC.route})` : ""}`
+          );
+        }
         if (outTC?.manejado) {
           if (outTC.route) logRoute(msg.from, outTC.route, outTC.extraLog || {});
           if (outTC.respuesta != null) await msg.reply(outTC.respuesta);

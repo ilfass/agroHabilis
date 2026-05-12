@@ -1,9 +1,9 @@
 # Propuesta: centralizar controlador de turno (P2#10)
 
-> **Estado:** REFACTOR COMPLETO EN CÓDIGO — 15/17 handlers migrados.
-> Falta solo activar gradualmente más handlers en producción y, una
-> vez validados todos, eliminar el código viejo de `whatsapp.js`
-> (paso M).
+> **Estado:** REFACTOR COMPLETO EN CÓDIGO — **17/17 handlers migrados**.
+> El TurnController es ahora la única puerta del turno. Falta solo
+> activar gradualmente los 2 nuevos en producción y, una vez validado,
+> eliminar el código viejo de `whatsapp.js` (paso M).
 >
 > **Progreso:**
 >
@@ -20,8 +20,8 @@
 > | F | `cmd_perfil_directo` (8 ramas) | ✅ | `3e5266d` |
 > | G | `cmd_cambio_plan` (4 ramas) | ✅ | `6386b79` |
 > | I | `cmd_admin` (catálogo + RESET ONBOARDING) | ✅ | `6386b79` |
-> | L | `cmd_bot_control`, `onboarding`, `resumen_interactivo` | ✅ | _este commit_ |
-> | L (no migrables) | `inventario_pendiente` (vive en `agent/pipeline/`) y `pipeline_agente` (es el flujo general — paso M) | ⏳ | — |
+> | L | `cmd_bot_control`, `onboarding`, `resumen_interactivo` | ✅ | `5ff9427` |
+> | L bis | `inventario_pendiente` (gate de SI/NO sobre borrador) + `pipeline_agente` (default final) + `turnTrace` logging estilo Cursor | ✅ | _este commit_ |
 > | M | Cleanup de código viejo de `whatsapp.js` | ⏳ post-validación | — |
 >
 > **Extractos preparatorios completados:**
