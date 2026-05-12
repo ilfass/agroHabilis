@@ -15,6 +15,7 @@ const { registrarHandler } = require("../agent/turn_controller");
 const { handlerCmdFlete } = require("./cmd_flete");
 const { handlerCmdResumen } = require("./cmd_resumen");
 const { handlerCmdAlertas } = require("./cmd_alertas");
+const { handlerCmdFinanzas } = require("./cmd_finanzas");
 
 /**
  * Mapeo id → función. Acá agregamos los pasos siguientes a medida que
@@ -25,7 +26,7 @@ const HANDLERS = {
   cmd_flete: handlerCmdFlete,
   cmd_resumen: handlerCmdResumen,
   cmd_alertas: handlerCmdAlertas,
-  /* TODO paso E */ cmd_finanzas: null,
+  cmd_finanzas: handlerCmdFinanzas,
   /* TODO paso F */ cmd_perfil_directo: null,
   /* TODO paso G */ cmd_cambio_plan: null,
   /* TODO paso H */ cmd_borrar_cuenta: null,

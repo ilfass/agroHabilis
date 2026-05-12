@@ -86,7 +86,7 @@ npm run test:handler:flete
 | `cmd_flete` | whatsapp.js ~1816 | ✅ migrado (paso B) |
 | `cmd_resumen` | whatsapp.js ~1828 | ✅ migrado (paso C) |
 | `cmd_alertas` | whatsapp.js ~1721/1734/1746/1402 | ✅ migrado (paso D) |
-| `cmd_finanzas` | whatsapp.js ~1711 | ⏳ pendiente (paso E) |
+| `cmd_finanzas` | whatsapp.js ~1759/1778/1795/1806/1817 | ✅ migrado (paso E) |
 | `cmd_perfil_directo` | whatsapp.js ~1393 | ⏳ pendiente (paso F) |
 | `cmd_cambio_plan` | whatsapp.js ~1138 | ⏳ pendiente (paso G) |
 | `cmd_borrar_cuenta` | whatsapp.js ~1245 | ⏳ pendiente (paso H) |

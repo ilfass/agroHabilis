@@ -35,6 +35,7 @@
     "test:handler:flete": "node scripts/test-handler-flete-snapshot.js",
     "test:handler:resumen": "node scripts/test-handler-resumen-snapshot.js",
     "test:handler:alertas": "node scripts/test-handler-alertas-snapshot.js",
+    "test:handler:finanzas": "node scripts/test-handler-finanzas-snapshot.js",
     "test:precios:minimos": "node scripts/tools/test-precios-minimos.js",
     "test:inventario:grano": "node scripts/tools/inventario-prueba-grano.js",
     "test:inventario:wa:ganado-multiple": "node scripts/tools/inventario-prueba-whatsapp-ganado-multiple.js",
