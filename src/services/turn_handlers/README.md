@@ -92,9 +92,9 @@ npm run test:handler:flete
 | `cmd_borrar_cuenta` | whatsapp.js ~1245 | ⏳ pendiente (paso H) |
 | `cmd_admin` | whatsapp.js ~1589 | ⏳ pendiente (paso I) |
 | `cmd_completar_perfil` | whatsapp.js ~1657 | ⏳ pendiente (paso J) |
-| `strict_suggestion` | whatsapp.js ~1838 | ⏳ pendiente (paso K) |
-| `bot_pausado` | whatsapp.js ~1852 | ⏳ pendiente (paso K) |
-| `cupo_excedido` | whatsapp.js ~1873 | ⏳ pendiente (paso K) |
+| `strict_suggestion` | whatsapp.js ~1886 | ✅ migrado (paso K) |
+| `bot_pausado` | whatsapp.js ~1900 | ✅ migrado (paso K) |
+| `cupo_excedido` | whatsapp.js ~1921 | ✅ migrado (paso K) |
 | `onboarding` | whatsapp.js ~1070 | ⏳ pendiente (paso L) |
 | `resumen_interactivo` | whatsapp.js ~1100 | ⏳ pendiente (paso L) |
 | `inventario_pendiente` | agent/pipeline ~86 | ⏳ pendiente (paso L) |
