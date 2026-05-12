@@ -101,7 +101,13 @@ const obtenerUltimaInteraccion = async ({ usuarioId, whatsapp }) => {
 };
 
 const obtenerUltimasInteracciones = async ({ usuarioId, whatsapp, limite = 3 }) => {
-  const n = Math.min(Math.max(Number(limite) || 1, 1), 8);
+  /**
+   * Cap subido de 8 → 12 para casos "agente" donde el productor carga
+   * varios lotes seguidos o hace seguimientos largos ("y el resto?",
+   * "podés con varios?"). Los callers piden lo que necesitan; este es
+   * solo el techo de seguridad para no romper performance.
+   */
+  const n = Math.min(Math.max(Number(limite) || 1, 1), 12);
   const h = horasFeedbackBroadcastMasivo();
   const filtro = sqlMasivoAdminRecienteOtroHistorial(2);
   if (usuarioId) {

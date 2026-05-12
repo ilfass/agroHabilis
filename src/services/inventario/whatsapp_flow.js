@@ -133,6 +133,41 @@ function fmtNum(n) {
   return x.toLocaleString("es-AR", { maximumFractionDigits: 2 });
 }
 
+/**
+ * Construye un resumen ultra-corto (~1 línea) del contenido de un
+ * fragmento "Lote X" para usar en la vista previa del multi-lote.
+ *
+ * Estrategia: extraer todas las cantidades "N <categoría>" o
+ * "N <unidad>" del texto y unirlas con " + ". Si hay varias, suma
+ * indica "carga compuesta". Si no se detecta nada, devuelve `null`
+ * y el caller muestra el fragmento como "_carga detectada_".
+ *
+ * Ejemplos:
+ *  "Lote 4. 100 vaquillonas"               → "100 vaquillonas"
+ *  "Lote 7. 46 vacas y 50 vacas Oyhamburu" → "46 vacas + 50 vacas"
+ *  "Lote 2b. Invernada de tres titulares. 60 vaquillonas de Fernández
+ *   64 macho y hembra de Oyhamburu 45 macho y hembra de Agro La Elisa"
+ *                                          → "60 vaquillonas + 64 + 45 (3 grupos)"
+ */
+function resumirFragmentoMultiLote(fragmento = "") {
+  const texto = String(fragmento || "");
+  if (!texto.trim()) return null;
+  /** Match liberal de "<num> <categoría/unidad>" — solo descriptivo. */
+  const re = /(\d+(?:[.,]\d+)?)\s+(novillos?|vacas?|vaquillonas?|terneros?|toros?|cabezas?|cabs?\.?|cabras?|chivos?|ovejas?|corderos?|caballos?|yeguas?|cerdos?|chanchos?|lechones?|machos?|hembras?|hect[áa]reas?|h[aá]s?|kg|tn|toneladas?|lts?\.?|litros?)/gi;
+  const matches = [];
+  let m;
+  while ((m = re.exec(texto)) !== null) {
+    matches.push({ num: m[1], cat: m[2].toLowerCase() });
+  }
+  if (matches.length === 0) return null;
+  if (matches.length === 1) return `${matches[0].num} ${matches[0].cat}`;
+  /** Si hay varios grupos, dejamos el primero completo + abreviado. */
+  const primero = `${matches[0].num} ${matches[0].cat}`;
+  const otros = matches.slice(1, 4).map((x) => x.num).join(" + ");
+  const sufijo = matches.length > 4 ? "…" : "";
+  return `${primero} + ${otros}${sufijo} _(${matches.length} grupos)_`;
+}
+
 function payloadMovimiento(row) {
   return typeof row?.payload === "object" && row.payload ? row.payload : JSON.parse(row?.payload || "{}");
 }
@@ -565,6 +600,26 @@ async function manejarInventarioWhatsapp({ texto = "", usuarioId, numeroWhatsapp
     const primero = bloques[0];
     const restantes = bloques.slice(1).map((b) => ({ lote_nombre: b.lote_nombre, fragmento: b.fragmento }));
 
+    /**
+     * Vista previa estilo Cursor: antes de procesar el primer lote,
+     * mostramos el "plan de carga" completo para que el productor vea
+     * de un vistazo TODO lo que vamos a registrar y qué se ignora. Si
+     * algo no le cuadra, puede cancelar con NO desde el primer
+     * borrador.
+     */
+    const previewProcesar = bloques
+      .map((b, i) => {
+        const resumen = resumirFragmentoMultiLote(b.fragmento);
+        return `  ${i + 1}. *Lote ${b.lote_nombre}* — ${resumen || "_carga detectada_"}`;
+      })
+      .join("\n");
+    const previewIgnorar = sinCarga.length
+      ? sinCarga
+          .slice(0, 12)
+          .map((b) => `Lote ${b.lote_nombre}`)
+          .join(", ") + (sinCarga.length > 12 ? "…" : "")
+      : "";
+
     const r = await manejarInventarioWhatsapp({
       texto: primero.fragmento,
       usuarioId,
@@ -575,9 +630,16 @@ async function manejarInventarioWhatsapp({ texto = "", usuarioId, numeroWhatsapp
     if (!r?.manejado) {
       return {
         manejado: true,
-        respuesta:
-          `📋 Detecté *${bloques.length} lotes con carga* en tu mensaje pero no pude interpretar el primero (Lote ${primero.lote_nombre}).\n` +
-          "Mandalo en mensajes separados, uno por lote, con cantidad y categoría clara.",
+        respuesta: [
+          `📋 *Plan detectado* (${bloques.length} lotes con carga${sinCarga.length ? `, ${sinCarga.length} sin hacienda` : ""}):`,
+          previewProcesar,
+          previewIgnorar ? `\n⏭️ _Ignoro: ${previewIgnorar}._` : "",
+          "",
+          `⚠️ No pude interpretar el primer lote (*Lote ${primero.lote_nombre}*) porque parece tener varias cargas mezcladas.`,
+          "Mandalos separados, uno por lote, con cantidad y categoría clara.",
+        ]
+          .filter(Boolean)
+          .join("\n"),
       };
     }
 
@@ -587,32 +649,21 @@ async function manejarInventarioWhatsapp({ texto = "", usuarioId, numeroWhatsapp
       indiceActual: 1,
     });
 
-    /**
-     * Informamos al productor:
-     * - Cuántos lotes con carga detectamos (los que vamos a procesar).
-     * - Cuántos «sin hacienda» encontramos (los descartamos, no es error).
-     */
-    const lineasSinCarga = sinCarga.length
-      ? [
-          `_También vi ${sinCarga.length} lote(s) sin hacienda (los ignoro): ${sinCarga
-            .slice(0, 6)
-            .map((b) => `Lote ${b.lote_nombre}`)
-            .join(", ")}${sinCarga.length > 6 ? "…" : ""}._`,
-        ]
-      : [];
-
     const cabecera = [
-      `📋 Detecté *${bloques.length} lotes con carga* en tu mensaje. Los voy a procesar uno por uno.`,
-      ...lineasSinCarga,
+      `📋 *Plan de carga* (${bloques.length} lotes con carga${sinCarga.length ? `, ${sinCarga.length} sin hacienda` : ""}):`,
+      previewProcesar,
+      previewIgnorar ? `\n⏭️ _Ignoro: ${previewIgnorar}._` : "",
+      "",
+      "Voy uno por uno. Confirmá con *SI* o cancelá con *NO* cada borrador.",
+      "",
       `*Lote ${primero.lote_nombre}* (1/${bloques.length}):`,
       "━━━━━━━━━━━━━━━━━",
-    ].join("\n");
-    const colaTxt = restantes.length
-      ? `\n\n_Después seguimos con: ${restantes.map((b) => `Lote ${b.lote_nombre}`).join(", ")}._`
-      : "";
+    ]
+      .filter(Boolean)
+      .join("\n");
     return {
       manejado: true,
-      respuesta: `${cabecera}\n${r.respuesta || ""}${colaTxt}`,
+      respuesta: `${cabecera}\n${r.respuesta || ""}`,
     };
   }
 
