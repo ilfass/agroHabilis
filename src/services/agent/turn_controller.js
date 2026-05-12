@@ -187,9 +187,99 @@ function listarHandlers() {
   }));
 }
 
+/**
+ * Lee el flag global del controlador. Aceptamos varias formas para tolerancia
+ * a typos al setearlo en el VPS:
+ *   AGENT_TURN_CONTROLLER=1 | true | on | yes
+ */
+function turnControllerActivo() {
+  const v = String(process.env.AGENT_TURN_CONTROLLER ?? "").trim().toLowerCase();
+  return ["1", "true", "on", "yes"].includes(v);
+}
+
+/**
+ * Whitelist explícita: solo se ejecutan los handlers indicados (coma-separados).
+ * Si está vacía, se ejecutan TODOS los enchufados.
+ *
+ * Ej: `AGENT_TURN_CONTROLLER_HANDLERS=cmd_flete,cmd_resumen`
+ */
+function handlersHabilitados() {
+  const raw = String(process.env.AGENT_TURN_CONTROLLER_HANDLERS || "").trim();
+  if (!raw) return null;
+  return new Set(
+    raw
+      .split(",")
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean)
+  );
+}
+
+/**
+ * Punto de entrada principal del controlador (lo que `whatsapp.js` debería
+ * llamar). Combina:
+ *   1) chequeo de flag global,
+ *   2) whitelist por handler,
+ *   3) ejecución ordenada con `ejecutarTurno`.
+ *
+ * Devuelve `{ manejado: false, ... }` si el flag está apagado o si ningún
+ * handler resolvió el turno. **Cuando devuelve `manejado: false`, el caller
+ * debe seguir con el código viejo (fallback)** — eso garantiza que la
+ * migración sea reversible: con flag OFF, comportamiento idéntico al
+ * actual.
+ *
+ * @param {TurnContext} ctx
+ * @returns {Promise<TurnHandlerResult & { turnTrace: any[], skipMotivo?: string }>}
+ */
+async function run(ctx) {
+  if (!turnControllerActivo()) {
+    return { manejado: false, turnTrace: [], skipMotivo: "flag_off" };
+  }
+  const whitelist = handlersHabilitados();
+  if (whitelist && whitelist.size === 0) {
+    return { manejado: false, turnTrace: [], skipMotivo: "whitelist_vacia" };
+  }
+  /** Filtramos el registro respetando el orden original. */
+  const previo = REGISTRO_HANDLERS.map((h) => h);
+  if (whitelist) {
+    /** Mutación local: clonamos para no tocar el array module-level. */
+    const filtrado = previo.map((h) =>
+      whitelist.has(h.id) ? h : { ...h, fn: null }
+    );
+    return ejecutarTurnoSobre(filtrado, ctx);
+  }
+  return ejecutarTurno(ctx);
+}
+
+/**
+ * Variante de `ejecutarTurno` que opera sobre un array filtrado.
+ * @param {{ id: string, fn: TurnHandler | null }[]} handlers
+ * @param {TurnContext} ctx
+ */
+async function ejecutarTurnoSobre(handlers, ctx) {
+  const trace = [];
+  for (const h of handlers) {
+    if (typeof h.fn !== "function") continue;
+    const t0 = Date.now();
+    let r;
+    try {
+      r = await h.fn(ctx);
+    } catch (e) {
+      r = { manejado: false, _error: String(e?.message || e) };
+    }
+    trace.push({ id: h.id, ms: Date.now() - t0, _error: r?._error });
+    if (r?.manejado && !r?.cederTurno) {
+      return { ...r, turnTrace: trace };
+    }
+  }
+  return { manejado: false, turnTrace: trace };
+}
+
 module.exports = {
   ejecutarTurno,
   registrarHandler,
   listarHandlers,
+  turnControllerActivo,
+  handlersHabilitados,
+  run,
   REGISTRO_HANDLERS,
 };

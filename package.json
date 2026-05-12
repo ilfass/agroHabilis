@@ -32,6 +32,7 @@
     "validate:ia-context": "node scripts/db/validate-ai-context.js",
     "test:clasificador": "node scripts/test-clasificador.js",
     "test:clasificador:snapshot": "node scripts/test-clasificador-snapshot.js",
+    "test:handler:flete": "node scripts/test-handler-flete-snapshot.js",
     "test:precios:minimos": "node scripts/tools/test-precios-minimos.js",
     "test:inventario:grano": "node scripts/tools/inventario-prueba-grano.js",
     "test:inventario:wa:ganado-multiple": "node scripts/tools/inventario-prueba-whatsapp-ganado-multiple.js",

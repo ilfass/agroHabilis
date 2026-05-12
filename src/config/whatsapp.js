@@ -13,6 +13,8 @@ const {
   obtenerEstadoBot,
   procesarConsulta,
 } = require("../services/consultas");
+const { encolarConsultaWhatsapp } = require("../services/agent/queue/tarea_fila");
+const { drenarUnaConsultaWhatsapp } = require("../services/agent/queue/drenar_consulta_whatsapp");
 const {
   gestionarOnboarding,
   gestionarCompletarPerfil,
@@ -71,6 +73,19 @@ const {
 const { generarConPromptLibre } = require("../services/gemini");
 const COMANDOS = require("./comandos");
 const capturaInteraccion = require("../services/interacciones_captura");
+const conversacionEstadoService = require("../services/conversacion_estado");
+const resumenInteractivo = require("../services/resumen_interactivo");
+const { parseComandoBot } = require("../services/consultas/bot_control");
+/**
+ * TurnController (P2#10) — migración gradual del dispatcher.
+ *
+ * El import de `services/turn_handlers` registra los handlers ya migrados
+ * en el `agent/turn_controller`. El flag `AGENT_TURN_CONTROLLER` (OFF por
+ * default) decide si se invoca. Cuando está OFF, todo el código viejo de
+ * abajo corre igual que siempre.
+ */
+require("../services/turn_handlers");
+const turnController = require("../services/agent/turn_controller");
 
 const parsePositiveInt = (raw, fallback) => {
   const n = Number.parseInt(String(raw ?? "").trim(), 10);
@@ -1059,6 +1074,44 @@ const procesarMensajeEntranteWhatsapp = async (msg) => {
       return msgReplyRaw(final, ...args);
     };
 
+    /**
+     * P2#10 — TurnController (gradual). Si `AGENT_TURN_CONTROLLER=1` y hay
+     * algún handler enchufado que matchea, lo resuelve acá; si no, sigue
+     * el flujo viejo de abajo intacto. Con flag OFF (default), retorna
+     * `{ manejado: false }` inmediatamente y no cambia comportamiento.
+     */
+    if (turnController.turnControllerActivo()) {
+      try {
+        const turnCtx = {
+          jid: msg.from,
+          numeroNormalizado: waCapturaNorm,
+          consulta,
+          comandoUpper: comando,
+          comandoAlias,
+          planCtx,
+          replyContexto,
+          reply: (texto, ...args) => msg.reply(texto, ...args),
+          replySinIA,
+          send: (texto) => client.sendMessage(msg.from, texto),
+          emitCaptura: emitCapturaSalida,
+          esAdmin: esAdminWhatsapp(msg.from),
+          flags: {
+            asyncCola: !["0", "false", "off", "no", ""].includes(
+              String(process.env.AGENT_CONSULTA_ASYNC ?? "").trim().toLowerCase()
+            ),
+          },
+        };
+        const outTC = await turnController.run(turnCtx);
+        if (outTC?.manejado && outTC.respuesta != null) {
+          if (outTC.route) logRoute(msg.from, outTC.route, outTC.extraLog || {});
+          await msg.reply(outTC.respuesta);
+          return;
+        }
+      } catch (e) {
+        console.warn("[WhatsApp][TurnController] error, sigo con flujo viejo:", e?.message || e);
+      }
+    }
+
     // Onboarding debe tener prioridad absoluta para evitar caer en IA libre
     // cuando el usuario todavía está completando alta.
     if (!esAdminWhatsapp(msg.from)) {
@@ -1079,6 +1132,51 @@ const procesarMensajeEntranteWhatsapp = async (msg) => {
         }
         console.log(`[WhatsApp] Onboarding en curso para ${msg.from}`);
         return;
+      }
+    }
+
+    const pareceComandoPrioridadResumen =
+      /^(QUIERO\s+PLAN|VER\s+COMANDO|VER\s+COMANDOS|MI\s+PLAN\b|DETENER\s+RESUMEN|BORRAR|ELIMINAR|MIS\s+|MI\s+EMAIL\b|MI\s+RESUMEN\b)/i.test(
+        consulta.trim()
+      ) || /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\s*$/i.test(consulta.trim());
+
+    if (!pareceComandoPrioridadResumen && !esAdminWhatsapp(msg.from)) {
+      const waN =
+        normalizarWhatsapp(numeroReal || msg.from) || normalizarWhatsapp(msg.from);
+      let waClaveEstado = waN;
+      let est = await conversacionEstadoService.obtenerEstado(waClaveEstado);
+      if (est?.flujo !== "resumen_interactivo" && planCtx.usuario?.id) {
+        const porUsuario =
+          await conversacionEstadoService.obtenerEstadoResumenInteractivoPorUsuarioId(
+            planCtx.usuario.id
+          );
+        if (porUsuario) {
+          est = porUsuario;
+          const k = String(porUsuario.whatsapp || "").replace(/\D/g, "");
+          if (k) waClaveEstado = k;
+        }
+      }
+      if (est?.flujo === "resumen_interactivo") {
+        const enviarResumenI = async (texto) => {
+          const out = formatearRespuestaAmigable(String(texto || ""));
+          await client.sendMessage(msg.from, out);
+          capturaInteraccion.registrarFireAndForget({
+            whatsappNorm: waCapturaNorm,
+            usuarioId: planCtx.usuario?.id ?? null,
+            direccion: "out",
+            cuerpo: out,
+            ruta: "resumen_interactivo",
+          });
+        };
+        const manejado = await resumenInteractivo.procesarRespuestaResumen({
+          whatsapp: waClaveEstado,
+          mensaje: consulta,
+          enviar: enviarResumenI,
+        });
+        if (manejado) {
+          logRoute(msg.from, "RESUMEN_INTERACTIVO");
+          return;
+        }
       }
     }
 
@@ -1736,24 +1834,30 @@ const procesarMensajeEntranteWhatsapp = async (msg) => {
         );
         return;
       }
-      const generado = await renderTemplate("mi_resumen", usuario);
-      // Sin segunda capa de IA: preservar plantilla (bloques, PLANTILLA, separadores).
-      await replySinIA(generado.mensaje);
+      const outMi = await resumenInteractivo.iniciarResumen(usuario, {
+        enviar: (texto) => sendMessage(msg.from, texto),
+      });
+      if (outMi?.omitido) {
+        await msg.reply(
+          "Terminá primero lo que te preguntó el bot (registro o *COMPLETAR PERFIL*) y después escribí *MI RESUMEN*."
+        );
+        return;
+      }
       try {
         await guardarConsulta({
           usuarioId: usuario.id,
           whatsapp: normalizarWhatsapp(msg.from),
           pregunta: String(msg.body || "").trim() || "MI RESUMEN",
-          respuesta: String(generado.mensaje || "").trim(),
+          respuesta: "[Resumen interactivo: invitación enviada]",
           tokensUsados: null,
           iaSinContexto: null,
-          iaProvider: "template_mi_resumen",
-          iaProviderTrace: [{ stage: "template", value: "mi_resumen" }],
+          iaProvider: "resumen_interactivo",
+          iaProviderTrace: [{ stage: "flujo", value: "invitacion" }],
         });
       } catch (e) {
         console.warn("[WhatsApp] No se pudo guardar historial MI RESUMEN:", e.message);
       }
-      console.log(`[WhatsApp] Resumen manual enviado a ${msg.from}`);
+      console.log(`[WhatsApp] Resumen interactivo iniciado (MI RESUMEN) para ${msg.from}`);
       return;
     }
 
@@ -1795,9 +1899,22 @@ const procesarMensajeEntranteWhatsapp = async (msg) => {
 
     const botActivo = await obtenerEstadoBot(msg.from);
     if (!botActivo) {
+      const cmdCtrl = parseComandoBot(consulta);
+      if (cmdCtrl) {
+        const rBot = await manejarComandoBot(msg.from, consulta);
+        if (rBot) await replySinIA(rBot);
+        return;
+      }
       console.log(
         `[WhatsApp] Consulta ignorada por bot pausado en chat ${msg.from}`
       );
+      try {
+        await replySinIA(
+          "En este chat el bot está *pausado*. Para que vuelva a responder escribí: *ACTIVAR BOT*"
+        );
+      } catch (e) {
+        console.warn("[WhatsApp] No se pudo avisar bot pausado:", e?.message || e);
+      }
       return;
     }
 
@@ -1816,9 +1933,22 @@ const procesarMensajeEntranteWhatsapp = async (msg) => {
 
     console.log(`[WhatsApp] Consulta recibida de ${msg.from}: ${consulta}`);
     logRoute(msg.from, "CONSULTA_OPERATIVA");
-    const respuesta = await procesarConsulta(msg.from, consulta, {
-      intencionPrecalculada: intencionIA,
-    });
+    const opcionesConsulta = { intencionPrecalculada: intencionIA };
+    const asyncCola = !["0", "false", "off", "no", ""].includes(
+      String(process.env.AGENT_CONSULTA_ASYNC ?? "").trim().toLowerCase()
+    );
+    if (asyncCola) {
+      await encolarConsultaWhatsapp({
+        jid: msg.from,
+        consulta,
+        opciones: opcionesConsulta,
+      });
+      await msg.reply(
+        "Estoy procesando tu consulta; te respondo en unos segundos. Si tarda, escribí de nuevo *HOLA* para ver estado."
+      );
+      return;
+    }
+    const respuesta = await procesarConsulta(msg.from, consulta, opcionesConsulta);
     await msg.reply(
       typeof respuesta === "string" && respuesta.trim()
         ? formatearFechasTextoArg(respuesta)
@@ -1916,6 +2046,7 @@ client.on("ready", () => {
   setTimeout(() => {
     void drenarChatsNoLeidosWhatsapp();
   }, delayMs);
+  iniciarDrenadorColaAgentConsultasSiCorresponde();
 });
 
 client.on("authenticated", () => {
@@ -2010,6 +2141,25 @@ const enviarCambioPlanWhatsapp = async ({ whatsapp, planObjetivo }) => {
 
 /** Ruta absoluta del PNG del QR de vinculación (si WHATSAPP_QR_PNG lo genera). */
 const getRutaQrWhatsappPng = () => resolveWhatsappQrPngPath();
+
+let colaAgentDrainerIniciado = false;
+
+const iniciarDrenadorColaAgentConsultasSiCorresponde = () => {
+  if (colaAgentDrainerIniciado) return;
+  if (["0", "false", "off", "no", ""].includes(String(process.env.AGENT_CONSULTA_ASYNC ?? "").trim().toLowerCase())) {
+    return;
+  }
+  colaAgentDrainerIniciado = true;
+  const ms = Math.max(400, Number.parseInt(String(process.env.AGENT_COLA_POLL_MS || "900"), 10) || 900);
+  setInterval(() => {
+    void drenarUnaConsultaWhatsapp({
+      procesarConsulta,
+      sendMessage,
+      formatearFechasTextoArg,
+    });
+  }, ms);
+  console.log(`[WhatsApp] Cola agent (consulta async): drenador cada ${ms}ms`);
+};
 
 module.exports = {
   client,
