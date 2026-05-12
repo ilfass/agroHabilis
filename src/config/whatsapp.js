@@ -136,19 +136,7 @@ const normalizarParaComandoRuteo = (texto = "") =>
 const formatearFechasTextoArg = (texto = "") =>
   String(texto || "").replace(/\b(20\d{2})-(\d{2})-(\d{2})\b/g, (_m, y, mm, dd) => `${dd}/${mm}/${y}`);
 
-const formatearRespuestaAmigable = (texto = "") => {
-  let t = String(texto || "").trim();
-  if (!t) return t;
-  t = t
-    .replace(/^Rango:/gim, "📊 *Rango:*")
-    .replace(/^Promedio:/gim, "📈 *Promedio:*")
-    .replace(/^Tendencia:/gim, "📉 *Tendencia:*")
-    .replace(/^Recomendación:/gim, "✅ *Recomendación:*")
-    .replace(/^Fecha:/gim, "🗓️ *Fecha:*")
-    .replace(/^Tipo de dato:/gim, "🏷️ *Tipo de dato:*")
-    .replace(/\n{3,}/g, "\n\n");
-  return enriquecerTextoWhatsApp(t.trim());
-};
+const { formatearRespuestaAmigable } = require("../services/whatsapp_textos");
 
 const humanizarSalidaConIA = async ({
   whatsapp,
@@ -702,9 +690,9 @@ const procesarMensajeEntranteWhatsapp = async (msg) => {
           },
         };
         const outTC = await turnController.run(turnCtx);
-        if (outTC?.manejado && outTC.respuesta != null) {
+        if (outTC?.manejado) {
           if (outTC.route) logRoute(msg.from, outTC.route, outTC.extraLog || {});
-          await msg.reply(outTC.respuesta);
+          if (outTC.respuesta != null) await msg.reply(outTC.respuesta);
           return;
         }
       } catch (e) {

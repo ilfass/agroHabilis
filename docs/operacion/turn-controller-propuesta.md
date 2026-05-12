@@ -1,8 +1,9 @@
 # Propuesta: centralizar controlador de turno (P2#10)
 
-> **Estado:** EN EJECUCIÓN — 10/17 handlers migrados, infraestructura
-> completa, deployado en producción. Flag activado con whitelist
-> `cmd_flete` en producción desde 2026-05-12.
+> **Estado:** REFACTOR COMPLETO EN CÓDIGO — 15/17 handlers migrados.
+> Falta solo activar gradualmente más handlers en producción y, una
+> vez validados todos, eliminar el código viejo de `whatsapp.js`
+> (paso M).
 >
 > **Progreso:**
 >
@@ -16,47 +17,54 @@
 > | K | `strict_suggestion` + `bot_pausado` + `cupo_excedido` | ✅ | `6636ea1` |
 > | H | `cmd_borrar_cuenta` | ✅ | `4caf48d` |
 > | J | `cmd_completar_perfil` (parcial) | ✅ | `4caf48d` |
-> | F | `cmd_perfil_directo` (8 ramas) | ✅ | _en curso_ |
-> | G | `cmd_cambio_plan` | ⛔ bloqueado | — |
-> | I | `cmd_admin` | ⛔ bloqueado | — |
-> | L | `onboarding`, `resumen_interactivo`, `inventario_pendiente`, `cmd_bot_control`, `pipeline_agente` | ⏳ stateful | — |
+> | F | `cmd_perfil_directo` (8 ramas) | ✅ | `3e5266d` |
+> | G | `cmd_cambio_plan` (4 ramas) | ✅ | `6386b79` |
+> | I | `cmd_admin` (catálogo + RESET ONBOARDING) | ✅ | `6386b79` |
+> | L | `cmd_bot_control`, `onboarding`, `resumen_interactivo` | ✅ | _este commit_ |
+> | L (no migrables) | `inventario_pendiente` (vive en `agent/pipeline/`) y `pipeline_agente` (es el flujo general — paso M) | ⏳ | — |
+> | M | Cleanup de código viejo de `whatsapp.js` | ⏳ post-validación | — |
 >
-> **Extractos preparatorios completados (paso F):**
+> **Extractos preparatorios completados:**
 >
 > - `src/services/whatsapp_parsers.js` — `parseZonas`, `parseCultivos`,
 >   `parseEmail`, `esLineaSolamenteCorreo`, `parseGanaderiaEstructurada`,
 >   `inferirEspecieGanadera`, `parseCategoriasGanaderas`,
->   `parseProvinciaPartido`, `ESPECIES_GANADERAS`.
+>   `parseProvinciaPartido`, `ESPECIES_GANADERAS` (paso F).
 > - `src/services/perfil_usuario.js` — `guardarPerfilGanaderoUsuario`,
->   `upsertPerfilProductivo`, `obtenerTextoPerfilUsuario`.
-> - `whatsapp.js` ahora importa estos módulos en lugar de definirlos
->   localmente. La carga del módulo sigue verde, sin regresiones.
->
-> **Bloqueos restantes:**
->
-> - **Paso G (`cmd_cambio_plan`)**: `resolverCambioPlanConPago` y
->   `mensajeErrorCambioPlan` son locales en whatsapp.js, además hay 4
->   puntos de entrada (alias QUIERO PLAN, natural, parametrizado, etc.).
->   Previo: extraer a `services/planes/cambio_plan.js`.
-> - **Paso I (`cmd_admin`)**: `responderComandoAdmin` y
->   `resetOnboardingNumero` son locales con deps anidadas
->   (`normalizarNumero`, `formatearFecha`, `estadoProveedorIA`,
->   `obtenerEstadoSistemaTexto`, `resumenFuentesWhatsapp`). Previo:
->   mover a `services/admin/comandos.js`.
-> - **Paso L (stateful)**: handlers con estado conversacional crítico.
->   Requiere QA dedicada con números reales en staging.
+>   `upsertPerfilProductivo`, `obtenerTextoPerfilUsuario` (paso F).
+> - `src/services/cambio_plan.js` — `resolverCambioPlanConPago` +
+>   `mensajeErrorCambioPlan` (paso G).
+> - `src/services/admin_comandos.js` — `responderComandoAdmin`,
+>   `resetOnboardingNumero`, `obtenerEstadoSistemaTexto`,
+>   `estadoProveedorIA`, `formatearFecha` (paso I; inyección de
+>   dependencia para `getEstadoWhatsapp`).
+> - `src/services/whatsapp_textos.js` — `formatearRespuestaAmigable`
+>   (paso L, para evitar ciclo de require entre handlers y whatsapp.js).
 >
 > **Próximos pasos recomendados:**
 >
-> 1. Validar `cmd_flete` en producción 24h (flag ya activo).
-> 2. Sumar a whitelist `cmd_resumen, cmd_alertas, cmd_finanzas,
->    cmd_borrar_cuenta, cmd_completar_perfil, strict_suggestion,
->    bot_pausado, cupo_excedido, cmd_perfil_directo`.
-> 3. Cuando todos confirmen, **eliminar el código viejo de whatsapp.js**
->    correspondiente (paso M del plan).
-> 4. Atacar G (cambio_plan): extraer + migrar.
-> 5. Atacar I (admin): extraer + migrar.
-> 6. Migrar paso L (stateful) con QA dedicada en staging.
+> 1. Sumar handlers a la whitelist en producción uno por uno, validando
+>    24h cada batch. Sugerencia:
+>    - **Batch 1**: `cmd_flete, cmd_resumen, cmd_alertas, cmd_finanzas,
+>      cmd_perfil_directo, cmd_cambio_plan, cmd_borrar_cuenta,
+>      cmd_completar_perfil, cmd_admin`.
+>    - **Batch 2** (stateful): `cmd_bot_control, onboarding,
+>      resumen_interactivo, strict_suggestion, bot_pausado,
+>      cupo_excedido`.
+> 2. Cuando los 15 handlers confirmen estabilidad ≥ 1 semana, ejecutar
+>    paso M: eliminar el `if/else` correspondiente en
+>    `procesarMensajeEntranteWhatsapp` y dejar solo:
+>    ```js
+>    const out = await turnController.run(ctx);
+>    if (out?.manejado) {
+>      if (out.respuesta != null) await msg.reply(out.respuesta);
+>      return;
+>    }
+>    // fallback: pipeline_agente actual (inalterado por ahora)
+>    ```
+> 3. Migrar también `inventario_pendiente` desde
+>    `agent/pipeline/consulta_whatsapp.js` (extracción adicional,
+>    requiere análisis específico de su estado en BD).
 
 ## 1. Por qué
 

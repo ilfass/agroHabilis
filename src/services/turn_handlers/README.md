@@ -91,6 +91,11 @@ npm run test:handler:flete
 | `cmd_cambio_plan` | whatsapp.js ~977/1006/1137/1401 (4 ramas) | ✅ migrado (paso G) |
 | `cmd_borrar_cuenta` | whatsapp.js ~1293/1315 | ✅ migrado (paso H) |
 | `cmd_admin` | whatsapp.js ~1239 + RESET ONBOARDING | ✅ migrado (paso I) |
+| `cmd_bot_control` | whatsapp.js ~1316 (`manejarComandoBot`) | ✅ migrado (paso L.1) |
+| `onboarding` | whatsapp.js ~716 (`gestionarOnboarding`) | ✅ migrado (paso L.2) |
+| `resumen_interactivo` | whatsapp.js ~743 (estado conversación) | ✅ migrado (paso L.3) |
+| `inventario_pendiente` | `agent/pipeline/consulta_whatsapp.js` | ⏳ vive en pipeline_agente |
+| `pipeline_agente` | flujo general de `procesarConsulta` | ⏳ queda en whatsapp.js (paso M futuro) |
 | `cmd_completar_perfil` | whatsapp.js ~1337 | ✅ migrado (paso J — solo rama "iniciar por intent") |
 | `strict_suggestion` | whatsapp.js ~1886 | ✅ migrado (paso K) |
 | `bot_pausado` | whatsapp.js ~1900 | ✅ migrado (paso K) |

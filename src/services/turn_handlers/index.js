@@ -24,6 +24,9 @@ const { handlerCmdCompletarPerfil } = require("./cmd_completar_perfil");
 const { handlerCmdPerfilDirecto } = require("./cmd_perfil_directo");
 const { handlerCmdCambioPlan } = require("./cmd_cambio_plan");
 const { handlerCmdAdmin } = require("./cmd_admin");
+const { handlerCmdBotControl } = require("./cmd_bot_control");
+const { handlerOnboarding } = require("./onboarding");
+const { handlerResumenInteractivo } = require("./resumen_interactivo");
 
 /**
  * Mapeo id → función. Acá agregamos los pasos siguientes a medida que
@@ -43,11 +46,11 @@ const HANDLERS = {
   strict_suggestion: handlerStrictSuggestion,
   bot_pausado: handlerBotPausado,
   cupo_excedido: handlerCupoExcedido,
-  /* TODO paso L */ onboarding: null,
-  /* TODO paso L */ resumen_interactivo: null,
-  /* TODO paso L */ inventario_pendiente: null,
-  /* TODO paso L */ cmd_bot_control: null,
-  /* TODO paso L */ pipeline_agente: null,
+  onboarding: handlerOnboarding,
+  resumen_interactivo: handlerResumenInteractivo,
+  cmd_bot_control: handlerCmdBotControl,
+  /* No migrable acá: vive en agent/pipeline/consulta_whatsapp.js */ inventario_pendiente: null,
+  /* No migrable acá: es el flujo general, queda en whatsapp.js hasta paso M */ pipeline_agente: null,
 };
 
 for (const [id, fn] of Object.entries(HANDLERS)) {
