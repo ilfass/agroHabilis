@@ -95,8 +95,24 @@ const rutaPrecio = async ({ clasificacion, mensaje, usuario }) => {
     });
   }
 
+  /**
+   * Mención de categoría de hacienda sin verbo de decisión (ej. respuesta
+   * corta "El novillo" tras un catch-all de "mercado"). Si la regex de
+   * `esConsultaHaciendaVenta` ya pesca, perfecto. Si no, igual queremos
+   * router a hacienda en vez de defaultear silenciosamente a soja.
+   */
+  const mensajeNormHac = String(mensaje || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+  const mencionaHaciendaAislada = /\b(novill|vaca|vaquillona|terner|invernada|cria|cría|hacienda|ganad|toro|cebu)/.test(
+    mensajeNormHac
+  );
+
   const esHacienda =
-    /hacienda/i.test(String(clasificacion?.producto || "")) || H.esConsultaHaciendaVenta(mensaje);
+    /hacienda/i.test(String(clasificacion?.producto || "")) ||
+    H.esConsultaHaciendaVenta(mensaje) ||
+    (mencionaHaciendaAislada && !cultivo);
   if (esHacienda) {
     const base = await H.responderHaciendaSimple(mensaje, nivelPrecio);
     const salida =
@@ -110,7 +126,18 @@ const rutaPrecio = async ({ clasificacion, mensaje, usuario }) => {
     });
   }
 
-  if (!cultivo) cultivo = "soja";
+  /**
+   * Antes había `if (!cultivo) cultivo = "soja";` — eso producía respuestas
+   * con dump de soja cuando el productor preguntaba "mercado" → "el novillo".
+   * Un agente repregunta concretamente en vez de inventar el cultivo.
+   */
+  if (!cultivo) {
+    return [
+      "¿De qué grano querés el precio?",
+      "Ej: *soja*, *maíz*, *trigo*, *girasol*, *cebada*, *sorgo*.",
+      "Si querés hacienda, decime *novillo*, *vaca*, *vaquillona*, *ternero*, *invernada*.",
+    ].join("\n");
+  }
 
   const ok = await precioRecienteSuficiente(cultivo);
   if (!ok && typeof recolectarPreciosCACFresco === "function") {

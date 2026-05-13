@@ -49,9 +49,16 @@ const normMinDefault = (texto = "") =>
 const esConsultaHaciendaVenta = (texto = "", { normMinFn } = {}) => {
   const norm = typeof normMinFn === "function" ? normMinFn : normMinDefault;
   const t = norm(texto);
-  const mencionaHacienda = /(hacienda|ganad|terner|invernada|novill|vaca|vaquillona|cria|cría)/.test(t);
+  const mencionaHacienda = /(hacienda|ganad|terner|invernada|novill|vaca|vaquillona|cria|cría|toro|cebu)/.test(t);
+  /**
+   * Verbos / sustantivos que demarcan "consulta de mercado de hacienda".
+   * Incluye `mercado`, `cotizacion`, `valor`, `pizarra`, `cotiza`, `mejorar`,
+   * `mejor` para casos como "El novillo" en seguimiento de "mercado" o
+   * "novillo cotiza?". Antes pedíamos un verbo de decisión obligatorio,
+   * lo que dejaba colar consultas claras a `precio` con default soja.
+   */
   const pideDecision =
-    /(conviene|vender|esperar|firme|flojo|precio|cuanto|cuánto|subio|subió|bajo|bajó|planchad|tendencia|vienen)/.test(
+    /(conviene|vender|esperar|firme|flojo|precio|cuanto|cuánto|subio|subió|bajo|bajó|planchad|tendencia|vienen|mercado|cotizacion|cotización|cotiza|pizarra|valor|valores|vale)/.test(
       t
     );
   return mencionaHacienda && pideDecision;
