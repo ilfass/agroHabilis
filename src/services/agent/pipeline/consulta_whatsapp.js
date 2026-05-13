@@ -108,6 +108,38 @@ const detectarPreguntaAmbiguaCatchAll = (textoPregunta = "", clasificacion = nul
   return null;
 };
 
+/**
+ * Detector "el usuario me está corrigiendo": pesca frases donde el
+ * productor avisa que la respuesta anterior no fue lo que pidió.
+ * Cuando dispara, devolvemos repregunta humilde en vez de hacer otro
+ * dump como si nada (sesión 2026-05-13: el bot, ante "pero te estoy
+ * preguntando otra cosa", soltó dump de trigo + maíz + flete).
+ *
+ * Devuelve `string` (mensaje de aclaración) o `null` si no aplica.
+ */
+const detectarCorreccionUsuario = (textoPregunta = "") => {
+  const t = String(textoPregunta || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+  if (!t || t.length > 220) return null;
+  const patrones = [
+    /\bte\s+(estoy\s+)?pregunt(o|aba|ando|e|é)\s+otra\s+cosa\b/,
+    /\bno\s+es\s+(lo|eso)\s+que\s+(te\s+)?pregunt/,
+    /\bno\s+(me\s+)?entendiste\b/,
+    /\bno\s+era\s+(eso|lo\s+que)\b/,
+    /\bno\s+te\s+estoy\s+pregunt/,
+    /\bese\s+no\s+es\s+(el|lo)\b/,
+    /\btiene\s+que\s+ser\s+otro\b/,
+  ];
+  if (!patrones.some((re) => re.test(t))) return null;
+  return [
+    "Tenés razón, me perdí 🤔. ¿Podés reformular en una línea qué necesitás concretamente?",
+    "Si querés podemos retomar lo último (precio, clima, registrar, consultar tus datos, mercado/análisis) — decime cuál y lo respondo derecho.",
+  ].join("\n");
+};
+
 const obtenerYCompletarPerfil = async (numeroWhatsapp) => {
   const inicial = await obtenerPerfil(numeroWhatsapp);
   const usuario = await completarGeolocalizacionSiFalta(inicial);
@@ -284,6 +316,38 @@ const procesarConsulta = async (numeroWhatsapp, pregunta, opciones = {}) => {
       ...clasificacion,
       ...hiloReg.clasificacionPatch,
     });
+  }
+
+  /**
+   * Anti-dump: si el productor está corrigiendo al bot ("te estoy
+   * preguntando otra cosa", "no entendiste", "tiene que ser otro"),
+   * devolvemos repregunta humilde y PARAMOS antes de routear nada.
+   * Sesión 2026-05-13: el bot, ante "te estoy preguntando otra cosa",
+   * soltó dump de trigo+maíz+flete. Inaceptable para agente.
+   */
+  if (!fusionPorAclaracionClasificador) {
+    const correccion = detectarCorreccionUsuario(textoPregunta);
+    if (correccion) {
+      try {
+        await guardarEstado(waNorm, "agent_clasif_baja", "pendiente", { mensaje_original: textoPregunta }, 1);
+      } catch (_e) {
+        /* sin estado en BD: seguimos sin merge persistente */
+      }
+      logConsultaRoute(numeroWhatsapp, "correccion_usuario", {
+        cultivo: clasificacion.cultivo,
+        confianza: clasificacion.confianza,
+        msClasificador: Date.now() - t0,
+      });
+      await guardarConsulta({
+        usuarioId: usuario?.id || null,
+        whatsapp: waNorm,
+        pregunta: textoPregunta,
+        respuesta: correccion,
+        tokensUsados: null,
+        iaProvider: "correccion_usuario",
+      });
+      return correccion;
+    }
   }
 
   /**
@@ -490,5 +554,6 @@ module.exports = {
   obtenerYCompletarPerfil,
   procesarConsulta,
   detectarPreguntaAmbiguaCatchAll,
+  detectarCorreccionUsuario,
   debeSolicitarAclaracionIntencion,
 };

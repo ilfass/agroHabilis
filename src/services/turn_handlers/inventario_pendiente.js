@@ -29,6 +29,68 @@ const { obtenerPendiente } = require("../inventario/core");
 const { manejarInventarioWhatsapp } = require("../inventario/whatsapp_flow");
 
 /**
+ * Si el texto del usuario es claramente de OTRO dominio (precio/clima/etc.),
+ * preferimos ceder el turno al pipeline general en vez de bombardear con
+ * recordatorios del borrador pendiente. Si NO matchea otro dominio, el
+ * mensaje probablemente es atributo del registro en curso ("dos están
+ * enfermas", "una preñada", "el toro grande") o aclaración ambigua, y
+ * devolvemos recordatorio en vez de dejar que el LLM responda "personas
+ * enfermas" (sesión 2026-05-13).
+ */
+const esConsultaOtroDominioExplicita = (texto = "") => {
+  const t = String(texto || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+  if (!t) return false;
+  if (
+    /\b(precio|cotizacion|valor|pizarra|mercado|d[oó]lar|dolar|euro|insumo|fertilizante|herbicida|semilla|flete)\b/.test(t)
+  ) {
+    return true;
+  }
+  if (/\b(clima|llueve|llover|llovi[oó]|temperatura|pron[oó]stico|helada|granizo|viento)\b/.test(t)) {
+    return true;
+  }
+  if (/\b(mi\s+resumen|mis\s+alertas|mi\s+margen|mis\s+ventas|mis\s+gastos|ver\s+comandos|planes)\b/.test(t)) {
+    return true;
+  }
+  /** Meta sobre la app (no inventario). */
+  if (/\b(sos\s+(un\s+)?(agente|bot)|qu[eé]\s+(es|hace|sos))\b/.test(t)) return true;
+  return false;
+};
+
+/** Mensajes claramente "cancelo/dejame primero hacer otra cosa". */
+const esPedidoCancelarPendiente = (texto = "") => {
+  const t = String(texto || "").toLowerCase().trim();
+  return /\b(cancelar|cancela|cancelemos|olvidalo|olvidate|dejalo|dejemos|no\s+lo\s+guardes|no\s+importa)\b/.test(t);
+};
+
+const construirRecordatorioPendiente = (pend) => {
+  const pp = (() => {
+    try {
+      return typeof pend?.payload === "string" ? JSON.parse(pend.payload) : pend?.payload || {};
+    } catch (_e) {
+      return {};
+    }
+  })();
+  const desc = (() => {
+    if (pp?.cabezas) return `${pp.cabezas} cab${pp?.categoria ? ` de ${pp.categoria}` : ""}`;
+    if (pp?.hectareas) return `${pp.hectareas} ha${pp?.cultivo ? ` de ${pp.cultivo}` : ""}`;
+    if (pp?.cantidad && pp?.unidad) return `${pp.cantidad} ${pp.unidad}${pp?.item ? ` de ${pp.item}` : ""}`;
+    return "registro";
+  })();
+  const lote = pend?.lote_nombre ? `📍 Lote: *${pend.lote_nombre}*` : "establecimiento";
+  return [
+    "Antes de seguir, tengo este borrador esperando confirmación:",
+    `${lote} | 🐾 ${desc}`,
+    "",
+    "Decime *SI* para guardarlo o *NO* para descartarlo.",
+    "Si querés agregar info (ej. «dos están enfermas» como nota), primero confirmá y después la anotamos en el lote.",
+  ].join("\n");
+};
+
+/**
  * @param {import("../agent/turn_controller").TurnContext} ctx
  */
 async function handlerInventarioPendiente(ctx) {
@@ -38,12 +100,40 @@ async function handlerInventarioPendiente(ctx) {
   const pend = await obtenerPendiente(usuarioId);
   if (!pend) return { manejado: false };
 
+  const consultaRaw = String(ctx.consulta || "");
+
+  /** Cancelación explícita: dejamos que el flow legacy procese SI/NO/cancelar. */
+  if (!esPedidoCancelarPendiente(consultaRaw) && esConsultaOtroDominioExplicita(consultaRaw)) {
+    /**
+     * Otro dominio (precio/clima/etc.): cedemos el turno al pipeline
+     * general. El recordatorio podría ser molesto si el productor
+     * cambió de tema; mejor dejarlo resolver y que el borrador siga
+     * vivo (expira por TTL).
+     */
+    return { manejado: false };
+  }
+
   const inv = await manejarInventarioWhatsapp({
-    texto: String(ctx.consulta || ""),
+    texto: consultaRaw,
     usuarioId,
     numeroWhatsapp: normalizarWhatsapp(ctx.jid),
   });
-  if (!inv?.manejado || inv.respuesta == null) return { manejado: false };
+
+  let respuesta = null;
+  let routeFinal = "registrar_inventario_pendiente";
+  if (inv?.manejado && inv.respuesta != null) {
+    respuesta = inv.respuesta;
+  } else {
+    /**
+     * Hay borrador pendiente pero el mensaje no es SI/NO ni encaja en
+     * ningún branch del flow. En vez de dejar que el pipeline general
+     * lo interprete (caso 2026-05-13: "Dos estaban enfermas" terminó
+     * en "personas enfermas"), devolvemos recordatorio explícito del
+     * borrador y le ofrecemos al productor un camino claro.
+     */
+    respuesta = construirRecordatorioPendiente(pend);
+    routeFinal = "inventario_pendiente_recordatorio";
+  }
 
   /**
    * Persistencia del turno en `historial_consultas`, exactamente como
@@ -55,8 +145,8 @@ async function handlerInventarioPendiente(ctx) {
     await guardarConsulta({
       usuarioId,
       whatsapp: normalizarWhatsapp(ctx.jid),
-      pregunta: String(ctx.consulta || ""),
-      respuesta: inv.respuesta,
+      pregunta: consultaRaw,
+      respuesta,
       tokensUsados: null,
     });
   } catch (e) {
@@ -65,8 +155,8 @@ async function handlerInventarioPendiente(ctx) {
 
   return {
     manejado: true,
-    respuesta: inv.respuesta,
-    route: "registrar_inventario_pendiente",
+    respuesta,
+    route: routeFinal,
     extraLog: { cultivo: null, confianza: "alta", msClasificador: 0 },
   };
 }

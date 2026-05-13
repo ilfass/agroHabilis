@@ -48,6 +48,25 @@ const CASOS_META_TRUE = [
   "es un bot esto?",
   "Y con respecto al registro?",
   "Y respecto al inventario?",
+  /** Preguntas sobre capacidades de la app (sesión 2026-05-13). */
+  "Puedo registrar novillos en mi lote?",
+  "puedo registrar novillos en mi lote? Y después puedo identificar cada novillo del lote?",
+  "Puedo identificar cada cabeza de ganado?",
+  "Puedo individualizar las vacas?",
+  "Se puede registrar varios animales a la vez?",
+  "Se puede identificar cada cabeza?",
+  "Podemos hacer eso en la app?",
+  "Podés identificar cada novillo?",
+  "Quiero saber si de las N cabezas puedo individualizar cada una",
+  "Sirve para llevar inventario individual?",
+  /** Meta-correctivos (sesión 2026-05-13). */
+  "Pero te estoy preguntando otra cosa",
+  "te estoy preguntando otra cosa",
+  "no me entendiste",
+  "no es lo que te pregunté",
+  "no era eso lo que te pregunté",
+  "tiene que ser otro",
+  "ese no es el índice de novillo",
 ];
 
 const CASOS_META_FALSE = [

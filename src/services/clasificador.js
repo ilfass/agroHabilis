@@ -438,16 +438,18 @@ const normalizarClasificacion = (obj) => {
 const esPreguntaMetaConversacional = (texto = "") => {
   const original = String(texto || "").trim();
   if (!original) return false;
-  /** Mensajes con número (suelen ser cargas) no son meta-charla. */
-  if (/\d/.test(original)) return false;
+  /**
+   * Mensajes con número se permiten SOLO si son claramente meta
+   * ("la cabeza 5", "puedo identificar el lote 3"). Si no matchea
+   * un patrón meta, sale como antes (no-meta) más abajo.
+   */
   const t = norm(original);
   /** Si menciona explícitamente un comando del catálogo, NO es meta-charla. */
   const disparadoresComandoExplicito = /\b(mi\s+resumen|mis\s+alertas|mi\s+margen|mis\s+gastos|mis\s+ventas|ver\s+comandos|completar\s+perfil|mi\s+plan|planes|quiero\s+plan\s+(pro|basico|gratis)|alerta|avisa(me|r)|cancelar\s+alerta|reset\s+onboarding|mi\s+ganado|mi\s+zona|mis\s+cultivos|borrar\s+mis\s+datos)\b/;
   if (disparadoresComandoExplicito.test(t)) return false;
   /**
-   * Patrones meta: preguntas sobre el bot, comentarios al bot, frases
-   * conversacionales sin pedido operativo concreto. Mantenemos la lista
-   * acotada y explícita para no pisar pedidos reales.
+   * Patrones meta: preguntas sobre el bot, sobre la app, comentarios al
+   * bot, frases conversacionales sin pedido operativo concreto.
    */
   const patronesMeta = [
     /\bsos\s+(un\s+)?(agente|bot|chat\s*bot|asistente|ia|inteligencia\s+artificial|robot|humano|persona)\b/,
@@ -470,7 +472,39 @@ const esPreguntaMetaConversacional = (texto = "") => {
     /^y\s+(con\s+)?respecto\s+(a|al|del|de|a\s+(la|los|las))\b/,
     /^y\s+(sobre|acerca\s+de|en\s+cuanto\s+a)\b/,
     /^y\s+(el|la|los|las)\s+\w{3,}\s*\??$/,
+    /**
+     * Preguntas sobre CAPACIDADES de la app:
+     *   "¿puedo registrar X?"
+     *   "¿puedo individualizar / identificar cada vaca?"
+     *   "¿podemos hacer X?"  "¿se puede X?"
+     *   "¿después puedo identificar cada novillo?"
+     * (sesión 2026-05-13: el bot interpretó como consulta de datos
+     *  y respondió "sin datos en base" — error grave).
+     */
+    /^(\(?\)?\s*)?(despu[eé]s\s+)?\bpuedo\s+(registrar|guardar|identificar|individualizar|marcar|asociar|vincular|listar|consultar|ver|cargar|anotar|trackear|seguir|separar|distinguir|filtrar|borrar|editar|modificar|exportar|descargar|imprimir|imprimir|compartir|llevar|controlar)\b/,
+    /\b(pod[eé]mos|podemos)\s+(registrar|guardar|identificar|individualizar|marcar|consultar|cargar|llevar|hacer)\b/,
+    /\b(se\s+puede|se\s+pueden|se\s+podr[ií]a|es\s+posible)\s+(registrar|guardar|identificar|individualizar|marcar|consultar|cargar|llevar|hacer|asociar|vincular|distinguir|filtrar)\b/,
+    /\bpod[eé]s\s+(identificar|individualizar|distinguir|separar|listar|trackear)\b/,
+    /\bsirve\s+para\s+(registrar|llevar|hacer|controlar)\b/,
+    /**
+     * "te estoy preguntando otra cosa" / "no es lo que te pregunté" /
+     * "no entendiste" / "ese no es" — meta-correctivos. Pedidos
+     * explícitos de que el bot vuelva a leer el mensaje previo en vez
+     * de seguir con un dump.
+     */
+    /\bte\s+(estoy\s+)?pregunt(o|aba|ando|e|é)\s+otra\s+cosa\b/,
+    /\bno\s+es\s+(lo|eso)\s+que\s+(te\s+)?pregunt/,
+    /\bno\s+(me\s+)?entendiste\b/,
+    /\bno\s+era\s+(eso|lo\s+que)\b/,
+    /\bno\s+te\s+estoy\s+pregunt/,
+    /\bese\s+no\s+es\s+(el|lo)\b/,
+    /\btiene\s+que\s+ser\s+otro\b/,
+    /\botro\s+(indice|índice|valor|precio|dato|n[uú]mero)\b/,
   ];
+  /** Si trae números pero matchea meta explícito (ej. "lote 3", "cabeza 5"), aplica. */
+  if (/\d/.test(original)) {
+    return patronesMeta.some((re) => re.test(t));
+  }
   return patronesMeta.some((re) => re.test(t));
 };
 

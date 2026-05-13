@@ -150,9 +150,28 @@ const print = (titulo, passed, det = "") => {
     state.pend = { id: 1 };
     state.invOut = { manejado: false, respuesta: null };
     const out = await handlerInventarioPendiente(baseCtx({ consulta: "tal vez" }));
+    /**
+     * Nuevo comportamiento (sesión 2026-05-13): si hay borrador
+     * pendiente y el flow del inventario no maneja el mensaje, el
+     * handler devuelve recordatorio explícito del borrador en vez de
+     * ceder turno (antes el LLM respondía cosas como "personas
+     * enfermas" al recibir "Dos estaban enfermas").
+     */
     print(
-      "inventario_pendiente: borrador pero flow no maneja → no match",
-      out.manejado === false && state.guardarCalls.length === 0
+      "inventario_pendiente: borrador pero flow no maneja → recordatorio",
+      out.manejado === true &&
+        out.route === "inventario_pendiente_recordatorio" &&
+        /borrador|confirmaci[oó]n|esperando/i.test(out.respuesta || "")
+    );
+  }
+  reset();
+  {
+    /** Texto que parece de OTRO dominio (precio): handler cede turno. */
+    state.invOut = { manejado: false, respuesta: null };
+    const out = await handlerInventarioPendiente(baseCtx({ consulta: "precio soja hoy" }));
+    print(
+      "inventario_pendiente: borrador + consulta de otro dominio → cede turno",
+      out.manejado === false
     );
   }
 

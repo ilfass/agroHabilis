@@ -27,6 +27,7 @@ require.cache[dbPath] = {
 
 const {
   detectarPreguntaAmbiguaCatchAll,
+  detectarCorreccionUsuario,
 } = require("../src/services/agent/pipeline/consulta_whatsapp");
 
 const CASOS_REPREGUNTA = [
@@ -104,6 +105,49 @@ const main = () => {
     console.log(
       `  ${passes ? "✓" : "✗"} ${fmt(JSON.stringify(c.msg), 42)} → ${r ? r.slice(0, 40) : "(null)"}`
     );
+  }
+
+  console.log("\n== Detector de correcciones del usuario ==");
+  const CORRECCIONES = [
+    { msg: "Pero te estoy preguntando otra cosa", expectStr: "reformular" },
+    { msg: "te estoy preguntando otra cosa", expectStr: "reformular" },
+    { msg: "no es lo que te pregunté", expectStr: "reformular" },
+    { msg: "no me entendiste", expectStr: "reformular" },
+    { msg: "no era eso", expectStr: "reformular" },
+    { msg: "ese no es el indice", expectStr: "reformular" },
+    { msg: "tiene que ser otro", expectStr: "reformular" },
+  ];
+  for (const c of CORRECCIONES) {
+    const r = detectarCorreccionUsuario(c.msg);
+    const passes = typeof r === "string" && r.toLowerCase().includes(c.expectStr.toLowerCase());
+    if (passes) ok += 1;
+    else {
+      fail += 1;
+      errs.push({ msg: c.msg, real: r, esperado: c.expectStr });
+    }
+    console.log(
+      `  ${passes ? "✓" : "✗"} ${fmt(JSON.stringify(c.msg), 42)} → ${
+        r ? r.slice(0, 60).replace(/\n/g, " ⏎ ") : "(null)"
+      }`
+    );
+  }
+
+  const NO_CORRECCION = [
+    { msg: "precio soja" },
+    { msg: "hola" },
+    { msg: "20 vacas en lote 3" },
+    { msg: "El novillo" },
+    { msg: "mercado" },
+  ];
+  for (const c of NO_CORRECCION) {
+    const r = detectarCorreccionUsuario(c.msg);
+    const passes = r === null;
+    if (passes) ok += 1;
+    else {
+      fail += 1;
+      errs.push({ msg: c.msg, real: r, esperado: null });
+    }
+    console.log(`  ${passes ? "✓" : "✗"} no-correccion ${fmt(JSON.stringify(c.msg), 30)} → ${r ? "(matchea)" : "(null)"}`);
   }
 
   console.log(`\nResumen: ${ok} OK, ${fail} fallidos.`);
