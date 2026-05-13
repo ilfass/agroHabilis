@@ -416,6 +416,64 @@ const normalizarClasificacion = (obj) => {
   };
 };
 
+/**
+ * Detecta preguntas/comentarios meta-conversacionales que **no** son
+ * comandos del bot (aunque el LLM clasificador a veces los marca como
+ * tal). Ejemplos típicos de la sesión 2026-05-12:
+ *
+ *   - "Sos un agente o un Chatbot?"
+ *   - "De qué trata agroHabilis?"
+ *   - "Tengo recomendaciones para hacerte"
+ *   - "Quiero saber si eso se puede hacer en esta app"
+ *   - "Pero todavía no te las dí"
+ *   - "Y con respecto al registro?"
+ *
+ * Todos estos terminan con respuestas robóticas tipo "No reconocí el
+ * comando..." si el clasificador los manda a `comando` y `rutaComando`
+ * no encuentra ningún match concreto.
+ *
+ * Esta función devuelve `true` SOLO si el texto es claramente
+ * conversacional/meta y NO contiene ningún disparador real de comando.
+ */
+const esPreguntaMetaConversacional = (texto = "") => {
+  const original = String(texto || "").trim();
+  if (!original) return false;
+  /** Mensajes con número (suelen ser cargas) no son meta-charla. */
+  if (/\d/.test(original)) return false;
+  const t = norm(original);
+  /** Si menciona explícitamente un comando del catálogo, NO es meta-charla. */
+  const disparadoresComandoExplicito = /\b(mi\s+resumen|mis\s+alertas|mi\s+margen|mis\s+gastos|mis\s+ventas|ver\s+comandos|completar\s+perfil|mi\s+plan|planes|quiero\s+plan\s+(pro|basico|gratis)|alerta|avisa(me|r)|cancelar\s+alerta|reset\s+onboarding|mi\s+ganado|mi\s+zona|mis\s+cultivos|borrar\s+mis\s+datos)\b/;
+  if (disparadoresComandoExplicito.test(t)) return false;
+  /**
+   * Patrones meta: preguntas sobre el bot, comentarios al bot, frases
+   * conversacionales sin pedido operativo concreto. Mantenemos la lista
+   * acotada y explícita para no pisar pedidos reales.
+   */
+  const patronesMeta = [
+    /\bsos\s+(un\s+)?(agente|bot|chat\s*bot|asistente|ia|inteligencia\s+artificial|robot|humano|persona)\b/,
+    /\bya\s+sos\s+(un\s+)?(agente|bot|asistente|ia)\b/,
+    /\bde\s+qu[eé]\s+(trata|se\s+trata|va|hace|sirve)/,
+    /\bqu[eé]\s+(es|hace|sos|hac[eé]s|pod[eé]s\s+hacer|sab[eé]s\s+hacer)\b/,
+    /\bpara\s+qu[eé]\s+(sirv|sos|est[aá])/,
+    /\bc[oó]mo\s+(funcion|te\s+llamas|te\s+llam[aá]s|trabaj[aá]s|me\s+ayud[aá]s)/,
+    /\btengo\s+(recomendacion|sugerencia|critica|cr[ií]tica|comentario|pregunta|consult|duda)/,
+    /\b(te\s+quer[ií]a|quer[ií]a)\s+(decir|comentar|preguntar|consultar|hacer)/,
+    /\b(te\s+)?dec[ií]a\s+que\b/,
+    /\bquiero\s+(saber|entender|ver|aprender)\s+(si|c[oó]mo|qu[eé]|cu[aá]ndo|d[oó]nde)\b/,
+    /\beso\s+se\s+puede\s+(hacer|usar)\b/,
+    /\bse\s+puede\s+hacer\s+(en\s+)?(esta|esa|la)\s+(app|aplicacion|aplicación|plataforma|web|herramienta)\b/,
+    /\bpero\s+todav[ií]a\s+no\b/,
+    /\bpod[eé]s\s+(guardar|procesar|cargar|manejar)\s+(todo|varios|muchos|juntos|a\s+la\s+vez)/,
+    /\bme\s+contest[aá]s\s+como\s+un?\s+robot\b/,
+    /\bpor\s+qu[eé]\s+(me\s+)?(contest|respond)/,
+    /\bes\s+un\s+(bot|robot|asistente|chat\s*bot|agente)\b/,
+    /^y\s+(con\s+)?respecto\s+(a|al|del|de|a\s+(la|los|las))\b/,
+    /^y\s+(sobre|acerca\s+de|en\s+cuanto\s+a)\b/,
+    /^y\s+(el|la|los|las)\s+\w{3,}\s*\??$/,
+  ];
+  return patronesMeta.some((re) => re.test(t));
+};
+
 const formatearHistorialParaClasificador = (historial = []) => {
   const filas = Array.isArray(historial) ? historial.slice(0, 5) : [];
   if (!filas.length) return "";
@@ -490,7 +548,23 @@ Campos extra:
 
   try {
     const raw = await llamarIAClasificador(prompt);
-    const c = normalizarClasificacion(parsearJSON(raw));
+    let c = normalizarClasificacion(parsearJSON(raw));
+    /**
+     * Guardrail: si el LLM marcó `comando` pero el mensaje es claramente
+     * una pregunta meta-conversacional (sin disparador de comando real
+     * en el texto), lo degradamos a `agro_general` para que el pipeline
+     * conversacional lo conteste con tono natural en vez de cortar con
+     * "No reconocí el comando...". Ver `esPreguntaMetaConversacional`
+     * para el detalle de patrones (origen: sesión 2026-05-12).
+     */
+    if (c.intencion === "comando" && esPreguntaMetaConversacional(mensaje)) {
+      c = {
+        ...c,
+        intencion: "agro_general",
+        confianza: c.confianza || "media",
+        _guardrailMetaConversacional: true,
+      };
+    }
     return aplicarRefuerzoRegistroInventario(mensaje, c);
   } catch (e) {
     if (process.env.NODE_ENV !== "test") {
@@ -518,6 +592,7 @@ module.exports = {
   normalizarClasificacion,
   aplicarRefuerzoRegistroInventario,
   aplicarRefuerzoSeguimientoHistorial,
+  esPreguntaMetaConversacional,
   INTENCIONES,
   ETIQUETAS_INTENCION_PROMPT,
 };

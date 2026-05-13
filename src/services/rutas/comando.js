@@ -2,6 +2,19 @@
 
 const { inferirComandoNatural, resolverComandoAlias } = require("../intent_classifier");
 const H = require("../consultas/legacy_helpers");
+const { hayProveedorIa, ejecutarJsonConCadenaIA } = require("../agent/ia/json_chain");
+/**
+ * Fallback conversacional cuando el clasificador marca `intencion=comando`
+ * pero ningún match concreto cae. Antes acá había un mensaje rígido tipo
+ * "No reconocí el comando" que generaba respuestas tipo robot. Ahora
+ * delegamos al pipeline general para que el LLM responda en forma
+ * natural y proponga alternativas — mucho más agente, menos chatbot.
+ *
+ * Lo lazy-require-amos para no romper el ciclo de carga (router.js ya
+ * importa este módulo).
+ */
+const fallbackConversacional = (args) =>
+  require("./agro_general").rutaAgroGeneral(args);
 
 /** PASO 12: capa ejecutable única para comandos (inyecta deps vía helpers). */
 const ejecutarComandoYHumanizar = (args) => H.ejecutarComandoYHumanizar(args);
@@ -77,14 +90,156 @@ const mapaHeurAComando = {
   "MI PLAN": "PLANES",
 };
 
+const comandoEsSensible = (cmd = "") =>
+  new Set(["REGISTRAR_GASTO", "REGISTRAR_VENTA", "CREAR_ALERTA"]).has(String(cmd || "").trim());
+
+const pushGateTrace = (clasificacion, evento) => {
+  if (!clasificacion || typeof clasificacion !== "object") return;
+  const arr = Array.isArray(clasificacion.agentGateTrace) ? clasificacion.agentGateTrace : [];
+  arr.push({
+    etapa: "agent_gate_comando",
+    ...evento,
+  });
+  clasificacion.agentGateTrace = arr.slice(-20);
+};
+
+const validarSenalComandoLocal = (cmd = "", texto = "") => {
+  const t = String(texto || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+  if (cmd === "REGISTRAR_GASTO") {
+    const ok = /\b(gaste|compre|gasto|compra)\b/.test(t) && /\d/.test(texto);
+    return { ok, faltantes: ok ? [] : ["monto o concepto de gasto"] };
+  }
+  if (cmd === "REGISTRAR_VENTA") {
+    const ok = /\b(vendi|venta)\b/.test(t) && /\d/.test(texto);
+    return { ok, faltantes: ok ? [] : ["cantidad o monto de venta"] };
+  }
+  if (cmd === "CREAR_ALERTA") {
+    const ok = /\d/.test(texto) && /\b(alerta|avisame|avisa|cuando)\b/i.test(texto);
+    return { ok, faltantes: ok ? [] : ["umbral numérico y condición de alerta"] };
+  }
+  return { ok: true, faltantes: [] };
+};
+
+const gatearComandoAntesDeEjecutar = async ({ comando, textoPregunta, clasificacion }) => {
+  const cmd = String(comando || "").trim();
+  if (!comandoEsSensible(cmd)) return { decision: "ejecutar", comando: cmd };
+
+  const v = validarSenalComandoLocal(cmd, textoPregunta);
+  if (v.ok) {
+    pushGateTrace(clasificacion, {
+      ok: true,
+      via: "validacion_local",
+      comando_candidato: cmd,
+      decision: "ejecutar",
+    });
+    return { decision: "ejecutar", comando: cmd };
+  }
+
+  if (!hayProveedorIa()) {
+    pushGateTrace(clasificacion, {
+      ok: false,
+      via: "validacion_local_sin_ia",
+      comando_candidato: cmd,
+      decision: "aclarar",
+      faltantes: v.faltantes,
+    });
+    return {
+      decision: "aclarar",
+      repregunta: `Para continuar me falta: ${v.faltantes.join(", ")}. Pasamelo en una línea y lo ejecuto.`,
+    };
+  }
+
+  const system = [
+    "Sos un guardrail de comandos en AgroHabilis (WhatsApp).",
+    "Te llega un comando sensible candidato y el texto del usuario.",
+    "Decidí si se puede ejecutar ya o si hay que pedir aclaración.",
+    "Respondé SOLO JSON válido:",
+    '{"decision":"ejecutar|aclarar","comando_final":"REGISTRAR_GASTO|REGISTRAR_VENTA|CREAR_ALERTA","repregunta":"string","confianza":0.0}',
+    "Reglas:",
+    "- ejecutar solo si hay datos operativos suficientes en este mensaje.",
+    "- si no alcanza, usar aclarar y escribir repregunta breve (voseo).",
+    "- no inventes montos, categorías ni condiciones.",
+  ].join(" ");
+  const user = [`Comando candidato: ${cmd}`, `Mensaje: ${textoPregunta}`].join("\n");
+  try {
+    const out = await ejecutarJsonConCadenaIA({
+      system,
+      user,
+      maxTokens: Number(process.env.COMANDO_GATE_MAX_TOKENS || 140),
+      contextLabel: "IA.comando_gate",
+      orderEnvVar: "COMANDO_GATE_IA_ORDER",
+    });
+    const parsed = out?.parsed || {};
+    const decision = String(parsed?.decision || "aclarar").trim().toLowerCase();
+    const comandoFinal = String(parsed?.comando_final || cmd).trim();
+    const confianzaRaw = Number(parsed?.confianza);
+    const confianza = Number.isFinite(confianzaRaw) ? Math.max(0, Math.min(1, confianzaRaw)) : null;
+    if (decision === "ejecutar" && comandoEsSensible(comandoFinal)) {
+      const v2 = validarSenalComandoLocal(comandoFinal, textoPregunta);
+      if (v2.ok) {
+        pushGateTrace(clasificacion, {
+          ok: true,
+          via: "ia_gate",
+          provider: out?.providerUsed || null,
+          model: out?.model || null,
+          provider_trace: out?.trace || [],
+          comando_candidato: cmd,
+          comando_final: comandoFinal,
+          decision: "ejecutar",
+          confianza,
+        });
+        return { decision: "ejecutar", comando: comandoFinal };
+      }
+    }
+    pushGateTrace(clasificacion, {
+      ok: false,
+      via: "ia_gate",
+      provider: out?.providerUsed || null,
+      model: out?.model || null,
+      provider_trace: out?.trace || [],
+      comando_candidato: cmd,
+      comando_final: comandoFinal || cmd,
+      decision: "aclarar",
+      confianza,
+    });
+    return {
+      decision: "aclarar",
+      repregunta:
+        String(parsed?.repregunta || "").trim() ||
+        `Para ejecutar ${cmd} me faltan datos concretos. Mandamelo en una línea con número y detalle.`,
+    };
+  } catch (_e) {
+    pushGateTrace(clasificacion, {
+      ok: false,
+      via: "ia_gate_error",
+      comando_candidato: cmd,
+      decision: "aclarar",
+      faltantes: v.faltantes,
+    });
+    return {
+      decision: "aclarar",
+      repregunta: `Para continuar me falta: ${v.faltantes.join(", ")}. Pasamelo en una línea y lo ejecuto.`,
+    };
+  }
+};
+
 const rutaComando = async ({ clasificacion, mensaje, usuario, numeroWhatsapp }) => {
   const textoPregunta = String(mensaje || "").trim();
   const u = textoPregunta.toUpperCase();
 
   const comandoIa = clasificacion?.comandoIa;
   if (comandoIa?.comando) {
-    let salida = await H.ejecutarComandoYHumanizar({
+    const gate = await gatearComandoAntesDeEjecutar({
       comando: comandoIa.comando,
+      textoPregunta,
+      clasificacion,
+    });
+    if (gate?.decision === "aclarar" && gate?.repregunta) return gate.repregunta;
+    let salida = await H.ejecutarComandoYHumanizar({
+      comando: gate?.comando || comandoIa.comando,
       parametros: comandoIa.parametros || {},
       usuario,
       numeroWhatsapp,
@@ -176,8 +331,14 @@ const rutaComando = async ({ clasificacion, mensaje, usuario, numeroWhatsapp }) 
   const heur = inferirComandoNatural(textoPregunta);
   const comando = mapaHeurAComando[heur];
   if (comando) {
-    const salida = await H.ejecutarComandoYHumanizar({
+    const gate = await gatearComandoAntesDeEjecutar({
       comando,
+      textoPregunta,
+      clasificacion,
+    });
+    if (gate?.decision === "aclarar" && gate?.repregunta) return gate.repregunta;
+    const salida = await H.ejecutarComandoYHumanizar({
+      comando: gate?.comando || comando,
       parametros: {},
       usuario,
       numeroWhatsapp,
@@ -191,7 +352,32 @@ const rutaComando = async ({ clasificacion, mensaje, usuario, numeroWhatsapp }) 
     }
   }
 
-  return "No reconocí el comando. Escribí *VER COMANDOS* para ver la lista.";
+  /**
+   * No matcheamos ningún comando concreto. Antes acá devolvíamos
+   * "No reconocí el comando. Escribí VER COMANDOS para ver la lista."
+   * — pero eso aplicaba a CUALQUIER mensaje que el clasificador hubiera
+   * marcado como `intencion=comando` (incluso preguntas conversacionales
+   * legítimas como "Sos un agente?", "De qué trata?", "Quiero saber si...").
+   *
+   * Resultado: el bot quedaba "rígido como chatbot" — exactamente la
+   * crítica del productor (sesión 2026-05-12).
+   *
+   * Ahora, en lugar de cortar con un mensaje rígido, delegamos al
+   * pipeline conversacional general (rutaAgroGeneral → LLM en modo
+   * agro). El LLM puede responder de forma natural y, si conviene,
+   * sugerir comandos suavemente.
+   */
+  try {
+    return await fallbackConversacional({ clasificacion, mensaje, usuario });
+  } catch (e) {
+    /** Último recurso si rutaAgroGeneral falla: un fallback amable. */
+    console.warn("[rutaComando] fallback conversacional falló:", e?.message || e);
+    return (
+      "Te leí, pero no estoy del todo seguro de qué necesitás. " +
+      "¿Querés que te ayude con precios, clima, registro de inventario o análisis? " +
+      "También podés escribir *VER COMANDOS* para ver todo lo que puedo hacer."
+    );
+  }
 };
 
 module.exports = { rutaComando, ejecutarComandoYHumanizar };

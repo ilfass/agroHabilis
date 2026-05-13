@@ -22,6 +22,7 @@
 > | I | `cmd_admin` (catálogo + RESET ONBOARDING) | ✅ | `6386b79` |
 > | L | `cmd_bot_control`, `onboarding`, `resumen_interactivo` | ✅ | `5ff9427` |
 > | L bis | `inventario_pendiente` (gate de SI/NO sobre borrador) + `pipeline_agente` (default final) + `turnTrace` logging estilo Cursor | ✅ | _este commit_ |
+> | UX | Guardrail meta-conversacional + fallback de `rutaComando` al pipeline conversacional (fix sesión 2026-05-12: "Sos un agente?", "Tengo recomendaciones", "Quiero saber si eso se puede...") | ✅ | _este commit_ |
 > | M | Cleanup de código viejo de `whatsapp.js` | ⏳ post-validación | — |
 >
 > **Extractos preparatorios completados:**

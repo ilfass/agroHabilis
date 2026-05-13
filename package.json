@@ -44,6 +44,7 @@
     "test:handler:stateful": "node scripts/test-handler-stateful-snapshot.js",
     "test:handler:pipeline": "node scripts/test-handler-pipeline-snapshot.js",
     "test:multilote": "node scripts/test-multilote-preview-snapshot.js",
+    "test:meta": "node scripts/test-meta-conversacional-snapshot.js",
     "test:precios:minimos": "node scripts/tools/test-precios-minimos.js",
     "test:inventario:grano": "node scripts/tools/inventario-prueba-grano.js",
     "test:inventario:wa:ganado-multiple": "node scripts/tools/inventario-prueba-whatsapp-ganado-multiple.js",
