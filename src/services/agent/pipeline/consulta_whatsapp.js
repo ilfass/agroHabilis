@@ -25,6 +25,31 @@ const { obtenerUltimasInteracciones } = require("../../consultas/contexto");
 const { invokeTool } = require("../tools");
 const { runObserveActVerifyChain } = require("../plan/oav_chain");
 const { ejecutarScoutToolLoop } = require("../ia/tool_loop_scout");
+const { obtenerEstado, limpiarEstado, guardarEstado } = require("../../conversacion_estado");
+
+const debeSolicitarAclaracionIntencion = ({ textoPregunta, clasificacion }) => {
+  if (
+    ["0", "false", "off", "no"].includes(String(process.env.AGENT_CLASIFICADOR_REPREGUNTA_BAJA ?? "").trim().toLowerCase())
+  ) {
+    return false;
+  }
+  const t = String(textoPregunta || "").trim();
+  if (!t || t.length > 220) return false;
+  if (t.length <= 3 && /^(si|s[ií]|no|ok)$/i.test(t)) return false;
+  if (/\d/.test(t)) return false;
+  if (/^(mi|mis|ver|flete|alerta|avisame|reset\b|quiero\s+plan)/i.test(t)) return false;
+  if (String(clasificacion?.intencion || "") === "comando") return false;
+  if (String(clasificacion?.intencion || "") === "registrar") return false;
+  try {
+    const { esPreguntaMetaConversacional } = require("../../clasificador");
+    if (esPreguntaMetaConversacional(t)) return false;
+  } catch (_e) {
+    /* seguimos */
+  }
+  const skip = new Set(["no_agro", "saludo", "small_talk"]);
+  if (skip.has(String(clasificacion?.intencion || ""))) return false;
+  return true;
+};
 
 const obtenerYCompletarPerfil = async (numeroWhatsapp) => {
   const inicial = await obtenerPerfil(numeroWhatsapp);
@@ -140,11 +165,28 @@ const procesarConsulta = async (numeroWhatsapp, pregunta, opciones = {}) => {
     historialReciente = [];
   }
 
+  const waNorm = normalizarWhatsapp(numeroWhatsapp);
+  let fusionPorAclaracionClasificador = false;
+  let textoTrabajo = textoPregunta;
+  try {
+    const st = await obtenerEstado(waNorm);
+    if (st?.flujo === "agent_clasif_baja" && String(st?.paso || "") === "pendiente") {
+      await limpiarEstado(waNorm);
+      fusionPorAclaracionClasificador = true;
+      const prev = String(st.contexto?.mensaje_original || "").trim().slice(0, 240);
+      textoTrabajo = prev
+        ? `${textoPregunta}\n\n(Aclaración del productor respecto del mensaje anterior poco claro: «${prev}».)`
+        : textoPregunta;
+    }
+  } catch (_e) {
+    /* seguimos sin merge */
+  }
+
   const t0 = Date.now();
-  let clasificacion = await clasificarMensaje(textoPregunta, usuario, { historial: historialReciente });
+  let clasificacion = await clasificarMensaje(textoTrabajo, usuario, { historial: historialReciente });
   if (opciones?.intencionPrecalculada) {
     clasificacion = normalizarClasificacion(
-      fusionarIntencionPrecalculada(clasificacion, opciones.intencionPrecalculada, textoPregunta)
+      fusionarIntencionPrecalculada(clasificacion, opciones.intencionPrecalculada, textoTrabajo)
     );
   }
   clasificacion = aplicarRefuerzoRegistroInventario(textoPregunta, clasificacion);
@@ -187,6 +229,37 @@ const procesarConsulta = async (numeroWhatsapp, pregunta, opciones = {}) => {
     });
   }
 
+  if (
+    !fusionPorAclaracionClasificador &&
+    clasificacion.confianza === "baja" &&
+    debeSolicitarAclaracionIntencion({ textoPregunta, clasificacion })
+  ) {
+    try {
+      await guardarEstado(waNorm, "agent_clasif_baja", "pendiente", { mensaje_original: textoPregunta }, 1);
+    } catch (_e) {
+      /* sin estado en BD: seguimos sin repregunta persistente */
+    }
+    const respuestaA = [
+      "No estoy seguro de qué necesitás con ese mensaje 🤔",
+      "¿Buscás *precio*, *clima*, *registrar* algo en el campo, *consultar tus datos* o *mercado / análisis*?",
+      "Respondé en una sola línea (ej: «precio soja» o «¿llueve esta semana?»).",
+    ].join("\n");
+    logConsultaRoute(numeroWhatsapp, "clasificador_aclaracion", {
+      cultivo: clasificacion.cultivo,
+      confianza: "baja",
+      msClasificador: Date.now() - t0,
+    });
+    await guardarConsulta({
+      usuarioId: usuario?.id || null,
+      whatsapp: waNorm,
+      pregunta: textoPregunta,
+      respuesta: respuestaA,
+      tokensUsados: null,
+      iaProvider: "clasificador_aclaracion",
+    });
+    return respuestaA;
+  }
+
   await invokeTool(
     "agent.turn_step",
     {
@@ -202,7 +275,7 @@ const procesarConsulta = async (numeroWhatsapp, pregunta, opciones = {}) => {
 
   const dominioTurno = await evaluarDominioTurnoAntesDeRouter({
     clasificacion,
-    mensaje: textoPregunta,
+    mensaje: textoTrabajo,
     usuario,
     numeroWhatsapp,
     historialPrecargado: historialReciente,
@@ -248,7 +321,7 @@ const procesarConsulta = async (numeroWhatsapp, pregunta, opciones = {}) => {
       clasificacion,
       usuario,
       numeroWhatsapp,
-      mensaje: textoPregunta,
+      mensaje: textoTrabajo,
     });
     if (scout?.resumen && String(scout.resumen).trim()) {
       clasificacion.agentScoutContext = String(scout.resumen).trim();
@@ -281,7 +354,7 @@ const procesarConsulta = async (numeroWhatsapp, pregunta, opciones = {}) => {
           }
           return routear({
             clasificacion,
-            mensaje: textoPregunta,
+            mensaje: textoTrabajo,
             usuario,
             numeroWhatsapp,
           });

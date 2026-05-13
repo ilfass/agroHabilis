@@ -70,6 +70,7 @@ const rutaAnalisisInterno = async ({ clasificacion, mensaje, usuario }) => {
       return H.enriquecerConGroundingAgroSiHaceFalta({
         pregunta: mensaje,
         textoBase: ventaPlusNoticias,
+        intencion: "analisis_interno",
       });
     }
   }
@@ -84,6 +85,7 @@ const rutaAnalisisInterno = async ({ clasificacion, mensaje, usuario }) => {
   return H.enriquecerConGroundingAgroSiHaceFalta({
     pregunta: mensaje,
     textoBase: H.sanitizarPlaceholders(String(out?.mensaje || "").trim()),
+    intencion: "analisis_interno",
   });
 };
 

@@ -594,8 +594,14 @@ const respuestaPrecioEscasa = respuestaPrecioEscasaMod;
 
 const cumpleMinimosRespuestaPrecio = cumpleMinimosRespuestaPrecioMod;
 
-const enriquecerConGroundingAgroSiHaceFalta = (args) =>
-  enriquecerConGroundingAgroSiHaceFaltaMod(args, {
+const enriquecerConGroundingAgroSiHaceFalta = (args) => {
+  let esPreguntaMetaConversacionalFn = null;
+  try {
+    esPreguntaMetaConversacionalFn = require("../clasificador").esPreguntaMetaConversacional;
+  } catch (_e) {
+    esPreguntaMetaConversacionalFn = null;
+  }
+  return enriquecerConGroundingAgroSiHaceFaltaMod(args, {
     tieneBloqueComplementoWebFn: tieneBloqueComplementoWeb,
     respuestaMercadoDesfasadaVersusPreguntaFn: respuestaMercadoDesfasadaVersusPregunta,
     preguntaQuedoSinCoberturaClaveFn: preguntaQuedoSinCoberturaClave,
@@ -607,7 +613,9 @@ const enriquecerConGroundingAgroSiHaceFalta = (args) =>
     sanitizarPlaceholdersFn: sanitizarPlaceholders,
     getGroundingMaxCharsFn: getGroundingMaxChars,
     formatearFuentesGroundingWhatsAppFn: formatearFuentesGroundingWhatsApp,
+    esPreguntaMetaConversacionalFn,
   });
+};
 
 /**
  * Mercado/hortícola/clima/FX: debe ir por `renderTemplate("consulta")` (IA + grounding), no por atajos

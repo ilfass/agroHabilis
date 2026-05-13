@@ -43,6 +43,7 @@ const rutaClima = async ({ mensaje, usuario }) => {
       return H.enriquecerConGroundingAgroSiHaceFalta({
         pregunta: mensaje,
         textoBase: texto,
+        intencion: "clima",
       });
     }
   } catch (_e) {
@@ -52,6 +53,7 @@ const rutaClima = async ({ mensaje, usuario }) => {
   return H.enriquecerConGroundingAgroSiHaceFalta({
     pregunta: mensaje,
     textoBase: base,
+    intencion: "clima",
   });
 };
 

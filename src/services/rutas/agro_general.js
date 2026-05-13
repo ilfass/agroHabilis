@@ -3,6 +3,7 @@
 const fs = require("fs");
 const path = require("path");
 const H = require("../consultas/legacy_helpers");
+const { esPreguntaMetaConversacional } = require("../clasificador");
 
 const CONTEXTO_DIR = path.join(__dirname, "../../../docs/contexto-ia");
 
@@ -119,14 +120,28 @@ const rutaAgroGeneral = async ({ clasificacion, mensaje, usuario }) => {
   }
 
   const ctx = cargarFragmentosContexto(mensaje);
+  const scout = String(clasificacion?.agentScoutContext || "").trim();
+  const bloqueScout = scout
+    ? `\n\n--- Hallazgos previos (scout / herramientas) ---\n${scout}\n`
+    : "";
   const pregunta = ctx
-    ? `${mensaje}\n\n--- Material interno de referencia (fragmentos) ---\n${ctx}`
-    : mensaje;
+    ? `${mensaje}${bloqueScout}\n\n--- Material interno de referencia (fragmentos) ---\n${ctx}`
+    : scout
+      ? `${mensaje}${bloqueScout}`
+      : mensaje;
 
   const out = await H.renderTemplate("consulta", usuario, pregunta);
+  const textoBase = H.sanitizarPlaceholders(String(out?.mensaje || "").trim());
+  const int = String(clasificacion?.intencion || "").trim();
+  const omitirWeb =
+    ["saludo", "small_talk", "no_agro"].includes(int.toLowerCase()) ||
+    Boolean(clasificacion?._guardrailMetaConversacional) ||
+    esPreguntaMetaConversacional(mensaje);
   return H.enriquecerConGroundingAgroSiHaceFalta({
     pregunta: mensaje,
-    textoBase: H.sanitizarPlaceholders(String(out?.mensaje || "").trim()),
+    textoBase,
+    intencion: int || "agro_general",
+    omitirComplementoWeb: omitirWeb,
   });
 };
 

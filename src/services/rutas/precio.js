@@ -72,6 +72,7 @@ const rutaPrecio = async ({ clasificacion, mensaje, usuario }) => {
     return H.enriquecerConGroundingAgroSiHaceFalta({
       pregunta: mensaje,
       textoBase: salida,
+      intencion: "precio",
     });
   }
 
@@ -90,6 +91,7 @@ const rutaPrecio = async ({ clasificacion, mensaje, usuario }) => {
     return H.enriquecerConGroundingAgroSiHaceFalta({
       pregunta: mensaje,
       textoBase: salida,
+      intencion: "precio",
     });
   }
 
@@ -104,6 +106,7 @@ const rutaPrecio = async ({ clasificacion, mensaje, usuario }) => {
     return H.enriquecerConGroundingAgroSiHaceFalta({
       pregunta: mensaje,
       textoBase: salida,
+      intencion: "precio",
     });
   }
 
@@ -128,6 +131,7 @@ const rutaPrecio = async ({ clasificacion, mensaje, usuario }) => {
   return H.enriquecerConGroundingAgroSiHaceFalta({
     pregunta: mensaje,
     textoBase: humanLimpio,
+    intencion: "precio",
   });
 };
 

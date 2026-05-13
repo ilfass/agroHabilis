@@ -31,7 +31,8 @@ const DISCLAIMER_NO_AGRO_WEB = [
 ].join("\n");
 
 /**
- * Pregunta clasificada por IA como no agro: respuesta con búsqueda web (mismo stack que plantilla consulta).
+ * Fuera de foco agro: respuesta con búsqueda web (legacy).
+ * Si `AGENT_DOMINIO_TURNO` está activo, `no_agro` suele resolverse antes en `agent/gates/dominio_turno` con repregunta.
  */
 const responderNoAgroConGrounding = async (
   { usuario, pregunta },
@@ -170,7 +171,39 @@ const generarSaludoIAControlado = async (
   return `¡Hola, ${nombre}! 👋\nEstoy para ayudarte con decisiones del día en ${zona}.\n¿Querés ver *precio*, *clima* o un *análisis*?`;
 };
 
-const enriquecerConGroundingAgroSiHaceFalta = async ({ pregunta = "", textoBase = "" } = {}, deps = {}) => {
+/**
+ * Charla liviana sobre el tiempo sin pedido técnico explícito ("va a estar
+ * lindo esta semana?") — no debe disparar bloque *Complemento web* masivo.
+ */
+const esCharlaTiempoConversacionalLigera = (texto = "") => {
+  const t = String(texto || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+  if (!t || /\d/.test(t)) return false;
+  if (/\b(precio|soja|ma[ií]z|trigo|dolar|cotizacion|venta|margen)\b/.test(t)) return false;
+  const tiempo =
+    /\b(va\s+a\s+estar|vas\s+a\s+estar|que\s+tal\s+el\s+tiempo|c[oó]mo\s+viene\s+el\s+tiempo|como\s+esta\s+el\s+tiempo)\b/.test(
+      t
+    );
+  const tono = /\b(lindo|linda|feo|fea|bueno|buena|mal|horrible|hermoso|hermosa|semana|find|finde|fin\s+de\s+semana|jornada|dia|d[ií]a)\b/.test(
+    t
+  );
+  return tiempo && tono;
+};
+
+const intencionSinComplementoWeb = (intencion = "") => {
+  const i = String(intencion || "")
+    .trim()
+    .toLowerCase();
+  return i === "saludo" || i === "small_talk" || i === "no_agro";
+};
+
+const enriquecerConGroundingAgroSiHaceFalta = async (
+  { pregunta = "", textoBase = "", intencion = "", omitirComplementoWeb = false } = {},
+  deps = {}
+) => {
   const {
     tieneBloqueComplementoWebFn: tieneBloqueComplementoWeb,
     respuestaMercadoDesfasadaVersusPreguntaFn: respuestaMercadoDesfasadaVersusPregunta,
@@ -183,10 +216,23 @@ const enriquecerConGroundingAgroSiHaceFalta = async ({ pregunta = "", textoBase 
     sanitizarPlaceholdersFn: sanitizarPlaceholders,
     getGroundingMaxCharsFn: getGroundingMaxChars,
     formatearFuentesGroundingWhatsAppFn: formatearFuentesGroundingWhatsApp,
+    esPreguntaMetaConversacionalFn,
   } = deps;
   const base = String(textoBase || "").trim();
   if (!base) return base;
   if (tieneBloqueComplementoWeb(base)) return base;
+  /** Saludo / charla / fuera de foco: sin anexar Google Search (UX tipo agente). */
+  if (omitirComplementoWeb || intencionSinComplementoWeb(intencion)) return base;
+  let metaConversacional = false;
+  const metaFn = typeof esPreguntaMetaConversacionalFn === "function" ? esPreguntaMetaConversacionalFn : null;
+  if (metaFn) {
+    try {
+      metaConversacional = Boolean(metaFn(pregunta));
+    } catch (_e) {
+      metaConversacional = false;
+    }
+  }
+  if (metaConversacional || esCharlaTiempoConversacionalLigera(pregunta)) return base;
   const desfasada = respuestaMercadoDesfasadaVersusPregunta(pregunta, base);
   const sinCoberturaClave = preguntaQuedoSinCoberturaClave(pregunta, base);
   const indicaCarenciaInternos = respuestaIndicaCarenciaDatosInternos(base);

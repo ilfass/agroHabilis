@@ -205,6 +205,8 @@ function turnControllerActivo() {
  */
 function handlersHabilitados() {
   const raw = String(process.env.AGENT_TURN_CONTROLLER_HANDLERS || "").trim();
+  /** `*` o `all` = misma semántica que lista vacía: todos los handlers enchufados. */
+  if (/^\*$/i.test(raw) || /^all$/i.test(raw)) return null;
   if (!raw) return null;
   return new Set(
     raw

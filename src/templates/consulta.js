@@ -61,6 +61,29 @@ const esConsultaMeteoPorTexto = (pregunta = "") => {
   return false;
 };
 
+/** Charla liviana sobre el tiempo sin pedido técnico; evita anexar complemento web en guardrail/plantilla. */
+const esCharlaTiempoPlantilla = (pregunta = "") => {
+  const t = normalizar(pregunta);
+  if (!t || /\d/.test(String(pregunta || ""))) return false;
+  if (/\b(precio|soja|maiz|trigo|dolar|cotizacion|venta|margen)\b/.test(t)) return false;
+  const tiempo =
+    /\b(va\s+a\s+estar|vas\s+a\s+estar|que\s+tal\s+el\s+tiempo|como\s+viene\s+el\s+tiempo|como\s+esta\s+el\s+tiempo)\b/.test(
+      t
+    );
+  const tono =
+    /\b(lindo|linda|feo|fea|bueno|buena|mal|horrible|hermoso|hermosa|semana|find|finde|fin\s+de\s+semana|jornada|dia|d[ií]a)\b/.test(
+      t
+    );
+  return tiempo && tono;
+};
+
+/** Por defecto respuestas más cortas (estilo agente). Desactivar: `CONSULTA_IA_RESPUESTA_CONCISA=0`. */
+const modoConcisoConsultaIa = () => {
+  const v = String(process.env.CONSULTA_IA_RESPUESTA_CONCISA ?? "").trim().toLowerCase();
+  if (["0", "false", "off", "no"].includes(v)) return false;
+  return true;
+};
+
 /** Hortícolas / frutas / cítricos frecuentes (no están en tabla precios; disparan mercado + grounding). */
 const RE_MERCADO_HORTI_O_FRUTA =
   /lim[oó]n|limones|naranja|mandarina|pomelo|toronja|tomate|durazno|duraznos|pera|peras|manzana|manzanas|uva|uvas|ar[aá]ndano|palta|paltas|aguacate|morron|morr[oó]n|pimiento|zanahoria|cebolla|ajo|berenjena|calabaza|zapallo|sand[ií]a|melon|mel[oó]n|kiwi|ciruela|ciruelas|higo|higos|\blima(s)?\b|horticol|fruta|verdura|c[ií]tric/;
@@ -1921,7 +1944,9 @@ module.exports = {
       let mensajeFinal = respuestaBase;
       let pipeline = "base_datos + guardrail_interpretativo";
       const traceExtra = [];
-      if (groundingHabilitadoEnConfig() && process.env.GEMINI_API_KEY?.trim()) {
+      const omitirGuardrailGrounding =
+        soloMeteoSinMercadoPlant || esCharlaTiempoPlantilla(pregunta);
+      if (groundingHabilitadoEnConfig() && process.env.GEMINI_API_KEY?.trim() && !omitirGuardrailGrounding) {
         try {
           const g = await generarConGroundingGoogleSearch({
             prompt: [
@@ -2057,6 +2082,9 @@ module.exports = {
       const ia = await generarConPromptLibre({
         system:
           "Rol: editor contextual. " +
+          (modoConcisoConsultaIa()
+            ? "MODO_CONCISO: toda la salida ≤10 líneas; no enumeres dólar+flete+insumos+granos si el usuario no lo pidió; respondé solo al foco de la pregunta. "
+            : "") +
           "Si datos.historial trae turnos previos (pregunta/respuesta), usalos para interpretar la consulta actual: desambiguá referencias cortas (‘eso’, ‘lo mismo’, ‘mañana’ en sentido de calendario vs. mercado) según el hilo. " +
           "Campo JSON contexto_hilo_resuelto: si es_seguimiento es true, tratá la pregunta como continuación del mismo cultivo/tema que el último intercambio; usá cultivo_contextual y ultimo_turno_extracto como hechos de hilo y NO cambies a otro cultivo por noticias o alertas si la pregunta no lo pide (ej. seguimiento de maíz tras precio del maíz). " +
           "Si tema_activo_detectado es logistica_continua o la pregunta es sobre puerto/plaza/destino/viaje/ruta/flete y respuesta_base ya listó línea 'Flete referencia' con destinos (ej. Rosario, Bahía Blanca), respondé nombrando esos destinos de referencia y no digas sin dato puntual ni que el cultivo es otro si datos.cultivo y el hilo dicen lo contrario. " +

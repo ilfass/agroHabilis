@@ -9,6 +9,7 @@ const rutaAnalisisMercado = async ({ clasificacion, mensaje, usuario }) => {
   return H.enriquecerConGroundingAgroSiHaceFalta({
     pregunta: mensaje,
     textoBase: texto,
+    intencion: "analisis_mercado",
   });
 };
 
