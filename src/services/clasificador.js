@@ -15,11 +15,12 @@
  *      sistemático cuando el LLM marca `comando` o `consulta_registros`
  *      para preguntas de capacidad / feedback al bot.
  *
- *   2) Refuerzos (en el pipeline)
- *      - `aplicarRefuerzoRegistroInventario`: si el mensaje habla de inventario,
- *        el intent se fuerza a `registrar` aunque la IA haya dicho otra cosa.
- *      - `aplicarRefuerzoSeguimientoHistorial`: si el mensaje es seguimiento
- *        ("y el resto?") y el último turno fue inventario, se fuerza `registrar`.
+ *   2) Verificación con LLM (post-clasificación, **sin regex de continuidad**)
+ *      - Si hay historial reciente, un **segundo pase** pide al modelo que
+ *        valide si la intención encaja con el hilo (precio → "y el novillo?",
+ *        inventario pendiente → "y el resto?", etc.). Es razonamiento en
+ *        lenguaje natural, no listas de patrones en código.
+ *      - Desactivar: `CLASIFICADOR_VERIFY_HISTORIAL=0`.
  *
  *   3) Gates (`agent/gates/*`)
  *      - Hilo de registro: ¿el productor en realidad quería gasto/registro?
@@ -35,8 +36,9 @@
  *
  * **Por qué no IA libre en todo el canal:** latencia, costo y pasos que
  * exigen determinismo (comandos literales `MI RESUMEN`, confirmaciones
- * `SI/NO`). El LLM trabaja libre en scout y router; acá solo se pide
- * **una etiqueta de ruta** con vocabulario cerrado + guardrail mínimo.
+ * `SI/NO`). El LLM trabaja libre en scout y router; acá se pide
+ * **una etiqueta de ruta** (1er pase) + **verify opcional con historial**
+ * (2do pase, desactivable) + guardrail léxico mínimo para meta/capacidad.
  */
 
 const { generarChatGroq } = require("./groq");
@@ -147,22 +149,17 @@ const fallbackClasificacionIaAgotada = () =>
   });
 
 /**
- * Preferencia: Groq llama-3.1-8b-instant → Gemini Flash → fallo.
+ * Preferencia: Groq → Gemini → fallo. `system` y `maxTokens` configurables
+ * (clasificador principal vs verificador de coherencia con historial).
  */
-const llamarIAClasificador = async (promptCompleto) => {
-  const system = [
-    "Sos el clasificador de intenciones de AgroHabilis (productores argentinos por WhatsApp).",
-    "Leé el mensaje del usuario y elegí UNA sola etiqueta de intención entre las que te lista el usuario en el prompt (vocabulario cerrado).",
-    "El valor de intencion debe ser literalmente una de las etiquetas listadas en el user (misma cadena; no un sinónimo).",
-    "Respondé EXCLUSIVAMENTE un objeto JSON válido (sin markdown, sin texto antes ni después).",
-  ].join(" ");
-
+const llamarIAClasificadorConSystem = async (system, promptCompleto, maxTokens) => {
+  const mt = Number(maxTokens || process.env.CLASIFICADOR_MAX_TOKENS || 100);
   if (process.env.GROQ_API_KEY?.trim()) {
     try {
       const { texto } = await generarChatGroq({
         system,
         user: promptCompleto,
-        maxTokens: Number(process.env.CLASIFICADOR_MAX_TOKENS || 100),
+        maxTokens: mt,
       });
       return String(texto || "").trim();
     } catch (e) {
@@ -180,142 +177,14 @@ const llamarIAClasificador = async (promptCompleto) => {
   throw new Error("Sin GROQ_API_KEY ni GEMINI_API_KEY para clasificador");
 };
 
-/**
- * Misma señal que `nl_heuristica` para inventario: si la IA se confunde (p. ej. clima por un nombre de campo),
- * forzamos `registrar` para que `rutaRegistrar` → inventario resuelva lote/categoría.
- * Incluye **consultas** de stock («cuántas vacas tengo en el caimán»), que antes caían en `agro_general`
- * y la IA inventaba «sin datos en base» sin mirar la tabla de inventario.
- */
-const aplicarRefuerzoRegistroInventario = (mensaje, clasificacion) => {
-  if (!clasificacion || typeof clasificacion !== "object") return clasificacion;
-  try {
-    const tn = norm(mensaje);
-    if (/\b(me\s+)?conviene\s+vender\b|\bvender\s+o\s+esperar\b|\bdebo\s+vender\b/.test(tn)) {
-      return clasificacion;
-    }
-    const inv = parseIntentInventario(mensaje);
-    if (inv?.clase !== "registro" && inv?.clase !== "consulta") return clasificacion;
-    if (inv?.clase === "ambiguo") return clasificacion;
-    const mal = new Set([
-      "clima",
-      "agro_general",
-      "analisis_mercado",
-      "analisis_interno",
-      "no_agro",
-      "precio",
-      "saludo",
-      "consulta_registros",
-    ]);
-    if (!mal.has(clasificacion.intencion)) return clasificacion;
-    return {
-      ...clasificacion,
-      intencion: "registrar",
-      confianza: "alta",
-      requiere_datos_propios: false,
-    };
-  } catch (_e) {
-    return clasificacion;
-  }
-};
-
-/**
- * Tokens de **producto cotizable** que aparecen en seguimientos cortos
- * tipo "y el novillo?", "y el maíz?", "y la cebada?". No es una lista de
- * frases: es una sola alternancia sobre el vocabulario que el clasificador
- * ya conoce como cotizable (granos + hacienda en pie + dólar).
- */
-const RE_PRODUCTO_COTIZABLE =
-  /\b(soja|ma[ií]z|trigo|cebada|girasol|sorgo|novillos?|novillitos?|vacas?|vaquillonas?|terneros?|terneras?|hacienda|liniers|matba|rofex|d[oó]lar|dolar|mep|blue|ccl|oficial)\b/;
-
-/**
- * Marcadores típicos de una respuesta de **precios/cotización**: símbolo
- * de moneda, unidad `/tn`, plazas conocidas, índice Liniers, etc. Usado
- * para reconocer cuándo el último turno del bot fue claramente de precio.
- */
-const RE_RESPUESTA_FUE_PRECIO =
-  /(\$\s?\d|\/tn\b|usd|u\$s|bcr|cac|matba|rofex|liniers|pizarra|cotiz|capacidad\s+de\s+pago|tendencia\s+(alcista|bajista|estable))/;
-
-/**
- * **Refuerzo de continuidad** — un único lugar donde el clasificador
- * respeta el "hilo" del turno anterior cuando el mensaje nuevo es
- * **corto y ambiguo** ("y el resto?", "y el novillo?", "y el maíz?").
- *
- * Cubre dos hilos posibles, mirando lo que el bot acaba de decir:
- *   - **Inventario**: último turno fue carga/confirmación/aclaración de
- *     inventario → forzamos `registrar`.
- *   - **Precio**: último turno fue una respuesta de cotización
- *     (`$/tn`, BCR/Liniers/Matba, "tendencia alcista", etc.) y el
- *     mensaje nuevo es un seguimiento corto con otro producto cotizable
- *     ("y el novillo?", "y el maíz?", "y el dólar?") → forzamos `precio`.
- *
- * Este refuerzo corre **además del refuerzo IA**: si el LLM ya respeta
- * el historial, no cambia nada; si se equivoca (típicamente eligiendo
- * `consulta_registros` por la palabra "novillo"), acá lo corregimos sin
- * agregar listas frase-por-frase.
- */
-const aplicarRefuerzoSeguimientoHistorial = (mensaje, clasificacion, historial) => {
-  if (!clasificacion || typeof clasificacion !== "object") return clasificacion;
-  if (!Array.isArray(historial) || !historial.length) return clasificacion;
-  const tn = norm(mensaje);
-  if (!tn || tn.length > 80) return clasificacion;
-
-  const ultimaRespBot = String(historial[0]?.respuesta || "");
-  const tBot = norm(ultimaRespBot);
-
-  const esSeguimientoInv =
-    /\by\s+(el|los|las)\s+(resto|demas|otros|otras)\b/.test(tn) ||
-    /\b(el|los|las)\s+(resto|demas|otros|otras)\b/.test(tn) ||
-    /^y\s+(?:el\s+)?resto\??$/.test(tn) ||
-    /\b(agregamos|agreguemos|agregale|agrego|sumamos|sumale|tambien\s+(estos|los|las|cargamos|guardamos))\b/.test(tn) ||
-    /\b(seguimos|continuamos|continuar|seguir)\s+(cargando|con\s+los|con\s+las)\b/.test(tn);
-
-  const ultimoTurnoFueInventario =
-    /guardado\s+en\s+inventario/.test(tBot) ||
-    /confirma\s+el\s+ingreso\s+al\s+inventario/.test(tBot) ||
-    /(no\s+pude\s+interpretar|cantidad\s+y\s+categoria)/.test(tBot) ||
-    /no\s+encontre\s+el\s+lote/.test(tBot) ||
-    /lote\s+\w+\s+creado/.test(tBot);
-
-  if (esSeguimientoInv && ultimoTurnoFueInventario) {
-    if (clasificacion.intencion === "registrar") return clasificacion;
-    return {
-      ...clasificacion,
-      intencion: "registrar",
-      confianza: clasificacion.confianza || "media",
-      requiere_datos_propios: false,
-      _refuerzoSeguimientoHistorial: "inventario",
-    };
-  }
-
-  /**
-   * Seguimiento de **precio**: mensaje arranca con "y el/la/los/las" o "y "
-   * y menciona un producto cotizable; o trae sólo el producto y el turno
-   * anterior tiene marcadores de respuesta de precio. Es un único patrón
-   * — **no** un catálogo de frases.
-   */
-  const esSeguimientoCorto =
-    /^y\s+(el|la|los|las)\s+\w+/.test(tn) ||
-    /^y\s+\w+\??$/.test(tn) ||
-    /^(?:el|la|los|las)\s+\w+\s*\??$/.test(tn);
-  const mencionaCotizable = RE_PRODUCTO_COTIZABLE.test(tn);
-  const ultimoTurnoFuePrecio = RE_RESPUESTA_FUE_PRECIO.test(tBot);
-
-  if (
-    esSeguimientoCorto &&
-    mencionaCotizable &&
-    ultimoTurnoFuePrecio &&
-    clasificacion.intencion !== "precio"
-  ) {
-    return {
-      ...clasificacion,
-      intencion: "precio",
-      requiere_datos_propios: false,
-      confianza: clasificacion.confianza || "media",
-      _refuerzoSeguimientoHistorial: "precio",
-    };
-  }
-
-  return clasificacion;
+const llamarIAClasificador = async (promptCompleto) => {
+  const system = [
+    "Sos el clasificador de intenciones de AgroHabilis (productores argentinos por WhatsApp).",
+    "Leé el mensaje del usuario y elegí UNA sola etiqueta de intención entre las que te lista el usuario en el prompt (vocabulario cerrado).",
+    "El valor de intencion debe ser literalmente una de las etiquetas listadas en el user (misma cadena; no un sinónimo).",
+    "Respondé EXCLUSIVAMENTE un objeto JSON válido (sin markdown, sin texto antes ni después).",
+  ].join(" ");
+  return llamarIAClasificadorConSystem(system, promptCompleto, Number(process.env.CLASIFICADOR_MAX_TOKENS || 100));
 };
 
 const clasificarHeuristica = (mensaje = "") => {
@@ -552,6 +421,84 @@ const formatearHistorialParaClasificador = (historial = []) => {
   return lineas.join("\n\n");
 };
 
+const verifyHistorialHabilitado = () => {
+  const v = String(process.env.CLASIFICADOR_VERIFY_HISTORIAL || "1").trim().toLowerCase();
+  return v !== "0" && v !== "false" && v !== "no";
+};
+
+/**
+ * Segundo pase **solo LLM**: valida si la intención elegida encaja con el
+ * hilo del chat (seguimiento de precio, de inventario, etc.). Sin refuerzos
+ * regex en código; el modelo razona sobre el texto del historial.
+ *
+ * `overrides.llamarVerificador(system, user, maxTokens)` → texto JSON (tests).
+ */
+const verificarCoherenciaIntencionConHistorialLLM = async (
+  mensaje,
+  clasificacion,
+  historial,
+  overrides = {}
+) => {
+  if (!verifyHistorialHabilitado()) return clasificacion;
+  if (!clasificacion || typeof clasificacion !== "object") return clasificacion;
+  const hist = Array.isArray(historial)
+    ? historial.filter((x) => x && (x.pregunta != null || x.respuesta != null)).slice(0, 5)
+    : [];
+  if (!hist.length) return clasificacion;
+
+  const historialTxt = formatearHistorialParaClasificador(hist);
+  if (!String(historialTxt || "").trim()) return clasificacion;
+
+  const listaEtiquetas = ETIQUETAS_INTENCION_PROMPT.map((e, i) => `${i + 1}. \`${e}\``).join("\n");
+
+  const system = [
+    "Sos un verificador de coherencia para AgroHabilis (WhatsApp, productores argentinos).",
+    "Recibís el historial reciente, un NUEVO mensaje del usuario y una intención ya elegida por otro modelo.",
+    "Decidí si esa intención encaja con el hilo conversacional.",
+    "Si el asistente acababa de dar cotizaciones o precios de mercado y el usuario pregunta corto por otro producto (ej. «¿y el novillo?», «y el maíz?») → suele seguir siendo `precio`, no `consulta_registros` ni `registrar`.",
+    "Si el asistente estaba en carga o confirmación de inventario y el usuario dice «y el resto», «los demás», «agregamos…» → suele ser `registrar`.",
+    "Si la intención propuesta ya es razonable para el hilo, respondé coherente true.",
+    "Respondé EXCLUSIVAMENTE JSON: {\"coherente\":true} o {\"coherente\":false,\"intencion\":\"...\",\"motivo\":\"breve\"}. Si coherente es false, intencion debe ser exactamente una de las etiquetas listadas en el user (misma cadena).",
+  ].join(" ");
+
+  const prompt = `
+## Etiquetas válidas (solo una si corregís)
+${listaEtiquetas}
+
+## Historial reciente (más antiguo arriba)
+${historialTxt}
+
+## Nuevo mensaje del usuario
+"""${String(mensaje || "").replace(/"/g, '\\"')}"""
+
+## Intención propuesta
+${JSON.stringify({ intencion: clasificacion.intencion })}
+`.trim();
+
+  const maxV = Number(process.env.CLASIFICADOR_VERIFY_MAX_TOKENS || 120);
+  try {
+    let raw;
+    if (typeof overrides.llamarVerificador === "function") {
+      raw = await overrides.llamarVerificador(system, prompt, maxV);
+    } else {
+      raw = await llamarIAClasificadorConSystem(system, prompt, maxV);
+    }
+    const obj = parsearJSON(String(raw || "").trim());
+    if (obj && obj.coherente === true) return clasificacion;
+    const nueva = String(obj?.intencion || "").trim();
+    if (!INTENCIONES.has(nueva)) return clasificacion;
+    return {
+      ...clasificacion,
+      intencion: nueva,
+      confianza: clasificacion.confianza || "media",
+      _verifyHistorialRetry: true,
+      _verifyMotivo: String(obj?.motivo || "").slice(0, 240),
+    };
+  } catch (_e) {
+    return clasificacion;
+  }
+};
+
 const clasificarMensaje = async (mensaje, usuario, opciones = {}) => {
   const listaEtiquetas = ETIQUETAS_INTENCION_PROMPT.map((e, i) => `${i + 1}. \`${e}\``).join("\n");
   const historialTxt = formatearHistorialParaClasificador(opciones?.historial || []);
@@ -631,7 +578,10 @@ Campos extra:
         _guardrailMetaConversacional: true,
       };
     }
-    return aplicarRefuerzoRegistroInventario(mensaje, c);
+    c = await verificarCoherenciaIntencionConHistorialLLM(mensaje, c, opciones?.historial || [], {
+      llamarVerificador: opciones?.llamarVerificadorClasificador,
+    });
+    return c;
   } catch (e) {
     if (process.env.NODE_ENV !== "test") {
       console.warn(
@@ -642,22 +592,20 @@ Campos extra:
       );
     }
     if (clasificadorFallbackUsaHeuristica()) {
-      const c = normalizarClasificacion(clasificarHeuristica(mensaje));
-      return aplicarRefuerzoRegistroInventario(mensaje, c);
+      return normalizarClasificacion(clasificarHeuristica(mensaje));
     }
-    const c = fallbackClasificacionIaAgotada();
-    return aplicarRefuerzoRegistroInventario(mensaje, c);
+    return fallbackClasificacionIaAgotada();
   }
 };
 
 module.exports = {
   clasificarMensaje,
   llamarIAClasificador,
+  llamarIAClasificadorConSystem,
   parsearJSON,
   clasificarHeuristica,
   normalizarClasificacion,
-  aplicarRefuerzoRegistroInventario,
-  aplicarRefuerzoSeguimientoHistorial,
+  verificarCoherenciaIntencionConHistorialLLM,
   esPreguntaMetaConversacional,
   parecePreguntaCapacidadOMetaFeedback,
   INTENCIONES,

@@ -1,43 +1,28 @@
 #!/usr/bin/env node
 /**
- * Snapshot tests del clasificador heurístico y de los refuerzos.
+ * Snapshot tests del clasificador **heurístico** (sin IA).
  *
  * - No usa IA ni base de datos: corre en < 1s.
- * - Cada caso declara `mensaje` y `esperado.intencion`.
- * - Sirve como red de seguridad ante refactors del clasificador o de las
- *   heurísticas de inventario/seguimiento.
+ * - La continuidad de hilo (precio tras cotización, inventario tras carga)
+ *   se cubre en `scripts/test-clasificador-verify-snapshot.js` con mocks
+ *   del segundo pase LLM (`verificarCoherenciaIntencionConHistorialLLM`).
  *
  * Uso:
  *   node scripts/test-clasificador-snapshot.js
- *   # exit code 0 si todo OK; 1 si algún caso falla
- *
- * Para agregar casos: editar la constante CASOS más abajo.
  */
 
 "use strict";
 
 require("dotenv").config({ override: false });
 
-const {
-  clasificarHeuristica,
-  normalizarClasificacion,
-  aplicarRefuerzoRegistroInventario,
-  aplicarRefuerzoSeguimientoHistorial,
-} = require("../src/services/clasificador");
+const { clasificarHeuristica, normalizarClasificacion } = require("../src/services/clasificador");
 
 const {
   parseIntentInventario,
   detectarCargaMultiLote,
 } = require("../src/services/inventario/nl_heuristica");
 
-const evaluarClasificador = (mensaje, opciones = {}) => {
-  const base = normalizarClasificacion(clasificarHeuristica(mensaje));
-  const conRefuerzoInv = aplicarRefuerzoRegistroInventario(mensaje, base);
-  if (Array.isArray(opciones.historial) && opciones.historial.length) {
-    return aplicarRefuerzoSeguimientoHistorial(mensaje, conRefuerzoInv, opciones.historial);
-  }
-  return conRefuerzoInv;
-};
+const evaluarClasificador = (mensaje) => normalizarClasificacion(clasificarHeuristica(mensaje));
 
 const CASOS_INTENT = [
   /* Saludos / small_talk */
@@ -68,64 +53,13 @@ const CASOS_INTENT = [
   { titulo: "comando PLANES", mensaje: "PLANES", intencion: "comando" },
   { titulo: "comando alerta", mensaje: "avisame cuando la soja supere 440000", intencion: "comando" },
 
-  /* Consulta de registros (gasto: ruta consulta_registros; animales/inventario: ruta registrar
-   *  porque el refuerzo manda toda consulta de inventario al flow unificado). */
+  /* Consulta de registros / inventario (heurística: parseIntentInventario manda animales a registrar) */
   { titulo: "consulta gasto", mensaje: "cuánto gasté este mes", intencion: "consulta_registros" },
   { titulo: "consulta inventario animales", mensaje: "cuántos animales tengo en total", intencion: "registrar" },
 
   /* Análisis */
   { titulo: "analisis mercado: conviene vender", mensaje: "conviene vender o espero", intencion: "analisis_mercado" },
   { titulo: "analisis interno: mis costos", mensaje: "con mis costos me da?", intencion: "analisis_interno" },
-];
-
-/** Seguimientos cortos en contexto de inventario reciente. */
-const HIST_INV_OK = [
-  {
-    pregunta: "si",
-    respuesta:
-      "✅ Listo, guardado en inventario.\n🐄 20 vaquillonas\n📍 Lote: 9\n📅 12/05/2026",
-  },
-];
-
-const HIST_INV_PEND = [
-  {
-    pregunta: "si",
-    respuesta: "No encontré el lote «9» en el sistema. ¿Querés que lo cree?",
-  },
-];
-
-const HIST_PRECIO_SOJA = [
-  {
-    pregunta: "el precio de la soja hoy",
-    respuesta:
-      "Hola Fabián, la soja en Rosario (CAC) promedia los $455.794/tn con datos al 11/05/2026 (fuente: cac_bcr). El rango de precios en las plazas oscila entre los $312.500 y los $1.185.894.",
-  },
-];
-
-const HIST_PRECIO_MAIZ = [
-  {
-    pregunta: "y el maíz?",
-    respuesta:
-      "Maíz en Rosario hoy alrededor de $200.000/tn. Pizarra BCR muestra tendencia estable.",
-  },
-];
-
-const CASOS_SEGUIMIENTO = [
-  { titulo: "seguimiento INV: y el resto", mensaje: "Y el resto?", historial: HIST_INV_OK, intencion: "registrar" },
-  { titulo: "seguimiento INV: los demas", mensaje: "y los demás", historial: HIST_INV_OK, intencion: "registrar" },
-  { titulo: "seguimiento INV: los otros (pendiente)", mensaje: "los otros", historial: HIST_INV_PEND, intencion: "registrar" },
-  { titulo: "seguimiento INV: agregamos", mensaje: "agregamos los del lote 14", historial: HIST_INV_OK, intencion: "registrar" },
-
-  /**
-   * Seguimientos de precio: el bot acaba de responder cotización y el
-   * usuario pregunta corto por otro producto. Debe seguir siendo `precio`
-   * (no `registrar` ni `consulta_registros`), aunque el producto coincida
-   * con una categoría de inventario (novillo/vaca).
-   */
-  { titulo: "seguimiento PRE: y el novillo?", mensaje: "Y el novillo?", historial: HIST_PRECIO_SOJA, intencion: "precio" },
-  { titulo: "seguimiento PRE: y el dólar?", mensaje: "Y el dólar?", historial: HIST_PRECIO_SOJA, intencion: "precio" },
-  { titulo: "seguimiento PRE: y la cebada?", mensaje: "Y la cebada?", historial: HIST_PRECIO_MAIZ, intencion: "precio" },
-  { titulo: "seguimiento PRE: el trigo", mensaje: "el trigo?", historial: HIST_PRECIO_SOJA, intencion: "precio" },
 ];
 
 const CASOS_MULTILOTE = [
@@ -163,21 +97,9 @@ const main = async () => {
   let fallados = 0;
   const errores = [];
 
-  console.log("== Intenciones (clasificarHeuristica + refuerzos) ==");
+  console.log("== Intenciones (solo clasificarHeuristica) ==");
   for (const c of CASOS_INTENT) {
     const out = evaluarClasificador(c.mensaje);
-    const ok = out.intencion === c.intencion;
-    if (ok) pasados += 1;
-    else {
-      fallados += 1;
-      errores.push({ titulo: c.titulo, mensaje: c.mensaje, esperado: c.intencion, real: out.intencion });
-    }
-    console.log(`  ${ok ? "✓" : "✗"} ${fmt(c.titulo, 38)} esperado=${fmt(c.intencion, 18)} real=${out.intencion}`);
-  }
-
-  console.log("\n== Seguimientos cortos en contexto inventario ==");
-  for (const c of CASOS_SEGUIMIENTO) {
-    const out = evaluarClasificador(c.mensaje, { historial: c.historial });
     const ok = out.intencion === c.intencion;
     if (ok) pasados += 1;
     else {
