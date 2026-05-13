@@ -3,14 +3,17 @@
 /**
  * # Clasificador de intenciones — rol en la arquitectura de agente
  *
- * Este módulo NO es la fuente de verdad de la decisión del turno. Es la **primera
- * capa** de un pipeline tipo agente (estilo Cursor / OpenAI tool-use):
+ * Este módulo NO es la fuente de verdad absoluta del turno. Es la **primera
+ * capa** de un pipeline tipo agente (Cursor / tool-use):
  *
- *   1) Clasificador (acá)
- *      - Devuelve un *hint* de intención: `precio`, `clima`, `registrar`, etc.
- *      - Usa heurística primero (rápida, gratis, determinista) y solo recurre
- *        a IA (Groq → Gemini) cuando la heurística no alcanza.
- *      - Recibe historial reciente para entender mensajes ambiguos en contexto.
+ *   1) **Clasificador con LLM** (Groq → Gemini): el modelo elige una
+ *      etiqueta cerrada con reglas explícitas en el prompt (incluye
+ *      desempates: capacidades del producto → `agro_general`, datos
+ *      propios → `consulta_registros`, etc.). **No** escalamos con listas
+ *      infinitas de frases en regex: una sola señal léxica amplia
+ *      (`parecePreguntaCapacidadOMetaFeedback`) corrige solo el error
+ *      sistemático cuando el LLM marca `comando` o `consulta_registros`
+ *      para preguntas de capacidad / feedback al bot.
  *
  *   2) Refuerzos (en el pipeline)
  *      - `aplicarRefuerzoRegistroInventario`: si el mensaje habla de inventario,
@@ -30,11 +33,10 @@
  *      - Ejecuta `router` con reintentos verificados. Si la primera respuesta
  *        no pasa verify, vuelve a intentar con más contexto.
  *
- * **Por qué no IA libre:** en un canal WhatsApp con productores, latencia +
- * costo + determinismo de comandos (`MI RESUMEN`, `PLANES`) y confirmaciones
- * de inventario (`SI/NO`) requieren *fast-path* heurístico. El LLM trabaja
- * libre en el scout y el router; el clasificador solo decide a *qué ruta*
- * mandar el turno.
+ * **Por qué no IA libre en todo el canal:** latencia, costo y pasos que
+ * exigen determinismo (comandos literales `MI RESUMEN`, confirmaciones
+ * `SI/NO`). El LLM trabaja libre en scout y router; acá solo se pide
+ * **una etiqueta de ruta** con vocabulario cerrado + guardrail mínimo.
  */
 
 const { generarChatGroq } = require("./groq");
@@ -79,6 +81,32 @@ const norm = (s = "") =>
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
+
+/**
+ * Comandos literales del catálogo: si aparecen, NO tratamos el mensaje
+ * como meta-charla ni como "pregunta de capacidad" genérica.
+ */
+const RE_DISPARADORES_COMANDO_EXPLICITO =
+  /\b(mi\s+resumen|mis\s+alertas|mi\s+margen|mis\s+gastos|mis\s+ventas|ver\s+comandos|completar\s+perfil|mi\s+plan|planes|quiero\s+plan\s+(pro|basico|gratis)|alerta|avisa(me|r)|cancelar\s+alerta|reset\s+onboarding|mi\s+ganado|mi\s+zona|mis\s+cultivos|borrar\s+mis\s+datos)\b/;
+
+/**
+ * **Un solo** guardrail léxico amplio (no una lista infinita de frases):
+ * modalidad de permiso / app, feedback de desacuerdo con el asistente,
+ * o pregunta sobre capacidad de datos (individualizar, trazabilidad).
+ *
+ * Se usa después del LLM para corregir `comando` o `consulta_registros`
+ * mal elegidos, y dentro de `esPreguntaMetaConversacional` vía OR.
+ * La decisión fina la hace el modelo en el prompt; esto solo evita
+ * respuestas tipo "sin datos en base" cuando el usuario pregunta *si puede*.
+ */
+const parecePreguntaCapacidadOMetaFeedback = (texto = "") => {
+  const t = norm(texto);
+  if (!t) return false;
+  if (RE_DISPARADORES_COMANDO_EXPLICITO.test(t)) return false;
+  return /\b(?:puedo|podemos|pod[eé]s|podria|podr[ií]a|se\s+puede|se\s+pueden|es\s+posible|permite|sirve\s+para|la\s+app|esta\s+app|agrohabilis|individualiz|identificar\s+cada|trazabilidad|no\s+(?:me\s+)?entend\w*|entendiste\s+mal|equivocaste|no\s+es\s+(?:eso|lo)\s+que|no\s+era\b|pregunt(?:o|aba|ando)\s+otra\s+cosa|no\s+te\s+estoy\s+pregunt|tiene\s+que\s+ser\s+otro|me\s+equivoc\w*|otro\s+(?:indice|valor|precio|dato|numero)|ese\s+no\s+es)\b/.test(
+    t
+  );
+};
 
 const parsearJSON = (textoBruto = "") => {
   const raw = String(textoBruto || "").trim();
@@ -417,40 +445,16 @@ const normalizarClasificacion = (obj) => {
 };
 
 /**
- * Detecta preguntas/comentarios meta-conversacionales que **no** son
- * comandos del bot (aunque el LLM clasificador a veces los marca como
- * tal). Ejemplos típicos de la sesión 2026-05-12:
- *
- *   - "Sos un agente o un Chatbot?"
- *   - "De qué trata agroHabilis?"
- *   - "Tengo recomendaciones para hacerte"
- *   - "Quiero saber si eso se puede hacer en esta app"
- *   - "Pero todavía no te las dí"
- *   - "Y con respecto al registro?"
- *
- * Todos estos terminan con respuestas robóticas tipo "No reconocí el
- * comando..." si el clasificador los manda a `comando` y `rutaComando`
- * no encuentra ningún match concreto.
- *
- * Esta función devuelve `true` SOLO si el texto es claramente
- * conversacional/meta y NO contiene ningún disparador real de comando.
+ * Meta-charla: sobre el bot, la app, o señal amplia de capacidad / feedback
+ * (`parecePreguntaCapacidadOMetaFeedback`). **No** listamos frase por frase
+ * infinitas: el LLM clasifica y este OR cubre el error sistemático
+ * comando/consulta_registros vs pregunta de producto.
  */
 const esPreguntaMetaConversacional = (texto = "") => {
   const original = String(texto || "").trim();
   if (!original) return false;
-  /**
-   * Mensajes con número se permiten SOLO si son claramente meta
-   * ("la cabeza 5", "puedo identificar el lote 3"). Si no matchea
-   * un patrón meta, sale como antes (no-meta) más abajo.
-   */
   const t = norm(original);
-  /** Si menciona explícitamente un comando del catálogo, NO es meta-charla. */
-  const disparadoresComandoExplicito = /\b(mi\s+resumen|mis\s+alertas|mi\s+margen|mis\s+gastos|mis\s+ventas|ver\s+comandos|completar\s+perfil|mi\s+plan|planes|quiero\s+plan\s+(pro|basico|gratis)|alerta|avisa(me|r)|cancelar\s+alerta|reset\s+onboarding|mi\s+ganado|mi\s+zona|mis\s+cultivos|borrar\s+mis\s+datos)\b/;
-  if (disparadoresComandoExplicito.test(t)) return false;
-  /**
-   * Patrones meta: preguntas sobre el bot, sobre la app, comentarios al
-   * bot, frases conversacionales sin pedido operativo concreto.
-   */
+  if (RE_DISPARADORES_COMANDO_EXPLICITO.test(t)) return false;
   const patronesMeta = [
     /\bsos\s+(un\s+)?(agente|bot|chat\s*bot|asistente|ia|inteligencia\s+artificial|robot|humano|persona)\b/,
     /\bya\s+sos\s+(un\s+)?(agente|bot|asistente|ia)\b/,
@@ -472,40 +476,11 @@ const esPreguntaMetaConversacional = (texto = "") => {
     /^y\s+(con\s+)?respecto\s+(a|al|del|de|a\s+(la|los|las))\b/,
     /^y\s+(sobre|acerca\s+de|en\s+cuanto\s+a)\b/,
     /^y\s+(el|la|los|las)\s+\w{3,}\s*\??$/,
-    /**
-     * Preguntas sobre CAPACIDADES de la app:
-     *   "¿puedo registrar X?"
-     *   "¿puedo individualizar / identificar cada vaca?"
-     *   "¿podemos hacer X?"  "¿se puede X?"
-     *   "¿después puedo identificar cada novillo?"
-     * (sesión 2026-05-13: el bot interpretó como consulta de datos
-     *  y respondió "sin datos en base" — error grave).
-     */
-    /^(\(?\)?\s*)?(despu[eé]s\s+)?\bpuedo\s+(registrar|guardar|identificar|individualizar|marcar|asociar|vincular|listar|consultar|ver|cargar|anotar|trackear|seguir|separar|distinguir|filtrar|borrar|editar|modificar|exportar|descargar|imprimir|imprimir|compartir|llevar|controlar)\b/,
-    /\b(pod[eé]mos|podemos)\s+(registrar|guardar|identificar|individualizar|marcar|consultar|cargar|llevar|hacer)\b/,
-    /\b(se\s+puede|se\s+pueden|se\s+podr[ií]a|es\s+posible)\s+(registrar|guardar|identificar|individualizar|marcar|consultar|cargar|llevar|hacer|asociar|vincular|distinguir|filtrar)\b/,
-    /\bpod[eé]s\s+(identificar|individualizar|distinguir|separar|listar|trackear)\b/,
-    /\bsirve\s+para\s+(registrar|llevar|hacer|controlar)\b/,
-    /**
-     * "te estoy preguntando otra cosa" / "no es lo que te pregunté" /
-     * "no entendiste" / "ese no es" — meta-correctivos. Pedidos
-     * explícitos de que el bot vuelva a leer el mensaje previo en vez
-     * de seguir con un dump.
-     */
-    /\bte\s+(estoy\s+)?pregunt(o|aba|ando|e|é)\s+otra\s+cosa\b/,
-    /\bno\s+es\s+(lo|eso)\s+que\s+(te\s+)?pregunt/,
-    /\bno\s+(me\s+)?entendiste\b/,
-    /\bno\s+era\s+(eso|lo\s+que)\b/,
-    /\bno\s+te\s+estoy\s+pregunt/,
-    /\bese\s+no\s+es\s+(el|lo)\b/,
-    /\btiene\s+que\s+ser\s+otro\b/,
-    /\botro\s+(indice|índice|valor|precio|dato|n[uú]mero)\b/,
   ];
-  /** Si trae números pero matchea meta explícito (ej. "lote 3", "cabeza 5"), aplica. */
-  if (/\d/.test(original)) {
-    return patronesMeta.some((re) => re.test(t));
-  }
-  return patronesMeta.some((re) => re.test(t));
+  const fromList = patronesMeta.some((re) => re.test(t));
+  if (fromList) return true;
+  if (parecePreguntaCapacidadOMetaFeedback(texto)) return true;
+  return false;
 };
 
 const formatearHistorialParaClasificador = (historial = []) => {
@@ -546,14 +521,15 @@ Usá esta guía para mapear el mensaje a **una** etiqueta de la lista de arriba.
 - \`analisis_interno\`: quiere un análisis que **cruza mercado con sus propios datos del campo** (costos por ha, margen con sus gastos/ventas, “con mis números”, “me da con lo que tengo cargado”, etc.).
 - \`clima\`: pregunta sobre **tiempo, lluvia esperada, helada, temperatura, pronóstico** para planificar (futuro o “¿va a llover?”). **No** uses esta etiqueta si en realidad está **registrando** un hecho (ej. “llovió 35 mm”, “puse vacas en el campo el caimán”: eso suele ser \`registrar\`).
 - \`registrar\`: quiere **cargar o actualizar un dato nuevo** en el sistema: gasto, venta, animal o inventario, lluvia caída, labor/aplicación/siembra, stock, etc. (verbos tipo: gasté, compré, vendí, registrá, puse, agregué, cargué, nació, vacuné, llovió… con contenido concreto).
-- \`consulta_registros\`: quiere **consultar datos que él mismo cargó antes** (cuánto gasté, mis ventas, inventario, animales en total, qué hay en un lote, etc.).
-- \`agro_general\`: pregunta de **conocimiento agro** (técnica, cultivo, norma, “qué es el FAS”, épocas de siembra en general, etc.) **sin** pedir precio puntual ni análisis de mercado personalizado ni comando del bot.
+- \`consulta_registros\`: quiere **consultar datos que él mismo cargó antes** (cuánto gasté, mis ventas, inventario, animales en total, qué hay en un lote, etc.). **NO** uses esta etiqueta si pregunta **si la app/herramienta permite** algo (p. ej. "¿puedo individualizar cada cabeza?", "¿se puede registrar por lote?", "¿después puedo identificar cada novillo?"): eso es **\`agro_general\`** (pregunta sobre el producto, no un listado de sus datos guardados).
+- \`agro_general\`: conocimiento agro **o** pregunta sobre **qué puede hacer AgroHabilis** (límites del registro, si admite trazabilidad animal, flujos, "¿puedo…?", "¿se puede…?"), **o** cuando el usuario **corrige** al asistente ("no me entendiste", "te pregunto otra cosa", "no es eso lo que pregunté"). **No** uses esta etiqueta si está **cargando datos concretos** (cantidades, animales, etc.): ahí suele ser \`registrar\`.
 - \`no_agro\`: pregunta que **no tiene que ver con el agro** operativo del productor (cultura general, deportes, etc.).
 - \`saludo\`: **saludo, despedida o agradecimiento** sin un pedido concreto de datos o acción en el mismo mensaje (o el pedido es trivialmente social).
 - \`small_talk\`: **charla breve sin pedido operativo** (estados de ánimo: "tengo sueño", "qué frío"; confirmaciones cortas como "dale", "perfecto"; risas, etc.). Diferencia con \`saludo\`: no es saludo/despedida, pero tampoco trae un pedido concreto. Si hay números o tema agro operativo, **no** uses small_talk.
 - \`comando\`: pide ejecutar una **función explícita del bot** (MI RESUMEN, MIS ALERTAS, MI MARGEN, PLANES, VER COMANDOS, “avisame cuando la soja supere X”, etc.).
 
 ### Desempates (muy importante)
+- Si el mensaje pregunta **si puede / si se puede / si la app permite** algo sin pedir un volcado de "mis datos guardados" → **\`agro_general\`**, no \`consulta_registros\`.
 - Si el mensaje **carga o mueve datos** (cantidades, animales, insumos, lluvia ya caída en mm, “puse X vacas en el campo/lote Y”) → preferí **\`registrar\`** sobre \`clima\` o \`agro_general\`, aunque mencione un nombre que suene a localidad geográfica (puede ser nombre de lote).
 - Si pide **pronóstico o “va a llover”** sin estar anotando un hecho pasado → \`clima\`.
 - Si encajan dos etiquetas, elegí la **más específica** al acto principal (p. ej. registrar > agro_general).
@@ -584,14 +560,14 @@ Campos extra:
     const raw = await llamarIAClasificador(prompt);
     let c = normalizarClasificacion(parsearJSON(raw));
     /**
-     * Guardrail: si el LLM marcó `comando` pero el mensaje es claramente
-     * una pregunta meta-conversacional (sin disparador de comando real
-     * en el texto), lo degradamos a `agro_general` para que el pipeline
-     * conversacional lo conteste con tono natural en vez de cortar con
-     * "No reconocí el comando...". Ver `esPreguntaMetaConversacional`
-     * para el detalle de patrones (origen: sesión 2026-05-12).
+     * Guardrail post-LLM: el modelo elige la intención; si equivocó a
+     * `comando` o `consulta_registros` para una pregunta meta / de
+     * capacidad del producto / feedback al bot, degradamos a
+     * `agro_general`. La detección usa `esPreguntaMetaConversacional`
+     * (lista corta de charla sobre el bot + **un solo** léxico amplio
+     * `parecePreguntaCapacidadOMetaFeedback`, no frase por frase).
      */
-    if (c.intencion === "comando" && esPreguntaMetaConversacional(mensaje)) {
+    if ((c.intencion === "comando" || c.intencion === "consulta_registros") && esPreguntaMetaConversacional(mensaje)) {
       c = {
         ...c,
         intencion: "agro_general",
@@ -627,6 +603,7 @@ module.exports = {
   aplicarRefuerzoRegistroInventario,
   aplicarRefuerzoSeguimientoHistorial,
   esPreguntaMetaConversacional,
+  parecePreguntaCapacidadOMetaFeedback,
   INTENCIONES,
   ETIQUETAS_INTENCION_PROMPT,
 };
