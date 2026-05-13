@@ -219,13 +219,39 @@ const aplicarRefuerzoRegistroInventario = (mensaje, clasificacion) => {
 };
 
 /**
- * Si el mensaje es un *seguimiento corto* ("y el resto?", "y los demás?",
- * "agregamos también...") y el último turno del bot fue claramente de
- * inventario (confirmación o pedido de aclaración), forzamos `registrar`
- * para que el pipeline retome la carga en vez de derivar a precios/clima.
+ * Tokens de **producto cotizable** que aparecen en seguimientos cortos
+ * tipo "y el novillo?", "y el maíz?", "y la cebada?". No es una lista de
+ * frases: es una sola alternancia sobre el vocabulario que el clasificador
+ * ya conoce como cotizable (granos + hacienda en pie + dólar).
+ */
+const RE_PRODUCTO_COTIZABLE =
+  /\b(soja|ma[ií]z|trigo|cebada|girasol|sorgo|novillos?|novillitos?|vacas?|vaquillonas?|terneros?|terneras?|hacienda|liniers|matba|rofex|d[oó]lar|dolar|mep|blue|ccl|oficial)\b/;
+
+/**
+ * Marcadores típicos de una respuesta de **precios/cotización**: símbolo
+ * de moneda, unidad `/tn`, plazas conocidas, índice Liniers, etc. Usado
+ * para reconocer cuándo el último turno del bot fue claramente de precio.
+ */
+const RE_RESPUESTA_FUE_PRECIO =
+  /(\$\s?\d|\/tn\b|usd|u\$s|bcr|cac|matba|rofex|liniers|pizarra|cotiz|capacidad\s+de\s+pago|tendencia\s+(alcista|bajista|estable))/;
+
+/**
+ * **Refuerzo de continuidad** — un único lugar donde el clasificador
+ * respeta el "hilo" del turno anterior cuando el mensaje nuevo es
+ * **corto y ambiguo** ("y el resto?", "y el novillo?", "y el maíz?").
  *
- * Esta heurística corre **además del refuerzo IA** y cubre el caso sin
- * LLM disponible.
+ * Cubre dos hilos posibles, mirando lo que el bot acaba de decir:
+ *   - **Inventario**: último turno fue carga/confirmación/aclaración de
+ *     inventario → forzamos `registrar`.
+ *   - **Precio**: último turno fue una respuesta de cotización
+ *     (`$/tn`, BCR/Liniers/Matba, "tendencia alcista", etc.) y el
+ *     mensaje nuevo es un seguimiento corto con otro producto cotizable
+ *     ("y el novillo?", "y el maíz?", "y el dólar?") → forzamos `precio`.
+ *
+ * Este refuerzo corre **además del refuerzo IA**: si el LLM ya respeta
+ * el historial, no cambia nada; si se equivoca (típicamente eligiendo
+ * `consulta_registros` por la palabra "novillo"), acá lo corregimos sin
+ * agregar listas frase-por-frase.
  */
 const aplicarRefuerzoSeguimientoHistorial = (mensaje, clasificacion, historial) => {
   if (!clasificacion || typeof clasificacion !== "object") return clasificacion;
@@ -233,16 +259,16 @@ const aplicarRefuerzoSeguimientoHistorial = (mensaje, clasificacion, historial) 
   const tn = norm(mensaje);
   if (!tn || tn.length > 80) return clasificacion;
 
-  const esSeguimiento =
+  const ultimaRespBot = String(historial[0]?.respuesta || "");
+  const tBot = norm(ultimaRespBot);
+
+  const esSeguimientoInv =
     /\by\s+(el|los|las)\s+(resto|demas|otros|otras)\b/.test(tn) ||
     /\b(el|los|las)\s+(resto|demas|otros|otras)\b/.test(tn) ||
     /^y\s+(?:el\s+)?resto\??$/.test(tn) ||
     /\b(agregamos|agreguemos|agregale|agrego|sumamos|sumale|tambien\s+(estos|los|las|cargamos|guardamos))\b/.test(tn) ||
     /\b(seguimos|continuamos|continuar|seguir)\s+(cargando|con\s+los|con\s+las)\b/.test(tn);
-  if (!esSeguimiento) return clasificacion;
 
-  const ultimaRespBot = String(historial[0]?.respuesta || "");
-  const tBot = norm(ultimaRespBot);
   const ultimoTurnoFueInventario =
     /guardado\s+en\s+inventario/.test(tBot) ||
     /confirma\s+el\s+ingreso\s+al\s+inventario/.test(tBot) ||
@@ -250,16 +276,46 @@ const aplicarRefuerzoSeguimientoHistorial = (mensaje, clasificacion, historial) 
     /no\s+encontre\s+el\s+lote/.test(tBot) ||
     /lote\s+\w+\s+creado/.test(tBot);
 
-  if (!ultimoTurnoFueInventario) return clasificacion;
-  if (clasificacion.intencion === "registrar") return clasificacion;
+  if (esSeguimientoInv && ultimoTurnoFueInventario) {
+    if (clasificacion.intencion === "registrar") return clasificacion;
+    return {
+      ...clasificacion,
+      intencion: "registrar",
+      confianza: clasificacion.confianza || "media",
+      requiere_datos_propios: false,
+      _refuerzoSeguimientoHistorial: "inventario",
+    };
+  }
 
-  return {
-    ...clasificacion,
-    intencion: "registrar",
-    confianza: clasificacion.confianza || "media",
-    requiere_datos_propios: false,
-    _refuerzoSeguimientoHistorial: true,
-  };
+  /**
+   * Seguimiento de **precio**: mensaje arranca con "y el/la/los/las" o "y "
+   * y menciona un producto cotizable; o trae sólo el producto y el turno
+   * anterior tiene marcadores de respuesta de precio. Es un único patrón
+   * — **no** un catálogo de frases.
+   */
+  const esSeguimientoCorto =
+    /^y\s+(el|la|los|las)\s+\w+/.test(tn) ||
+    /^y\s+\w+\??$/.test(tn) ||
+    /^(?:el|la|los|las)\s+\w+\s*\??$/.test(tn);
+  const mencionaCotizable = RE_PRODUCTO_COTIZABLE.test(tn);
+  const ultimoTurnoFuePrecio = RE_RESPUESTA_FUE_PRECIO.test(tBot);
+
+  if (
+    esSeguimientoCorto &&
+    mencionaCotizable &&
+    ultimoTurnoFuePrecio &&
+    clasificacion.intencion !== "precio"
+  ) {
+    return {
+      ...clasificacion,
+      intencion: "precio",
+      requiere_datos_propios: false,
+      confianza: clasificacion.confianza || "media",
+      _refuerzoSeguimientoHistorial: "precio",
+    };
+  }
+
+  return clasificacion;
 };
 
 const clasificarHeuristica = (mensaje = "") => {
@@ -500,7 +556,7 @@ const clasificarMensaje = async (mensaje, usuario, opciones = {}) => {
   const listaEtiquetas = ETIQUETAS_INTENCION_PROMPT.map((e, i) => `${i + 1}. \`${e}\``).join("\n");
   const historialTxt = formatearHistorialParaClasificador(opciones?.historial || []);
   const bloqueHistorial = historialTxt
-    ? `\n## Conversación previa en este mismo chat (más antiguo arriba)\n${historialTxt}\n\n### Cómo usar el historial\n- Si el mensaje nuevo es **corto o ambiguo** ("y el resto?", "podés procesar varios a la vez?", "y mañana?"), interpretalo **como seguimiento del mismo tema** del último turno (precio del cultivo X, registro de inventario, alerta, etc.) y elegí esa intención.\n- Si el último turno fue un **pedido de carga al inventario** y el mensaje nuevo dice "varios", "el resto", "los otros", "todos juntos" → casi seguro la intención es \`registrar\`.\n- No cambies el tema salvo que el usuario lo aclare con palabras explícitas de otro dominio.`
+    ? `\n## Conversación previa en este mismo chat (más antiguo arriba)\n${historialTxt}\n\n### Cómo usar el historial\n- Si el mensaje nuevo es **corto o ambiguo** ("y el resto?", "podés procesar varios a la vez?", "y mañana?"), interpretalo **como seguimiento del mismo tema** del último turno (precio del cultivo X, registro de inventario, alerta, etc.) y elegí esa intención.\n- Si el último turno fue un **pedido de carga al inventario** y el mensaje nuevo dice "varios", "el resto", "los otros", "todos juntos" → casi seguro la intención es \`registrar\`.\n- Si el último turno del Asistente **respondió un precio o cotización** (símbolo \`$\`, \`/tn\`, BCR, Liniers, Matba, "tendencia alcista", etc.) y el mensaje nuevo es un seguimiento corto que menciona **otro producto cotizable** ("y el novillo?", "y el maíz?", "y el dólar?", "y la cebada?") → la intención es \`precio\` (NO \`consulta_registros\` ni \`registrar\`, aunque el nombre del producto coincida con una categoría de inventario).\n- No cambies el tema salvo que el usuario lo aclare con palabras explícitas de otro dominio.`
     : "";
   const prompt = `
 ## Tarea

@@ -94,11 +94,38 @@ const HIST_INV_PEND = [
   },
 ];
 
+const HIST_PRECIO_SOJA = [
+  {
+    pregunta: "el precio de la soja hoy",
+    respuesta:
+      "Hola Fabián, la soja en Rosario (CAC) promedia los $455.794/tn con datos al 11/05/2026 (fuente: cac_bcr). El rango de precios en las plazas oscila entre los $312.500 y los $1.185.894.",
+  },
+];
+
+const HIST_PRECIO_MAIZ = [
+  {
+    pregunta: "y el maíz?",
+    respuesta:
+      "Maíz en Rosario hoy alrededor de $200.000/tn. Pizarra BCR muestra tendencia estable.",
+  },
+];
+
 const CASOS_SEGUIMIENTO = [
-  { titulo: "seguimiento: y el resto", mensaje: "Y el resto?", historial: HIST_INV_OK, intencion: "registrar" },
-  { titulo: "seguimiento: los demas", mensaje: "y los demás", historial: HIST_INV_OK, intencion: "registrar" },
-  { titulo: "seguimiento: los otros (pendiente)", mensaje: "los otros", historial: HIST_INV_PEND, intencion: "registrar" },
-  { titulo: "seguimiento: agregamos", mensaje: "agregamos los del lote 14", historial: HIST_INV_OK, intencion: "registrar" },
+  { titulo: "seguimiento INV: y el resto", mensaje: "Y el resto?", historial: HIST_INV_OK, intencion: "registrar" },
+  { titulo: "seguimiento INV: los demas", mensaje: "y los demás", historial: HIST_INV_OK, intencion: "registrar" },
+  { titulo: "seguimiento INV: los otros (pendiente)", mensaje: "los otros", historial: HIST_INV_PEND, intencion: "registrar" },
+  { titulo: "seguimiento INV: agregamos", mensaje: "agregamos los del lote 14", historial: HIST_INV_OK, intencion: "registrar" },
+
+  /**
+   * Seguimientos de precio: el bot acaba de responder cotización y el
+   * usuario pregunta corto por otro producto. Debe seguir siendo `precio`
+   * (no `registrar` ni `consulta_registros`), aunque el producto coincida
+   * con una categoría de inventario (novillo/vaca).
+   */
+  { titulo: "seguimiento PRE: y el novillo?", mensaje: "Y el novillo?", historial: HIST_PRECIO_SOJA, intencion: "precio" },
+  { titulo: "seguimiento PRE: y el dólar?", mensaje: "Y el dólar?", historial: HIST_PRECIO_SOJA, intencion: "precio" },
+  { titulo: "seguimiento PRE: y la cebada?", mensaje: "Y la cebada?", historial: HIST_PRECIO_MAIZ, intencion: "precio" },
+  { titulo: "seguimiento PRE: el trigo", mensaje: "el trigo?", historial: HIST_PRECIO_SOJA, intencion: "precio" },
 ];
 
 const CASOS_MULTILOTE = [
