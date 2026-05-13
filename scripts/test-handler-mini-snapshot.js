@@ -70,14 +70,35 @@ const main = async () => {
     print("strict_suggestion: saludo libre → NO matchea", out.manejado === false);
   }
   {
+    /**
+     * Modo agente: `mi perfil` no matchea ninguna sugerencia exacta del
+     * catálogo (no hay regla `perfil` standalone en sugerirComandoPorTexto)
+     * → `strict_suggestion` AHORA debe ceder el turno al pipeline_agente
+     * en vez de bloquear con texto fijo "Escribí VER COMANDOS".
+     */
     const out = await handlerStrictSuggestion({
       consulta: "mi perfil",
       comandoAlias: "MI PERFIL",
       comandoNatural: "",
     });
     print(
-      "strict_suggestion: prefijo MI → matchea",
-      out.manejado === true && out.route === "STRICT_SUGGESTION"
+      "strict_suggestion: prefijo MI sin sugerencia exacta → cede al pipeline",
+      out.manejado === false
+    );
+  }
+  {
+    /**
+     * Caso con sugerencia exacta (matchea regla `comando|comandos|ayuda|menu`):
+     * sí debe responder directo con la lista corta de comandos.
+     */
+    const out = await handlerStrictSuggestion({
+      consulta: "ayuda",
+      comandoAlias: "AYUDA",
+      comandoNatural: "AYUDA",
+    });
+    print(
+      "strict_suggestion: 'ayuda' → sugerencia directa (lista corta)",
+      out.manejado === true && out.route === "STRICT_SUGGESTION" && /comandos/i.test(out.respuesta || "")
     );
   }
   {

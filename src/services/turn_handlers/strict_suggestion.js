@@ -72,14 +72,24 @@ async function handlerStrictSuggestion(ctx) {
   }
 
   const sugerencia = sugerirComandoPorTexto(consulta);
-  return {
-    manejado: true,
-    respuesta:
-      sugerencia ||
-      "Detecté que querés usar un comando. Escribí *VER COMANDOS* y te muestro la lista completa.",
-    route: "STRICT_SUGGESTION",
-    extraLog: { sugerencia: Boolean(sugerencia), comandoNatural: natural || null },
-  };
+  if (sugerencia) {
+    return {
+      manejado: true,
+      respuesta: sugerencia,
+      route: "STRICT_SUGGESTION",
+      extraLog: { sugerencia: true, comandoNatural: natural || null },
+    };
+  }
+  /**
+   * Modo agente: si NO hay sugerencia clara del catálogo, NO cortamos al
+   * usuario con texto fijo "Escribí VER COMANDOS". Dejamos pasar al
+   * `pipeline_agente` para que el LLM entienda la intención (puede ser
+   * meta-charla, ambigüedad, o consulta que la heurística no clasificó).
+   *
+   * El handler queda solo como "sugerencia rápida si pega exacto",
+   * nunca como blocker.
+   */
+  return { manejado: false, extraLog: { sugerencia: false, comandoNatural: natural || null } };
 }
 
 module.exports = { handlerStrictSuggestion };

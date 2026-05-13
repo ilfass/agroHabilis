@@ -96,6 +96,32 @@ const esActualidadGeopoliticaSinAnclaAgro = (texto = "") => {
   return false;
 };
 
+/** Deportes, fixture, charla meta sobre el bot, ocio digital: sin ancla operativa agro. */
+const esProbableNoAgroDeportesOcio = (texto = "") => {
+  const raw = String(texto || "").trim();
+  if (!raw || raw.length < 5 || raw.length > 280) return false;
+  const t = normalizarTexto(raw);
+  if (tieneTemaOperativoSaludo(t)) return false;
+  if (
+    /\b(soja|ma[ií]z|trigo|girasol|cebada|sorgo|hect[aá]rea|\bha\b|flete|matba|rofex|magyp|novillo|terner|hacienda|siembra|cosecha|insumo|lote|acopio|disponible)\b/.test(
+      t
+    )
+  ) {
+    return false;
+  }
+  if (/\b(cuando|cu[aá]ndo)\s+juega\b/.test(t)) return true;
+  if (
+    /\b(river|boca(\s+juniors?)?|racing|independiente|san lorenzo|velez|vélez|hurac[aá]n|estudiantes|gimnasia|messi|maradona|mundial|libertadores|futbol|fútbol|liga\s+argentina|afa|champions|nba|tenis|formula\s*1|f1)\b/.test(
+      t
+    )
+  ) {
+    return true;
+  }
+  if (/\b(honesto|deshonesto)\b/.test(t) && /\b(sos|eres|sos\s+vos|el\s+bot)\b/.test(t)) return true;
+  if (/\b(netflix|pel[ií]cula|serie\s+de\s+tv|spotify|instagram|tiktok|meme)\b/.test(t)) return true;
+  return false;
+};
+
 /**
  * Pregunta por la lista de comandos del bot / menú / cómo escribir (no consulta de mercado).
  * Si hay cita larga arriba y la última línea es la pregunta, se evalúa esa última parte.
@@ -265,7 +291,26 @@ const sugerirComandoPorTexto = (texto = "") => {
   ];
   const hit = reglas.find((r) => r.re.test(t));
   if (!hit) return null;
-  return `Detecté una intención de comando.\n👉 Probá con: *${hit.cmd}*\nSi querés ver todos los comandos, escribí: *VER COMANDOS*`;
+  /**
+   * En modo agente queremos textos cortos y naturales, no "Detecté una
+   * intención de comando" tipo chatbot. Para el caso particular de
+   * pedido de ayuda/menú/comandos devolvemos directamente la lista
+   * corta; para el resto, una invitación amable a usar el comando
+   * exacto SIN la introducción robótica.
+   */
+  if (hit.cmd === "VER COMANDOS") {
+    return [
+      "Estos son los comandos rápidos:",
+      "• *MI RESUMEN* — panorama del día",
+      "• *MIS ALERTAS* — alertas de precio",
+      "• *MI MARGEN* — gastos y ventas del mes",
+      "• *PLANES* — opciones de plan",
+      "• *MI ZONA*, *MIS CULTIVOS*, *MI GANADO* — completar perfil",
+      "",
+      "Pero también podés escribirme natural (ej. *avisame si la soja supera $440000*).",
+    ].join("\n");
+  }
+  return `Para eso usá *${hit.cmd}*. (También entiendo lenguaje natural — si no estás seguro, escribime cómo lo dirías.)`;
 };
 
 const resolverComandoAlias = (comando = "") => {
@@ -590,6 +635,8 @@ module.exports = {
   esConsultaDolarRapida,
   esFrasePuenteConsulta,
   esProbableConocimientoGeneralSinAgro,
+  esActualidadGeopoliticaSinAnclaAgro,
+  esProbableNoAgroDeportesOcio,
   esMensajeRuidoOSinSentido,
   intencionHeuristicaRapidaSinGemini,
 };

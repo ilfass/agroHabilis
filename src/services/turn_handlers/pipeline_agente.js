@@ -35,9 +35,17 @@ async function handlerPipelineAgente(ctx) {
 
   if (ctx?.flags?.asyncCola) {
     try {
+      /**
+       * Contrato real de la cola: `{ jid, consulta, opciones }`
+       * (ver `agent/queue/tarea_fila.js` y `drenar_consulta_whatsapp.js`).
+       * Antes pasábamos `whatsapp` por error → el drenador descartaba la
+       * tarea como `payload_invalido` y el productor NUNCA recibía
+       * respuesta cuando `AGENT_CONSULTA_ASYNC=1`.
+       */
       await encolarConsultaWhatsapp({
-        whatsapp: ctx.jid,
+        jid: ctx.jid,
         consulta,
+        opciones: {},
       });
       return {
         manejado: true,
@@ -54,6 +62,14 @@ async function handlerPipelineAgente(ctx) {
     return {
       manejado: true,
       respuesta: typeof respuesta === "string" ? respuesta : String(respuesta || ""),
+      /**
+       * `yaHumanizada=true` evita que `whatsapp.js` haga un SEGUNDO pase
+       * por `humanizarSalidaConIA` sobre una respuesta que ya fue
+       * generada por el LLM dentro del pipeline. Antes hacíamos 2 LLM
+       * calls por mensaje (latencia x2 + a veces la reescritura rompía
+       * formato).
+       */
+      yaHumanizada: true,
       route: "PIPELINE_AGENTE_SYNC",
     };
   } catch (e) {

@@ -669,12 +669,21 @@ const procesarMensajeEntranteWhatsapp = async (msg) => {
      */
     if (turnController.turnControllerActivo()) {
       try {
+        /**
+         * `comandoNatural` heurístico (sin LLM, ~0ms) calculado ANTES del
+         * TurnController. Antes faltaba en `turnCtx` y handlers como
+         * `strict_suggestion`, `cmd_alertas`, `cmd_finanzas`, etc. que lo
+         * leían siempre veían `undefined` → matchings rotos y caídas en
+         * texto fijo o en flujo legacy.
+         */
+        const comandoNaturalPre = inferirComandoNatural(consulta) || "";
         const turnCtx = {
           jid: msg.from,
           numeroNormalizado: waCapturaNorm,
           consulta,
           comandoUpper: comando,
           comandoAlias,
+          comandoNatural: comandoNaturalPre,
           planCtx,
           replyContexto,
           reply: (texto, ...args) => msg.reply(texto, ...args),
@@ -707,7 +716,20 @@ const procesarMensajeEntranteWhatsapp = async (msg) => {
         }
         if (outTC?.manejado) {
           if (outTC.route) logRoute(msg.from, outTC.route, outTC.extraLog || {});
-          if (outTC.respuesta != null) await msg.reply(outTC.respuesta);
+          if (outTC.respuesta != null) {
+            /**
+             * Si el handler marcó `yaHumanizada` (caso pipeline_agente,
+             * que ya pasó por el LLM dentro del pipeline), evitamos un
+             * segundo paso por `humanizarSalidaConIA`. Ahorra una LLM
+             * call por mensaje y previene reescritura que rompía formato
+             * (especialmente bloques con ━ y emojis del template).
+             */
+            if (outTC.yaHumanizada) {
+              await replySinIA(outTC.respuesta);
+            } else {
+              await msg.reply(outTC.respuesta);
+            }
+          }
           return;
         }
       } catch (e) {
