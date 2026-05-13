@@ -51,6 +51,63 @@ const debeSolicitarAclaracionIntencion = ({ textoPregunta, clasificacion }) => {
   return true;
 };
 
+/**
+ * Preguntas catch-all que un agente jamás contestaría sin antes pedir
+ * el objeto del pedido. Independiente de la confianza del clasificador
+ * (a veces Gemini devuelve `media` con interpretación arbitraria y por
+ * eso aterrizan en data-dumps como el reportado el 2026-05-12).
+ *
+ * Devuelve `string` con repregunta concreta o `null` si no aplica.
+ * El llamador puede pasar `clasificacion` para evitar repreguntar en
+ * seguimientos donde ya hay cultivo/tema en el historial.
+ */
+const detectarPreguntaAmbiguaCatchAll = (textoPregunta = "", clasificacion = null) => {
+  const t = String(textoPregunta || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+  if (!t || t.length > 60 || /\d/.test(t)) return null;
+  /** Seguimientos detectados ya resuelven la ambigüedad por contexto. */
+  if (clasificacion?._refuerzoSeguimientoHistorial) return null;
+  /** "mercado" / "precio" / "cotización" a secas → ¿de qué? */
+  if (/^(mercado|precios?|cotizacion(es)?|y\s+(el\s+)?mercado|hoy\s+(el\s+)?mercado)\??$/.test(t)) {
+    if (String(clasificacion?.cultivo || "").trim()) return null;
+    return [
+      "¿De qué querés el precio o vista de mercado?",
+      "Ej: *soja*, *maíz*, *trigo*, *novillo*, *dólar*, *insumos*…",
+      "Mandámelo en una línea y lo busco.",
+    ].join("\n");
+  }
+  /** "y con respecto al X" / "y respecto a X" → registrar vs consultar vs precio. */
+  const mResp = t.match(
+    /^y\s+(?:con\s+)?respecto\s+(?:a|al|del|de|a\s+(?:la|los|las))\s+(.+?)\s*\??$/
+  );
+  if (mResp) {
+    const obj = mResp[1].slice(0, 40).trim();
+    return [
+      `¿Sobre *${obj}* qué necesitás?`,
+      "▸ *Registrar* algo nuevo, *consultar* tus datos cargados, o ver *precio / análisis* de mercado.",
+      "Decímelo concreto y lo respondo.",
+    ].join("\n");
+  }
+  /** "y el X?" / "y la X?" sin verbo. */
+  if (/^y\s+(el|la|los|las)\s+\w{3,}\s*\??$/.test(t)) {
+    return "Decímelo más concreto: ¿qué necesitás saber/hacer? Una sola línea alcanza.";
+  }
+  /** "podés guardar todos|varios|juntos|a la vez" sin contenido. */
+  if (
+    /^pod[eé]s\s+(guardar|procesar|cargar|manejar)\s+(todo|todos|varios|muchos|juntos|a\s+la\s+vez)\b/.test(t) ||
+    /^se\s+pueden?\s+(guardar|cargar|registrar)\s+(varios|todos|a\s+la\s+vez)/.test(t)
+  ) {
+    return [
+      "Sí, podés mandarme varios en un solo mensaje 👌",
+      "Pasame los datos (por ejemplo varios lotes con cantidades) y los cargo en orden.",
+    ].join("\n");
+  }
+  return null;
+};
+
 const obtenerYCompletarPerfil = async (numeroWhatsapp) => {
   const inicial = await obtenerPerfil(numeroWhatsapp);
   const usuario = await completarGeolocalizacionSiFalta(inicial);
@@ -229,6 +286,37 @@ const procesarConsulta = async (numeroWhatsapp, pregunta, opciones = {}) => {
     });
   }
 
+  /**
+   * Repregunta dura para preguntas catch-all (independiente de la
+   * confianza del clasificador). Resuelve casos como "mercado" a secas
+   * (que terminaba en data-dump) o "Y con respecto al registro?" (que
+   * terminaba contestando inventario sin que el usuario lo pidiera).
+   */
+  if (!fusionPorAclaracionClasificador) {
+    const repreguntaCatchAll = detectarPreguntaAmbiguaCatchAll(textoPregunta, clasificacion);
+    if (repreguntaCatchAll) {
+      try {
+        await guardarEstado(waNorm, "agent_clasif_baja", "pendiente", { mensaje_original: textoPregunta }, 1);
+      } catch (_e) {
+        /* sin estado en BD: seguimos sin merge persistente */
+      }
+      logConsultaRoute(numeroWhatsapp, "aclaracion_catch_all", {
+        cultivo: clasificacion.cultivo,
+        confianza: clasificacion.confianza,
+        msClasificador: Date.now() - t0,
+      });
+      await guardarConsulta({
+        usuarioId: usuario?.id || null,
+        whatsapp: waNorm,
+        pregunta: textoPregunta,
+        respuesta: repreguntaCatchAll,
+        tokensUsados: null,
+        iaProvider: "aclaracion_catch_all",
+      });
+      return repreguntaCatchAll;
+    }
+  }
+
   if (
     !fusionPorAclaracionClasificador &&
     clasificacion.confianza === "baja" &&
@@ -401,4 +489,6 @@ procesarConsulta.obtenerYCompletarPerfil = obtenerYCompletarPerfil;
 module.exports = {
   obtenerYCompletarPerfil,
   procesarConsulta,
+  detectarPreguntaAmbiguaCatchAll,
+  debeSolicitarAclaracionIntencion,
 };
