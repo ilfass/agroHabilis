@@ -68,6 +68,7 @@ const {
   textoParaClasificacionSaludo,
   esSaludoSocialCorto,
   esPreguntaAyudaComandosOMenu,
+  esQuejaCorreccionRespuestaBot,
 } = require("../services/whatsapp_intents");
 const {
   parseZonas,
@@ -163,6 +164,9 @@ const humanizarSalidaConIA = async ({
     return draft;
   }
   if (esPreguntaAyudaComandosOMenu(String(mensajeUsuario || ""))) {
+    return draft;
+  }
+  if (esQuejaCorreccionRespuestaBot(String(mensajeUsuario || ""))) {
     return draft;
   }
   if (

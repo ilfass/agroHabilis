@@ -532,7 +532,7 @@ Usá esta guía para mapear el mensaje a **una** etiqueta de la lista de arriba.
 - \`comando\`: pide ejecutar una **función explícita del bot** (MI RESUMEN, MIS ALERTAS, MI MARGEN, PLANES, VER COMANDOS, “avisame cuando la soja supere X”, etc.).
 
 ### Desempates (muy importante)
-- Si el mensaje pregunta **si puede / si se puede / si la app permite** algo sin pedir un volcado de "mis datos guardados" → **\`agro_general\`**, no \`consulta_registros\`.
+- Si el mensaje pregunta **solo** «¿qué día es hoy?», «¿qué fecha es?», «¿qué hora es?» (calendario civil, sin mercado) → \`agro_general\` y en el JSON incluí \`"meta_consulta": "fecha"\` o \`"hora"\` según corresponda (además el pipeline fusiona \`meta_fecha\` / \`meta_hora\` del detector rápido).
 - Si el mensaje **carga o mueve datos** (cantidades, animales, insumos, lluvia ya caída en mm, “puse X vacas en el campo/lote Y”) → preferí **\`registrar\`** sobre \`clima\` o \`agro_general\`, aunque mencione un nombre que suene a localidad geográfica (puede ser nombre de lote).
 - Si pide **pronóstico o “va a llover”** sin estar anotando un hecho pasado → \`clima\`.
 - Si encajan dos etiquetas, elegí la **más específica** al acto principal (p. ej. registrar > agro_general).
@@ -550,10 +550,12 @@ Devolvé **solo** el JSON (sin markdown, sin texto fuera del objeto):
   "zona_mencionada": null,
   "requiere_datos_propios": false,
   "confianza": "media",
-  "variante_precio": null
+  "variante_precio": null,
+  "meta_consulta": null
 }
 
 Campos extra:
+- Si la consulta es **solo** «¿qué día es hoy?» / «¿qué fecha es?»: \`meta_consulta\`: "fecha". Si **solo** «¿qué hora es?»: \`meta_consulta\`: "hora". Si no aplica: null.
 - Si la consulta es **solo** tipo de cambio (sin cultivos/granos en la misma pregunta): \`variante_precio\`: "dolar".
 - Si pregunta **insumos** (urea, glifosato, semillas, fertilizantes): \`producto\`: "insumo".
 - Si pregunta **hacienda en pie** para precio o decisión de compra/venta: \`producto\`: "hacienda".

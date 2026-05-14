@@ -10,6 +10,7 @@ const { rutaAgroGeneral } = require("./rutas/agro_general");
 const { rutaNoAgro } = require("./rutas/no_agro");
 const { rutaSaludo } = require("./rutas/saludo");
 const { rutaComando } = require("./rutas/comando");
+const { esQuejaCorreccionRespuestaBot } = require("./intent_classifier");
 
 const pedirRegistro = () =>
   "Para eso primero necesito tu perfil activo. Escribime cualquier mensaje y arrancamos el onboarding.";
@@ -45,6 +46,13 @@ const routear = async ({ clasificacion, mensaje, usuario, numeroWhatsapp }) => {
       return rutaNoAgro({ clasificacion, mensaje, usuario, numeroWhatsapp });
 
     case "saludo":
+      if (esQuejaCorreccionRespuestaBot(mensaje)) {
+        return rutaAgroGeneral({
+          clasificacion: { ...clasificacion, intencion: "agro_general", _correccionConversacional: true },
+          mensaje,
+          usuario,
+        });
+      }
       return rutaSaludo({ usuario, mensaje });
 
     case "small_talk":
@@ -53,6 +61,13 @@ const routear = async ({ clasificacion, mensaje, usuario, numeroWhatsapp }) => {
        * y reorienta a temas agro. Evita que el gate de dominio rechace al
        * usuario con "queda fuera de lo que puedo resolver".
        */
+      if (esQuejaCorreccionRespuestaBot(mensaje)) {
+        return rutaAgroGeneral({
+          clasificacion: { ...clasificacion, intencion: "agro_general", _correccionConversacional: true },
+          mensaje,
+          usuario,
+        });
+      }
       return rutaSaludo({ usuario, mensaje });
 
     case "comando":

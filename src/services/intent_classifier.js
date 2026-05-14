@@ -38,25 +38,75 @@ const esPreguntaAyudaRegistroGasto = (texto = "") => {
   return pideComo && mencionaGasto && !/(gaste|gast[eé]|compre|compr[eé])\s+[\d.,]/i.test(t);
 };
 
+/** Última línea + texto completo (citas / respuestas largas arriba en WhatsApp). */
+const candidatosMetaFechaHora = (texto = "") => {
+  const raw = String(texto || "").trim();
+  const lines = raw.split(/\r?\n+/).map((l) => l.trim()).filter(Boolean);
+  const out = [];
+  if (lines.length) out.push(lines[lines.length - 1].replace(/\s+/g, " ").trim());
+  out.push(raw.replace(/\s+/g, " ").trim());
+  return [...new Set(out.filter(Boolean))];
+};
+
 const esMetaFechaHeuristica = (texto = "") => {
-  const t = normalizarTexto(texto).replace(/[¿?]/g, "").replace(/\s+/g, " ").trim();
-  if (!t || t.length > 80) return false;
-  return (
-    /^(que|qu[eé])\s+d[ií]a\s+(es\s+)?(hoy|ahora)\b/.test(t) ||
-    /^fecha\s+(de\s+)?hoy\b/.test(t) ||
-    /^hoy\s+que\s+d[ií]a\b/.test(t) ||
-    /^que\s+fecha\s+(es\s+)?hoy\b/.test(t)
-  );
+  for (const cand of candidatosMetaFechaHora(texto)) {
+    const t = normalizarTexto(cand).replace(/[¿?]/g, "").replace(/\s+/g, " ").trim();
+    if (!t || t.length > 96) continue;
+    if (
+      /^(que|qu[eé])\s+d[ií]a\s+(es\s+)?(hoy|ahora)\b/.test(t) ||
+      /^fecha\s+(de\s+)?hoy\b/.test(t) ||
+      /^hoy\s+que\s+d[ií]a\b/.test(t) ||
+      /^que\s+fecha\s+(es\s+)?hoy\b/.test(t) ||
+      /^(cu[aá]l|cual)\s+es\s+la\s+fecha\s+(de\s+)?hoy\b/.test(t) ||
+      /^(cu[aá]l|cual)\s+d[ií]a\s+(es\s+)?(hoy|este)\b/.test(t) ||
+      /\bque\s+d[ií]a\s+corresponde\b/.test(t) ||
+      /\bque\s+d[ií]a\s+es\s+hoy\b/.test(t)
+    ) {
+      return true;
+    }
+  }
+  return false;
 };
 
 const esMetaHoraHeuristica = (texto = "") => {
-  const t = normalizarTexto(texto).replace(/[¿?]/g, "").replace(/\s+/g, " ").trim();
-  if (!t || t.length > 80) return false;
+  for (const cand of candidatosMetaFechaHora(texto)) {
+    const t = normalizarTexto(cand).replace(/[¿?]/g, "").replace(/\s+/g, " ").trim();
+    if (!t || t.length > 96) continue;
+    if (
+      /^(y\s+)?(que|qu[eé])\s+hora\s+es\b/.test(t) ||
+      /^hora\s+actual\b/.test(t) ||
+      /^decime\s+la\s+hora\b/.test(t) ||
+      /^me\s+decis\s+la\s+hora\b/.test(t) ||
+      /^ten[eé]s\s+la\s+hora\b/.test(t) ||
+      /\bqu[eé]\s+hora\s+es\b/.test(t)
+    ) {
+      return true;
+    }
+  }
+  return false;
+};
+
+/**
+ * El usuario indica que la respuesta anterior fue fuera de tema o repetitiva.
+ * No debe caer en `rutaSaludo` con el menú precio/clima/análisis en bucle.
+ */
+const esQuejaCorreccionRespuestaBot = (texto = "") => {
+  const t = normalizarTexto(texto).replace(/[¿?¡!.,;:]+/g, " ").replace(/\s+/g, " ").trim();
+  if (!t || t.length > 220) return false;
   return (
-    /^(y\s+)?(que|qu[eé])\s+hora\s+es\b/.test(t) ||
-    /^hora\s+actual\b/.test(t) ||
-    /^decime\s+la\s+hora\b/.test(t) ||
-    /^me\s+decis\s+la\s+hora\b/.test(t)
+    /\bno\s+te\s+pregunt/.test(t) ||
+    /\bno\s+es\s+eso\s+lo\s+que\s+pregunt/.test(t) ||
+    /\bsolo\s+te\s+pregunt/.test(t) ||
+    /\bsolo\s+quer[ií]a\s+(saber|pregunt)/.test(t) ||
+    /\bme\s+(?:estas|est[aá]s)\s+respond/.test(t) ||
+    /\bsiempre\s+lo\s+mismo\b/.test(t) ||
+    /\bme\s+repet[ií]s\b/.test(t) ||
+    /\bno\s+me\s+entend/.test(t) ||
+    /\bte\s+equivoc/.test(t) ||
+    /\best[aá]s\s+equivocad/.test(t) ||
+    /\bpor\s+el\s+d[ií]a\b/.test(t) ||
+    /\bme\s+refer[ií]a\s+al\s+d[ií]a\b/.test(t) ||
+    /\bera\s+(por\s+)?el\s+d[ií]a\b/.test(t)
   );
 };
 
@@ -577,6 +627,18 @@ const detectarIntencionIA = async (texto = "") => {
       comando = null;
       parametros = {};
     }
+    /** Post-Gemini: calendario civil (día/hora) no debe ir a plantilla de mercado. */
+    const puedeForzarMetaTiempo = (x) =>
+      ["consulta_libre", "saludo", "no_agro", "analisis_mercado", "analisis_interno", "precio", "clima", "agro_general"].includes(x);
+    if (esMetaHoraHeuristica(input) && puedeForzarMetaTiempo(tipo)) {
+      tipo = "meta_hora";
+      comando = null;
+      parametros = {};
+    } else if (esMetaFechaHeuristica(input) && puedeForzarMetaTiempo(tipo)) {
+      tipo = "meta_fecha";
+      comando = null;
+      parametros = {};
+    }
     if (tipo === "ayuda_uso") {
       parametros.recurso = normalizarRecursoAyuda(parametros.recurso || parametros.tema || "");
     }
@@ -631,6 +693,7 @@ module.exports = {
   esPreguntaAyudaRegistroGasto,
   esMetaFechaHeuristica,
   esMetaHoraHeuristica,
+  esQuejaCorreccionRespuestaBot,
   esPreguntaAyudaComandosOMenu,
   esConsultaDolarRapida,
   esFrasePuenteConsulta,

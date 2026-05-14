@@ -15,6 +15,7 @@ const {
 const { routear } = require("../../router");
 const { completarGeolocalizacionSiFalta, logConsultaRoute } = require("../../consultas/legacy_helpers");
 const { fusionarIntencionPrecalculada } = require("../../consultas/intencion_precalculada");
+const { detectarIntencionIA } = require("../../intent_classifier");
 const { obtenerPendiente } = require("../../inventario/core");
 const { manejarInventarioWhatsapp } = require("../../inventario/whatsapp_flow");
 const { evaluarHiloAntesDeRegistroOGasto } = require("../../dialogo_hilo_registro");
@@ -237,13 +238,16 @@ const procesarConsulta = async (numeroWhatsapp, pregunta, opciones = {}) => {
     /* seguimos sin merge */
   }
 
+  let intencionPrecalculada = opciones?.intencionPrecalculada;
+  if (!intencionPrecalculada || typeof intencionPrecalculada !== "object") {
+    intencionPrecalculada = await detectarIntencionIA(textoTrabajo);
+  }
+
   const t0 = Date.now();
   let clasificacion = await clasificarMensaje(textoTrabajo, usuario, { historial: historialReciente });
-  if (opciones?.intencionPrecalculada) {
-    clasificacion = normalizarClasificacion(
-      fusionarIntencionPrecalculada(clasificacion, opciones.intencionPrecalculada, textoTrabajo)
-    );
-  }
+  clasificacion = normalizarClasificacion(
+    fusionarIntencionPrecalculada(clasificacion, intencionPrecalculada, textoTrabajo)
+  );
 
   const hiloReg = await evaluarHiloAntesDeRegistroOGasto({
     mensaje: textoPregunta,

@@ -4,6 +4,7 @@ const fs = require("fs");
 const path = require("path");
 const H = require("../consultas/legacy_helpers");
 const { esPreguntaMetaConversacional } = require("../clasificador");
+const { esQuejaCorreccionRespuestaBot } = require("../intent_classifier");
 
 const CONTEXTO_DIR = path.join(__dirname, "../../../docs/contexto-ia");
 
@@ -95,6 +96,57 @@ const lineasAyudaRecurso = (recurso = "") => {
 };
 
 const rutaAgroGeneral = async ({ clasificacion, mensaje, usuario }) => {
+  const rawMsg = String(mensaje || "").trim();
+
+  if (clasificacion?._correccionConversacional || esQuejaCorreccionRespuestaBot(rawMsg)) {
+    try {
+      const { texto } = await H.generarConPromptLibre({
+        system: [
+          "Sos AgroHabilis (WhatsApp, productor argentino).",
+          "El usuario indica que tu respuesta anterior no era lo que pedía o que repetís el mismo ofrecimiento (precio/clima/análisis).",
+          "Reglas estrictas:",
+          "- Máximo 3 líneas, tono breve y natural rioplatense.",
+          "- Disculpá sin dramatizar.",
+          "- NO ofrezcas menús tipo «precio, clima o análisis» ni listas de temas.",
+          "- Si pedía la hora o el día, respondé solo eso usando zona America/Argentina/Buenos_Aires (no inventes otros datos).",
+          "- Si no alcanza para inferir, una sola pregunta abierta: qué dato quería.",
+          "- Sin bloque de mercado, sin «Base AgroHabilis», sin cifras de cotización salvo que el usuario las haya pedido en este mensaje.",
+        ].join(" "),
+        user: `Mensaje del usuario: ${rawMsg.slice(0, 450)}`,
+      });
+      const out = String(texto || "").trim();
+      if (out) return out;
+    } catch (_e) {
+      /* fallback abajo */
+    }
+    const h = new Date().toLocaleTimeString("es-AR", {
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "America/Argentina/Buenos_Aires",
+    });
+    const d = new Date().toLocaleString("es-AR", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+      timeZone: "America/Argentina/Buenos_Aires",
+    });
+    const tn = rawMsg
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase();
+    if (/\bhora\b/.test(tn)) {
+      return `Perdón la confusión.\n⏰ Son las *${h}* (hora Argentina).`;
+    }
+    if (/\b(d[ií]a|fecha)\b/.test(tn)) {
+      return `Perdón la confusión.\n📅 Hoy es *${d}* (Argentina).`;
+    }
+    return (
+      "Perdón, me despisté con lo anterior.\n" +
+      "Decime en *una línea* qué necesitás (fecha de hoy, hora, o un precio concreto) y te respondo directo, sin el menú de siempre."
+    );
+  }
+
   const meta = clasificacion?.meta_consulta;
   if (meta === "fecha") {
     const s = new Date().toLocaleString("es-AR", {
