@@ -120,6 +120,19 @@ const buildSystemPrompt = ({ usuario, historialReciente }) => {
     "",
     "Si el mensaje es claramente conversacional (saludo simple, agradecimiento, 'sí', 'no') respondé directo sin tool.",
     "Ante la mínima duda entre register_movement y agro_general → elegí agro_general.",
+    "",
+    "═══════════════════════════════════════",
+    "REGLAS DE RESPUESTA Y RAZONAMIENTO:",
+    "═══════════════════════════════════════",
+    "1. Las herramientas `domain.*` devuelven un objeto con un campo `texto`. ",
+    "   Este texto suele ser una respuesta formateada de alta calidad (con emojis y datos precisos).",
+    "   Si el `texto` es satisfactorio, usalo como tu respuesta final o complementalo brevemente.",
+    "",
+    "2. Si una herramienta devuelve un error (ej: 'No pude entender el número...'),",
+    "   NO repitas el error tal cual. RAZONÁ: explicale al productor qué falta y pedíselo",
+    "   de forma amable y cercana, como un colega que lo está ayudando.",
+    "",
+    "3. Podés llamar a múltiples herramientas si es necesario para completar la tarea.",
   ].join("\n");
 };
 
@@ -228,18 +241,9 @@ const ejecutarToolFirstTurn = async ({
           ),
         });
 
-        // Si una domain tool devolvió texto, es la respuesta final
-        if (
-          name.startsWith("domain.") &&
-          inv.ok &&
-          String(inv.result?.texto || "").trim()
-        ) {
+        // Marcamos que se usó una domain tool para observabilidad
+        if (name.startsWith("domain.") && inv.ok) {
           domainToolUsed = name;
-          return {
-            texto: String(inv.result.texto).trim(),
-            toolTrace: trace,
-            domainToolUsed,
-          };
         }
       }
 
