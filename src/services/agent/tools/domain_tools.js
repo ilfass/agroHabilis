@@ -113,8 +113,13 @@ registerTool({
   description:
     "Registra un movimiento en el campo del productor: venta de granos/hacienda, " +
     "gasto/compra (insumos, combustible, mano de obra, etc.), o movimiento de inventario/stock. " +
-    "Usá esta tool cuando el productor diga que vendió, gastó, compró, tiene X cabezas, " +
-    "cargó un dato, o cuando menciona cifras junto con una acción de registro.",
+    "SOLO usá esta tool cuando el productor PROVEE datos concretos en el mensaje: " +
+    "cantidad + categoría (ej: '120 novillos en lote Norte') o monto + concepto (ej: 'gasté 50000 en semilla'). " +
+    "NO usés esta tool para preguntas sobre capacidades del sistema, aunque mencionen animales o lotes. " +
+    "Contraejemplos que NO deben llamar esta tool: " +
+    "'¿Puedo registrar los cerdos en cinco chiqueros?' (→ domain.agro_general), " +
+    "'¿Puedo cargar varios lotes?' (→ domain.agro_general), " +
+    "'¿Se puede identificar cada animal?' (→ domain.agro_general).",
   parameters: {
     type: "object",
     properties: {
