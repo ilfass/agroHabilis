@@ -2,7 +2,7 @@
 
 /**
  * Pipeline tipo agente para una consulta WhatsApp (post-comando-control en `consultas.js`).
- * Orden: inventario pendiente → clasificar → refuerzo inventario → diálogo hilo registro → gate dominio → **scout opcional (tool-calling OpenRouter)** → pasos del plan (`agent/tools`) → **cadena OAV** (`runObserveActVerifyChain`: hoy un paso `router` con verify/retry) → persistencia.
+ * Orden: inventario pendiente → clasificar (o placeholder si `clasificadorDeferidoAlBucleUnificado` / `AGENT_WHATSAPP_SOLO_AGENTE`) → diálogo hilo → gates → dominio (salvo defer o solo-agente) → bucle unificado con tools (`agent.clasificar`, `agent.invoke_router`, …) **o** scout + `routear` con OAV → persistencia. Con `AGENT_IA_TOTAL` (default ON) no hay catch-all regex ni repregunta fija por confianza baja antes del router.
  */
 
 const { query } = require("../../../config/database");
@@ -15,7 +15,6 @@ const {
 const { routear } = require("../../router");
 const { completarGeolocalizacionSiFalta, logConsultaRoute } = require("../../consultas/legacy_helpers");
 const { fusionarIntencionPrecalculada } = require("../../consultas/intencion_precalculada");
-const { detectarIntencionIA } = require("../../intent_classifier");
 const { obtenerPendiente } = require("../../inventario/core");
 const { manejarInventarioWhatsapp } = require("../../inventario/whatsapp_flow");
 const { evaluarHiloAntesDeRegistroOGasto } = require("../../dialogo_hilo_registro");
@@ -24,7 +23,16 @@ const { obtenerUltimasInteracciones } = require("../../consultas/contexto");
 const { invokeTool } = require("../tools");
 const { runObserveActVerifyChain } = require("../plan/oav_chain");
 const { ejecutarScoutToolLoop } = require("../ia/tool_loop_scout");
+const { ejecutarTurnoUnificado, unifiedTurnLoopHabilitado, clasificadorDeferidoAlBucleUnificado } = require("../ia/unified_turn_loop");
+const { toolFirstModeHabilitado, ejecutarToolFirstTurn } = require("../ia/tool_first_turn");
 const { obtenerEstado, limpiarEstado, guardarEstado } = require("../../conversacion_estado");
+const {
+  clasificadorHistorialLimite,
+  verifyRouterMaxAttempts,
+  oavStepMaxAttemptsCap,
+  agentIaTotal,
+  soloAgenteWhatsappActivo,
+} = require("../cursor_mode");
 
 const debeSolicitarAclaracionIntencion = ({ textoPregunta, clasificacion }) => {
   if (
@@ -135,8 +143,15 @@ const mergeIaProviderTrace = (dialogoHiloTrace, gateTracesMerged) => {
   return dialogoHiloTrace || gates;
 };
 
-const resolverIaProviderLabel = (dialogoHiloTrace, agentTurnTrace, agentGateTrace, precioAgentTrace) => {
+const resolverIaProviderLabel = (
+  dialogoHiloTrace,
+  agentUnifiedTurnTrace,
+  agentTurnTrace,
+  agentGateTrace,
+  precioAgentTrace
+) => {
   if (dialogoHiloTrace) return "dialogo_hilo";
+  if (agentUnifiedTurnTrace?.length) return "agent_unified";
   if (agentTurnTrace?.length) return "agent_turn";
   if (agentGateTrace?.length) return "agent_gate";
   if (precioAgentTrace?.length) return "precio_agent";
@@ -156,7 +171,7 @@ const buildIaProviderTraceFinal = (clasificacion, dialogoHiloTrace, gateTracesMe
 /**
  * @param {string} numeroWhatsapp
  * @param {string} pregunta
- * @param {{ intencionPrecalculada?: unknown }} [opciones]
+ * @param {{ intencionPrecalculada?: object }} [opciones] Si viene (p. ej. desde WhatsApp tras `detectarIntencionIA`), se fusiona con el clasificador; si no, solo clasificador + verify.
  */
 const procesarConsulta = async (numeroWhatsapp, pregunta, opciones = {}) => {
   const textoPregunta = String(pregunta || "").trim();
@@ -200,18 +215,11 @@ const procesarConsulta = async (numeroWhatsapp, pregunta, opciones = {}) => {
   let historialReciente = [];
   try {
     /**
-     * Cap del historial para el clasificador y gates. Subido de 4 → 8
-     * (override por env) para casos como cargar varios lotes seguidos
-     * o seguimientos largos ("Y el resto?", "podés procesar varios?",
-     * "los demás también"). Un agente debe poder hilar más turnos.
+     * Filas de historial para clasificador y gates. Default 8; con
+     * `AGENT_CURSOR_MODE=1` sube a 24 salvo override por
+     * `AGENT_HISTORIAL_CLASIFICADOR_LIMITE` (ver `agent/cursor_mode.js`).
      */
-    const limiteHistorial = Math.max(
-      1,
-      Math.min(
-        12,
-        Number.parseInt(String(process.env.AGENT_HISTORIAL_CLASIFICADOR_LIMITE || "8"), 10) || 8
-      )
-    );
+    const limiteHistorial = clasificadorHistorialLimite();
     historialReciente = await obtenerUltimasInteracciones({
       usuarioId: usuario?.id ?? null,
       whatsapp: normalizarWhatsapp(numeroWhatsapp),
@@ -238,16 +246,88 @@ const procesarConsulta = async (numeroWhatsapp, pregunta, opciones = {}) => {
     /* seguimos sin merge */
   }
 
-  let intencionPrecalculada = opciones?.intencionPrecalculada;
-  if (!intencionPrecalculada || typeof intencionPrecalculada !== "object") {
-    intencionPrecalculada = await detectarIntencionIA(textoTrabajo);
+  const intencionPrecalculada =
+    opciones?.intencionPrecalculada && typeof opciones.intencionPrecalculada === "object"
+      ? opciones.intencionPrecalculada
+      : null;
+
+  const soloWa = soloAgenteWhatsappActivo();
+  if (soloWa && !unifiedTurnLoopHabilitado()) {
+    return [
+      "Modo solo-agente WhatsApp (`AGENT_WHATSAPP_SOLO_AGENTE`) requiere `OPENROUTER_API_KEY` y el bucle unificado activo",
+      "(p. ej. `AGENT_UNIFIED_TURN_LOOP=1` o modo agente). Revisá la configuración.",
+    ].join(" ");
+  }
+
+  /**
+   * ── Tool-first mode ──────────────────────────────────────────────────────
+   * Activar: AGENT_TOOL_FIRST_MODE=1
+   * El LLM actúa directamente como router usando domain.* tools.
+   * Sin clasificador previo, sin switch de intenciones.
+   * Si devuelve texto → respuesta final. Si falla → fallback al pipeline clásico.
+   */
+  if (toolFirstModeHabilitado()) {
+    try {
+      const tfResult = await ejecutarToolFirstTurn({
+        usuario,
+        numeroWhatsapp,
+        mensaje: textoTrabajo,
+        historialReciente,
+      });
+      if (String(tfResult?.texto || "").trim()) {
+        const respuestaTF = String(tfResult.texto).trim();
+        logConsultaRoute(numeroWhatsapp, tfResult.domainToolUsed || "tool_first_direct", {
+          cultivo: null,
+          confianza: "alta",
+          msClasificador: 0,
+          via: "tool_first",
+        });
+        await guardarConsulta({
+          usuarioId: usuario?.id || null,
+          whatsapp: normalizarWhatsapp(numeroWhatsapp),
+          pregunta: textoPregunta,
+          respuesta: respuestaTF,
+          tokensUsados: null,
+          iaProvider: "tool_first",
+          iaProviderTrace: tfResult.toolTrace?.length
+            ? [{ type: "tool_first_trace", events: tfResult.toolTrace.slice(-20) }]
+            : null,
+        });
+        return respuestaTF;
+      }
+      // Si no devolvió texto → fallback silencioso al pipeline clásico
+      console.warn("[agent] tool_first_turn: sin respuesta, fallback a pipeline clásico");
+    } catch (err) {
+      console.warn("[agent] tool_first_turn error:", err?.message || err);
+    }
   }
 
   const t0 = Date.now();
-  let clasificacion = await clasificarMensaje(textoTrabajo, usuario, { historial: historialReciente });
-  clasificacion = normalizarClasificacion(
-    fusionarIntencionPrecalculada(clasificacion, intencionPrecalculada, textoTrabajo)
-  );
+  let deferClasificador = clasificadorDeferidoAlBucleUnificado();
+  let clasificacion;
+  if (soloWa) {
+    clasificacion = normalizarClasificacion({ intencion: "agro_general", confianza: "media" });
+    if (intencionPrecalculada) {
+      clasificacion = normalizarClasificacion(
+        fusionarIntencionPrecalculada(clasificacion, intencionPrecalculada, textoTrabajo)
+      );
+    }
+    deferClasificador = false;
+  } else if (deferClasificador) {
+    clasificacion = normalizarClasificacion({ intencion: "agro_general", confianza: "baja" });
+    if (intencionPrecalculada) {
+      clasificacion = normalizarClasificacion(
+        fusionarIntencionPrecalculada(clasificacion, intencionPrecalculada, textoTrabajo)
+      );
+    }
+  } else {
+    clasificacion = await clasificarMensaje(textoTrabajo, usuario, { historial: historialReciente });
+    clasificacion = normalizarClasificacion(
+      intencionPrecalculada
+        ? fusionarIntencionPrecalculada(clasificacion, intencionPrecalculada, textoTrabajo)
+        : clasificacion
+    );
+  }
 
   const hiloReg = await evaluarHiloAntesDeRegistroOGasto({
     mensaje: textoPregunta,
@@ -287,12 +367,11 @@ const procesarConsulta = async (numeroWhatsapp, pregunta, opciones = {}) => {
   }
 
   /**
-   * Repregunta dura para preguntas catch-all (independiente de la
-   * confianza del clasificador). Resuelve casos como "mercado" a secas
-   * (que terminaba en data-dump) o "Y con respecto al registro?" (que
-   * terminaba contestando inventario sin que el usuario lo pidiera).
+   * Catch-all por regex (solo si `AGENT_IA_TOTAL=0`): p. ej. «mercado» a secas
+   * o «Y con respecto al registro?». Con IA total (default ON) sigue el flujo
+   * verify + dominio + scout + router.
    */
-  if (!fusionPorAclaracionClasificador) {
+  if (!fusionPorAclaracionClasificador && !agentIaTotal()) {
     const repreguntaCatchAll = detectarPreguntaAmbiguaCatchAll(textoPregunta, clasificacion);
     if (repreguntaCatchAll) {
       try {
@@ -317,8 +396,12 @@ const procesarConsulta = async (numeroWhatsapp, pregunta, opciones = {}) => {
     }
   }
 
+  /**
+   * Repregunta fija por confianza baja: desactivada con `AGENT_IA_TOTAL` (default ON).
+   */
   if (
     !fusionPorAclaracionClasificador &&
+    !agentIaTotal() &&
     clasificacion.confianza === "baja" &&
     debeSolicitarAclaracionIntencion({ textoPregunta, clasificacion })
   ) {
@@ -361,13 +444,17 @@ const procesarConsulta = async (numeroWhatsapp, pregunta, opciones = {}) => {
     { clasificacion }
   );
 
-  const dominioTurno = await evaluarDominioTurnoAntesDeRouter({
-    clasificacion,
-    mensaje: textoTrabajo,
-    usuario,
-    numeroWhatsapp,
-    historialPrecargado: historialReciente,
-  });
+  const omitirDominioAntesRouter = deferClasificador || soloWa;
+  let dominioTurno = { accion: "delegar", texto: null };
+  if (!omitirDominioAntesRouter) {
+    dominioTurno = await evaluarDominioTurnoAntesDeRouter({
+      clasificacion,
+      mensaje: textoTrabajo,
+      usuario,
+      numeroWhatsapp,
+      historialPrecargado: historialReciente,
+    });
+  }
   if (dominioTurno.accion === "repregunta_dominio" && String(dominioTurno.texto || "").trim()) {
     const respuestaDominio = String(dominioTurno.texto).trim();
     logConsultaRoute(numeroWhatsapp, "agent_turn_dominio", {
@@ -390,45 +477,46 @@ const procesarConsulta = async (numeroWhatsapp, pregunta, opciones = {}) => {
     return respuestaDominio;
   }
 
-  await invokeTool(
-    "agent.turn_step",
-    { step: "post_dominio", detail: { intencion: clasificacion.intencion } },
-    { clasificacion }
-  );
+  if (!deferClasificador && !soloWa) {
+    await invokeTool(
+      "agent.turn_step",
+      { step: "post_dominio", detail: { intencion: clasificacion.intencion } },
+      { clasificacion }
+    );
 
-  logConsultaRoute(numeroWhatsapp, clasificacion.intencion, {
-    cultivo: clasificacion.cultivo,
-    confianza: clasificacion.confianza,
-    msClasificador: Date.now() - t0,
-  });
+    logConsultaRoute(numeroWhatsapp, clasificacion.intencion, {
+      cultivo: clasificacion.cultivo,
+      confianza: clasificacion.confianza,
+      msClasificador: Date.now() - t0,
+    });
+  }
 
   await invokeTool("agent.turn_step", { step: "pre_router" }, { clasificacion });
 
   try {
-    const scout = await ejecutarScoutToolLoop({
-      clasificacion,
-      usuario,
-      numeroWhatsapp,
-      mensaje: textoTrabajo,
-    });
-    if (scout?.resumen && String(scout.resumen).trim()) {
-      clasificacion.agentScoutContext = String(scout.resumen).trim();
-    }
-    if (scout?.toolTrace?.length) {
-      await invokeTool(
-        "agent.turn_step",
-        { step: "scout_tool_loop", detail: { eventos: scout.toolTrace.length } },
-        { clasificacion }
-      );
+    if (!unifiedTurnLoopHabilitado()) {
+      const scout = await ejecutarScoutToolLoop({
+        clasificacion,
+        usuario,
+        numeroWhatsapp,
+        mensaje: textoTrabajo,
+      });
+      if (scout?.resumen && String(scout.resumen).trim()) {
+        clasificacion.agentScoutContext = String(scout.resumen).trim();
+      }
+      if (scout?.toolTrace?.length) {
+        await invokeTool(
+          "agent.turn_step",
+          { step: "scout_tool_loop", detail: { eventos: scout.toolTrace.length } },
+          { clasificacion }
+        );
+      }
     }
   } catch (e) {
     console.warn("[agent] scout tool loop:", e?.message || e);
   }
 
-  const maxRouterAttempts = Math.min(
-    4,
-    Math.max(1, Number.parseInt(String(process.env.AGENT_VERIFY_ROUTER_MAX || "2"), 10) || 2)
-  );
+  const maxRouterAttempts = Math.min(oavStepMaxAttemptsCap(), verifyRouterMaxAttempts());
 
   const respuesta = await runObserveActVerifyChain({
     ctx: { clasificacion },
@@ -437,6 +525,62 @@ const procesarConsulta = async (numeroWhatsapp, pregunta, opciones = {}) => {
         name: "router",
         maxAttempts: maxRouterAttempts,
         act: async ({ attempt }) => {
+          let needClasificarFallback = false;
+          if (attempt === 1 && unifiedTurnLoopHabilitado()) {
+            try {
+              const uni = await ejecutarTurnoUnificado({
+                clasificacion,
+                usuario,
+                numeroWhatsapp,
+                mensaje: textoTrabajo,
+                deferClasificador,
+                soloAgenteWhatsapp: soloWa,
+                historialReciente,
+                intencionPrecalculada,
+              });
+              if (Array.isArray(uni?.toolTrace)) {
+                clasificacion.agentUnifiedTurnTrace = uni.toolTrace;
+              }
+              if (uni?.toolTrace?.length) {
+                await invokeTool(
+                  "agent.turn_step",
+                  {
+                    step: "unified_tool_loop",
+                    detail: {
+                      eventos: uni.toolTrace.length,
+                      usedInvokeRouter: Boolean(uni.usedInvokeRouter),
+                    },
+                  },
+                  { clasificacion }
+                );
+              }
+              if (String(uni?.texto || "").trim()) {
+                return String(uni.texto).trim();
+              }
+              needClasificarFallback = Boolean(deferClasificador) && !soloWa;
+            } catch (err) {
+              console.warn("[agent] unified turn loop:", err?.message || err);
+              needClasificarFallback = Boolean(deferClasificador) && !soloWa;
+            }
+          }
+          if ((attempt > 1 && deferClasificador && !soloWa) || needClasificarFallback) {
+            try {
+              await invokeTool(
+                "agent.clasificar",
+                {},
+                {
+                  clasificacion,
+                  usuario,
+                  numeroWhatsapp,
+                  mensaje: textoTrabajo,
+                  historialReciente,
+                  intencionPrecalculada,
+                }
+              );
+            } catch (_e) {
+              /* seguimos con routear */
+            }
+          }
           if (attempt > 1) {
             await invokeTool("agent.turn_step", { step: "router_reintento", detail: { attempt } }, { clasificacion });
           }
@@ -454,18 +598,40 @@ const procesarConsulta = async (numeroWhatsapp, pregunta, opciones = {}) => {
     ],
   });
 
+  if (deferClasificador || soloWa) {
+    await invokeTool(
+      "agent.turn_step",
+      {
+        step: "post_dominio",
+        detail: { intencion: clasificacion.intencion, deferred: Boolean(deferClasificador), soloAgente: soloWa },
+      },
+      { clasificacion }
+    );
+    logConsultaRoute(numeroWhatsapp, clasificacion.intencion, {
+      cultivo: clasificacion.cultivo,
+      confianza: clasificacion.confianza,
+      msClasificador: Date.now() - t0,
+    });
+  }
+
   await invokeTool(
     "agent.turn_step",
     { step: "post_router", detail: { len: typeof respuesta === "string" ? respuesta.length : 0 } },
     { clasificacion }
   );
 
+  const agentUnifiedTurnTrace = Array.isArray(clasificacion?.agentUnifiedTurnTrace)
+    ? clasificacion.agentUnifiedTurnTrace
+    : null;
   const agentGateTrace = Array.isArray(clasificacion?.agentGateTrace) ? clasificacion.agentGateTrace : null;
   const precioAgentTrace = Array.isArray(clasificacion?.precioAgentTrace)
     ? clasificacion.precioAgentTrace
     : null;
   const agentTurnTrace = Array.isArray(clasificacion?.agentTurnTrace) ? clasificacion.agentTurnTrace : null;
   const gateTracesMerged = [
+    ...(agentUnifiedTurnTrace?.length
+      ? [{ type: "agent_unified_turn", events: agentUnifiedTurnTrace.slice(-48) }]
+      : []),
     ...(agentTurnTrace || []),
     ...(agentGateTrace || []),
     ...(precioAgentTrace || []),
@@ -477,7 +643,13 @@ const procesarConsulta = async (numeroWhatsapp, pregunta, opciones = {}) => {
     pregunta: textoPregunta,
     respuesta,
     tokensUsados: null,
-    iaProvider: resolverIaProviderLabel(dialogoHiloTrace, agentTurnTrace, agentGateTrace, precioAgentTrace),
+    iaProvider: resolverIaProviderLabel(
+      dialogoHiloTrace,
+      agentUnifiedTurnTrace,
+      agentTurnTrace,
+      agentGateTrace,
+      precioAgentTrace
+    ),
     iaProviderTrace: buildIaProviderTraceFinal(clasificacion, dialogoHiloTrace, gateTracesMerged),
   });
 
