@@ -86,7 +86,7 @@ const buildSystemPrompt = ({ usuario, historialReciente }) => {
     "- domain.market_analysis: análisis de mercado, tendencias, perspectivas, noticias del agro.",
     "- domain.my_analysis: análisis personalizado combinando sus datos con el mercado (¿me conviene vender?).",
     "- domain.run_command: comandos del bot (MI RESUMEN, VER COMANDOS, MIS ALERTAS, PLANES, etc.).",
-    "- domain.agro_general: dudas técnicas, buenas prácticas, preguntas sobre el bot, saludos, o cualquier consulta que no encaje en otra tool.",
+    "- domain.agro_general: dudas técnicas, buenas prácticas, preguntas sobre qué puede hacer el bot (capacidades, si permite lotes múltiples, seguimiento de animales), saludos, o cualquier consulta que no encaje en otra tool.",
     "",
     "Si el mensaje es claramente conversacional (saludo simple, agradecimiento) podés responder sin tool.",
     "Para todo lo demás: primero la tool, luego la respuesta.",
