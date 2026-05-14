@@ -287,6 +287,25 @@ async function upsertSaldoDesdeMovimientoConfirmado(movRow) {
       if (!Number.isFinite(cantidad) || cantidad < 0) throw new Error("cantidad_ganado_invalida");
       cantidad = Math.round(cantidad);
     }
+    
+    if (Array.isArray(pj.animales_individuales) && pj.animales_individuales.length > 0) {
+      for (const anim of pj.animales_individuales) {
+        await query(
+          `
+            INSERT INTO animales_individuales (usuario_id, lote_id, caravana, categoria, estado, observaciones)
+            VALUES ($1, $2, $3, $4, $5, $6)
+          `,
+          [
+            usuarioId,
+            loteId,
+            anim.caravana || null,
+            anim.categoria || etiqueta,
+            anim.estado || "sano",
+            anim.observaciones || null,
+          ]
+        );
+      }
+    }
   } else if (dominio === "cultivo") {
     const cultivo = String(pj.cultivo || "").trim();
     item_clave = itemClaveCultivo(cultivo);
