@@ -68,7 +68,6 @@ const {
   textoParaClasificacionSaludo,
   esSaludoSocialCorto,
   esPreguntaAyudaComandosOMenu,
-  esQuejaCorreccionRespuestaBot,
 } = require("../services/whatsapp_intents");
 const {
   parseZonas,
@@ -96,6 +95,7 @@ const capturaInteraccion = require("../services/interacciones_captura");
 const conversacionEstadoService = require("../services/conversacion_estado");
 const resumenInteractivo = require("../services/resumen_interactivo");
 const { parseComandoBot } = require("../services/consultas/bot_control");
+const { analizarMediaAgro } = require("../services/vision/agro_vision");
 /**
  * TurnController (P2#10) — migración gradual del dispatcher.
  *
@@ -166,15 +166,11 @@ const humanizarSalidaConIA = async ({
   if (esPreguntaAyudaComandosOMenu(String(mensajeUsuario || ""))) {
     return draft;
   }
-  if (esQuejaCorreccionRespuestaBot(String(mensajeUsuario || ""))) {
-    return draft;
-  }
   if (
-    draft.includes("━━━━━━━━") ||
     /PLANTILLA\s+(GRATIS|BASICO|BÁSICO|PRO)\b/i.test(draft) ||
     /📦\s*\*PLANTILLA\b/i.test(draft)
   ) {
-    // Evitar reescrituras agresivas de layouts completos (todos los planes).
+    // Evitar reescrituras agresivas de layouts completos de planes.
     return draft;
   }
   try {
@@ -193,16 +189,16 @@ const humanizarSalidaConIA = async ({
       [String(whatsapp || "").replace(/\D/g, ""), hHist]
     );
     const system = [
-      "Sos AgroHabilis. Reescribí el borrador en lenguaje natural de WhatsApp.",
-      "Reglas estrictas:",
-      "- No inventes datos, fechas, precios ni fuentes.",
-      "- Conservá todos los datos concretos del borrador.",
-      "- Respuesta breve (4-5 líneas) salvo que el contenido requiera más.",
-      "- Evitá etiquetas técnicas como NO_DATA/CONTEXT.",
-      "- No repitas ni cites el texto de mensajeUsuario al inicio ni como encabezado; respondé directo al punto.",
-      "- Mantené o mejorá formato WhatsApp: *negrita*, _cursiva_, emojis en títulos de bloque y separadores ━ si aportan claridad.",
-      "- No agregues el nombre del usuario al inicio si el borrador no lo trae ya; no inventes tratamientos personales.",
-      "- Para decir 'hoy' o la fecha en Argentina usá solo fecha_hoy_ar del JSON (no la fecha del servidor).",
+      "Sos AgroHabilis, asistente experto para el productor argentino. Tu tarea es convertir el 'borrador' (datos técnicos) en una respuesta natural y amigable por WhatsApp.",
+      "Reglas de oro:",
+      "- Respondé como un asistente humano atento, no como un bot rígido.",
+      "- No inventes datos, fechas, precios ni fuentes. Respetá el 'borrador' al 100%.",
+      "- Conservá los bloques de datos con separadores ━ si el borrador los trae, son útiles para la lectura rápida.",
+      "- Saludá al usuario si es el primer mensaje del día o parece natural hacerlo.",
+      "- Cerrá el mensaje de forma servicial (ej: 'Cualquier otra duda me chiflas', 'Espero que te sirva el dato').",
+      "- No repitas la pregunta del usuario como encabezado.",
+      "- Mantené negritas (*) y emojis del borrador si aportan, pero sentite libre de agregar calidez.",
+      "- Si el borrador trae errores técnicos (NO_DATA, etc), explicalo amablemente sin lenguaje técnico.",
     ].join("\n");
     const user = JSON.stringify(
       {
@@ -614,7 +610,24 @@ const procesarMensajeEntranteWhatsapp = async (msg) => {
 
     const replyContexto = { intencionTipo: null };
 
-    const consulta = String(msg.body || "").trim();
+    let consulta = String(msg.body || "").trim();
+
+    if (msg.hasMedia) {
+      try {
+        const media = await msg.downloadMedia();
+        if (media && (media.mimetype.startsWith("image/") || media.mimetype === "application/pdf")) {
+          const buffer = Buffer.from(media.data, "base64");
+          const visionText = await analizarMediaAgro(buffer, media.mimetype, consulta);
+          if (visionText) {
+            consulta = `[Análisis de archivo: ${visionText}] ${consulta}`.trim();
+            console.log(`[Vision] Procesado media ${media.mimetype} para ${msg.from}`);
+          }
+        }
+      } catch (err) {
+        console.warn("[Vision] Fallo procesamiento de media:", err.message);
+      }
+    }
+
     if (!consulta) return;
     const numeroReal = await resolverNumeroRealMensaje(msg);
     await registrarIdentidadWhatsapp({
