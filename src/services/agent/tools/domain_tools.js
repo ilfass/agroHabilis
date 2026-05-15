@@ -233,27 +233,129 @@ registerTool({
 registerTool({
   name: "domain.my_analysis",
   description:
-    "Análisis personalizado basado en los datos del propio productor: cultivos registrados, " +
-    "hectáreas, finanzas, contexto de zona. Usá esta tool cuando el productor pregunta " +
-    "«¿me conviene vender?», «¿cómo estoy parado?», «análisis de mi campaña», " +
-    "o cualquier pregunta que combine sus datos internos con el contexto de mercado.",
+    "Análisis personalizado y de valor agregado basado en los datos del propio productor " +
+    "(cultivos registrados, hectáreas, costos, finanzas) cruzados con datos externos de mercado. " +
+    "Usá esta tool cuando el productor pregunta «¿me conviene vender?», «¿cómo estoy parado?», " +
+    "«análisis de mi campaña», o cualquier pregunta que requiera fórmulas agroeconómicas " +
+    "(Margen Bruto, Punto de Equilibrio) combinando su información interna con el contexto externo.",
   parameters: {
     type: "object",
-    properties: {},
+    properties: {
+      cultivo: {
+        type: "string",
+        description: "Cultivo específico a analizar si aplica. Opcional.",
+      },
+    },
   },
-  execute: async (ctx) => {
+  execute: async (ctx, args) => {
     const { rutaAnalisisInterno } = require("../../rutas/analisis_interno");
-    const clasificacion = {
-      ...(ctx.clasificacion || {}),
-      intencion: "analisis_interno",
-      confianza: "alta",
-    };
+    const patch = { intencion: "analisis_interno", confianza: "alta" };
+    if (args.cultivo) patch.cultivo = String(args.cultivo).toLowerCase().trim();
+    const clasificacion = { ...(ctx.clasificacion || {}), ...patch };
     const texto = await rutaAnalisisInterno({
       clasificacion,
       mensaje: String(ctx.mensaje || "").trim(),
       usuario: ctx.usuario || null,
       numeroWhatsapp: ctx.numeroWhatsapp,
     });
+    return { texto: String(texto || "").trim() };
+  },
+});
+
+// ---------------------------------------------------------------------------
+// domain.get_technical_ratios — Ratios insumo-producto y relaciones de intercambio
+// ---------------------------------------------------------------------------
+registerTool({
+  name: "domain.get_technical_ratios",
+  description:
+    "Calcula relaciones de intercambio y ratios técnicos (Insumo-Producto, Novillo/Maíz, Ternero/Soja). " +
+    "Herramienta de alto valor para ingenieros agrónomos y productores. " +
+    "Usá esta tool cuando pregunten por equivalencias, cuántos kg de grano se necesitan para comprar otro activo, " +
+    "o la relación histórica/actual entre dos productos del agro.",
+  parameters: {
+    type: "object",
+    properties: {
+      activo_a: { type: "string", description: "Primer producto (ej: soja, novillo, ternero)." },
+      activo_b: { type: "string", description: "Segundo producto (ej: maiz, glifosato, urea)." },
+    },
+    required: ["activo_a", "activo_b"],
+  },
+  execute: async (ctx) => {
+    const { responderRelacionIntercambio } = require("../../consultas/relacion");
+    const {
+      normMin,
+      consultaPideDisponibleYMatba,
+      tokenPosicionPorMes,
+      obtenerFuturoMatbaReferencia,
+      obtenerPrecioActivoRelacion,
+      formatearMoneda,
+      adaptarRespuestaPorNivel,
+    } = require("../../consultas/legacy_helpers");
+
+    const texto = await responderRelacionIntercambio(
+      { texto: ctx.mensaje, nivel: "TECNICO" },
+      {
+        normMinFn: normMin,
+        consultaPideDisponibleYMatbaFn: consultaPideDisponibleYMatba,
+        tokenPosicionPorMesFn: tokenPosicionPorMes,
+        obtenerFuturoMatbaReferenciaFn: obtenerFuturoMatbaReferencia,
+        obtenerPrecioActivoRelacionFn: obtenerPrecioActivoRelacion,
+        formatearMonedaFn: formatearMoneda,
+        adaptarRespuestaPorNivelFn: adaptarRespuestaPorNivel,
+      }
+    );
+    return { texto: String(texto || "").trim() };
+  },
+});
+
+// ---------------------------------------------------------------------------
+// domain.get_market_structure — Carry, Inverso, Basis y TC Implícito
+// ---------------------------------------------------------------------------
+registerTool({
+  name: "domain.get_market_structure",
+  description:
+    "Análisis técnico de la estructura de mercado: Carry, Backwardation (Inverso), Basis y Tipo de Cambio Implícito. " +
+    "Herramienta profesional para optimizar el timing de venta y cobertura. " +
+    "Usá esta tool cuando pregunten si conviene vender hoy o esperar al futuro, " +
+    "cómo está el carry, o la relación entre el spot y las posiciones MATBA/ROFEX.",
+  parameters: {
+    type: "object",
+    properties: {
+      cultivo: { type: "string", description: "Grano a analizar (ej: soja, maiz, trigo)." },
+      incluir_hacienda: {
+        type: "boolean",
+        description: "Si debe incluir lectura de feedlot/novillo en el análisis. Opcional.",
+      },
+    },
+    required: ["cultivo"],
+  },
+  execute: async (ctx, args) => {
+    const { responderEstructuraMercadoYFeedlot } = require("../../consultas/estructura");
+    const {
+      normMin,
+      adaptarRespuestaPorNivel,
+      query,
+      toISODateParam,
+      formatearMoneda,
+      etiquetaTipoCambio,
+      obtenerDisponiblePoliticaResumenUnCultivo,
+    } = require("../../consultas/legacy_helpers");
+
+    // Enriquecemos el mensaje si pide hacienda
+    const mensaje = args.incluir_hacienda ? `${ctx.mensaje} novillo feedlot` : ctx.mensaje;
+
+    const texto = await responderEstructuraMercadoYFeedlot(
+      { texto: mensaje, nivel: "TECNICO" },
+      {
+        normMinFn: normMin,
+        adaptarRespuestaPorNivelFn: adaptarRespuestaPorNivel,
+        queryFn: query,
+        toISODateParamFn: toISODateParam,
+        formatearMonedaFn: formatearMoneda,
+        etiquetaTipoCambioFn: etiquetaTipoCambio,
+        obtenerDisponiblePoliticaResumenUnCultivoFn: obtenerDisponiblePoliticaResumenUnCultivo,
+      }
+    );
     return { texto: String(texto || "").trim() };
   },
 });
