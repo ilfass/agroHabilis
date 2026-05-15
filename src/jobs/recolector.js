@@ -10,6 +10,7 @@ const { obtenerPreciosRosgan } = require("../scrapers/rosgan");
 const { obtenerPreciosInsumos } = require("../scrapers/insumos");
 const { obtenerPreciosBcrGix } = require("../scrapers/bcr_gix");
 const { obtenerDatosMATba } = require("../scrapers/futuros_matba");
+const { obtenerPreciosBCP } = require("../scrapers/granos_bcp");
 const { obtenerPreciosPapa } = require("../scrapers/papa_argenpapa");
 const { obtenerPreciosPapaMcba } = require("../scrapers/papa_mcba");
 const { obtenerPreciosPapaMagyp } = require("../scrapers/papa_magyp_csv");
@@ -17,6 +18,8 @@ const { obtenerNoticiasWeb } = require("../scrapers/noticias_web");
 const { obtenerMercadosWeb } = require("../scrapers/mercados_web");
 const { obtenerContextoInta } = require("../scrapers/inta_contexto");
 const { obtenerMagypExtra } = require("../scrapers/magyp_extra");
+const { obtenerPreciosMagypPreciosPhp } = require("../scrapers/granos_magyp_precios_php");
+const { obtenerPreciosMarounPizarra } = require("../scrapers/granos_maroun_pizarra");
 const { obtenerSioGranosAutomatico } = require("../scrapers/siogranos");
 const { verificarAlertas } = require("../services/alertas");
 const { generarSnapshotMercado } = require("../services/snapshot");
@@ -130,6 +133,7 @@ const obtenerConfianzaMercado = (mercado = "") => {
   if (m.includes("MATBA")) return 0.9;
   if (m.includes("WEB")) return 0.7;
   if (m.includes("AFA")) return 0.82;
+  if (m.includes("MAROUN")) return 0.88;
   return 0.78;
 };
 
@@ -143,6 +147,8 @@ const inferirFuenteIngesta = (item = {}, mercadoNorm = "") => {
   if (/afa|cbot/.test(m)) return "afa_scl";
   if (/sio|monitor/.test(m)) return "sio_granos";
   if (/todoagro|lncampo|_web|mercados_web|agrofy/.test(m)) return "mercados_web";
+  if (/maroun/i.test(m)) return "maroun_pizarra";
+  if (/magyp_precios_php|magyp_precio_php/i.test(m)) return "magyp_precios_php";
   if (/matba|rofex/.test(m)) return "matba_rofex";
   return "ingesta";
 };
@@ -773,6 +779,34 @@ const recolectarPreciosCACFresco = async () => {
     resumen.errores.push(error.message);
   }
 
+  try {
+    const pampe = [];
+    try {
+      pampe.push(...(await conReintentos(() => obtenerPreciosMagypPreciosPhp(), { intentos: 2, etiqueta: "MAGYP_PHP_CAC" })));
+    } catch (e) {
+      resumen.errores.push(`MAGYP precios.php (CAC job): ${e.message}`);
+    }
+    try {
+      pampe.push(...(await conReintentos(() => obtenerPreciosMarounPizarra(), { intentos: 2, etiqueta: "MAROUN_CAC_JOB" })));
+    } catch (e) {
+      resumen.errores.push(`Maroun (CAC job): ${e.message}`);
+    }
+    try {
+      pampe.push(...(await conReintentos(() => obtenerPreciosBCP(), { intentos: 2, etiqueta: "BCP_CAC_JOB" })));
+    } catch (e) {
+      resumen.errores.push(`BCP (CAC job): ${e.message}`);
+    }
+    for (const item of pampe) {
+      try {
+        resumen.insertados += await insertPrecio(item, { perfilValidacion: "web" });
+      } catch (e2) {
+        resumen.errores.push(`Pampeana ${item.cultivo || ""}: ${e2.message}`);
+      }
+    }
+  } catch (e) {
+    resumen.errores.push(String(e?.message || e));
+  }
+
   if (resumen.errores.length) resumen.ok = false;
 
   console.log(
@@ -956,6 +990,11 @@ const ejecutarRecolectorDiario = async () =>
       haciendaInsertada: 0,
       noticiasFuente: 0,
       noticiasInsertadas: 0,
+      errores: [],
+    },
+    fuentes_pampeanas: {
+      totalFuente: 0,
+      insertados: 0,
       errores: [],
     },
     snapshot: {
@@ -1473,6 +1512,42 @@ const ejecutarRecolectorDiario = async () =>
     resumen.magyp_extra.errores.push(error.message);
   }
 
+  try {
+    const pampe = [];
+    try {
+      const magypPhp = await conReintentos(() => obtenerPreciosMagypPreciosPhp(), {
+        intentos: 2,
+        esperaBaseMs: 1500,
+        etiqueta: "MAGYP_PRECIOS_PHP",
+      });
+      pampe.push(...magypPhp);
+    } catch (error) {
+      resumen.fuentes_pampeanas.errores.push(`MAGYP precios.php: ${error.message}`);
+    }
+    try {
+      const maroun = await conReintentos(() => obtenerPreciosMarounPizarra(), {
+        intentos: 2,
+        esperaBaseMs: 1500,
+        etiqueta: "MAROUN_PIZARRA",
+      });
+      pampe.push(...maroun);
+    } catch (error) {
+      resumen.fuentes_pampeanas.errores.push(`Maroun: ${error.message}`);
+    }
+    resumen.fuentes_pampeanas.totalFuente = pampe.length;
+    for (const item of pampe) {
+      try {
+        resumen.fuentes_pampeanas.insertados += await insertPrecio(item, { perfilValidacion: "web" });
+      } catch (error) {
+        resumen.fuentes_pampeanas.errores.push(
+          `Pampeana ${item.cultivo || "n/d"} ${item.mercado || "n/d"}: ${error.message}`
+        );
+      }
+    }
+  } catch (error) {
+    resumen.fuentes_pampeanas.errores.push(error.message);
+  }
+
   if (resumen.mercados_web.insertados === 0) {
     try {
       const recuperados = await reusarUltimoDatoValidoPreciosPorMercado({
@@ -1489,6 +1564,15 @@ const ejecutarRecolectorDiario = async () =>
         `Fallback ultimo_valido LN Campo: ${fallbackError.message}`
       );
     }
+  }
+
+  try {
+    const bcp = await conReintentos(() => obtenerPreciosBCP(), { intentos: 2, etiqueta: "BCP_DAILY" });
+    for (const item of bcp) {
+      resumen.fuentes_pampeanas.insertados += await insertPrecio(item, { perfilValidacion: "web" });
+    }
+  } catch (e) {
+    resumen.fuentes_pampeanas.errores.push(`BCP Daily: ${e.message}`);
   }
 
   try {
@@ -1518,6 +1602,7 @@ const ejecutarRecolectorDiario = async () =>
     resumen.mercados_web.errores.length +
     resumen.sio_granos.errores.length +
     resumen.magyp_extra.errores.length +
+    resumen.fuentes_pampeanas.errores.length +
     resumen.snapshot.errores.length;
 
   if (totalErrores > 0) {
@@ -1543,6 +1628,7 @@ const ejecutarRecolectorDiario = async () =>
         magyp_extra_precios: resumen.magyp_extra.preciosInsertados,
         magyp_extra_hacienda: resumen.magyp_extra.haciendaInsertada,
         magyp_extra_noticias: resumen.magyp_extra.noticiasInsertadas,
+        fuentes_pampeanas_insertados: resumen.fuentes_pampeanas.insertados,
         snapshot_id: resumen.snapshot.id,
         snapshot_items: resumen.snapshot.totalItems,
         errores: totalErrores,
@@ -1584,6 +1670,9 @@ const ejecutarRecolectorDiario = async () =>
   }
   if (resumen.magyp_extra.errores.length) {
     console.error("[Recolector] Errores MAGYP extra:", resumen.magyp_extra.errores);
+  }
+  if (resumen.fuentes_pampeanas.errores.length) {
+    console.error("[Recolector] Errores fuentes pampeanas:", resumen.fuentes_pampeanas.errores);
   }
   if (resumen.rosgan.errores.length) {
     console.error("[Recolector] Errores Rosgan:", resumen.rosgan.errores);
