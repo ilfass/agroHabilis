@@ -96,6 +96,7 @@ const conversacionEstadoService = require("../services/conversacion_estado");
 const resumenInteractivo = require("../services/resumen_interactivo");
 const { parseComandoBot } = require("../services/consultas/bot_control");
 const { analizarMediaAgro } = require("../services/vision/agro_vision");
+const { transcribirAudio } = require("../services/voice/transcription");
 /**
  * TurnController (P2#10) — migración gradual del dispatcher.
  *
@@ -621,6 +622,13 @@ const procesarMensajeEntranteWhatsapp = async (msg) => {
           if (visionText) {
             consulta = `[Análisis de archivo: ${visionText}] ${consulta}`.trim();
             console.log(`[Vision] Procesado media ${media.mimetype} para ${msg.from}`);
+          }
+        } else if (media && media.mimetype.startsWith("audio/")) {
+          const buffer = Buffer.from(media.data, "base64");
+          const transcript = await transcribirAudio(buffer, media.mimetype);
+          if (transcript) {
+            consulta = `${consulta} [Audio transcrito: ${transcript}]`.trim();
+            console.log(`[Voice] Audio transcrito para ${msg.from}: ${transcript.slice(0, 50)}...`);
           }
         }
       } catch (err) {
