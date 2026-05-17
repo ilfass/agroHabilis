@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AgroHabilis - Campañas de Outreach</title>
+    <style>
+      :root { --bg:#f3f7ff; --bg-soft:#eef4ff; --panel:#ffffff; --panel-soft:#f7faff; --text:#17233a; --muted:#5f7294; --accent:#2f8bff; --line:#dbe7ff; --danger:#e45858; --shadow:0 12px 30px rgba(39,81,161,.12); --success:#1f7a3f; }
+      * { box-sizing:border-box; }
+      body { margin:0; font-family:Inter,Segoe UI,Arial,sans-serif; font-size:15px; background: linear-gradient(180deg, var(--bg-soft), var(--bg)); color:var(--text); padding:24px 24px 24px 276px; }
+      .topbar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:12px; }
+      .nav { position: fixed; left: 18px; top: 18px; width: 230px; display:flex; flex-direction:column; gap:8px; padding:12px; border:1px solid var(--line); border-radius:16px; background:#fff; box-shadow: var(--shadow); margin-bottom:14px; }
+      .nav .brand { display:flex; align-items:center; gap:10px; padding:8px 10px 12px; border-bottom:1px solid #e7efff; margin-bottom:4px; font-weight:800; color:#1e3b6e; }
+      .brand-dot { width:10px; height:10px; border-radius:999px; background:#2f8bff; box-shadow:0 0 0 4px rgba(47,139,255,.12); }
+      .nav a { text-decoration:none; padding:9px 12px; border-radius:10px; border:1px solid #d5e3ff; color:#38507b; background:#fff; font-size:13px; font-weight:600; width:100%; }
+      .nav a.active { background: linear-gradient(180deg, var(--accent), #1f66c9); border:none; color:#fff; font-weight:700; }
+      .card { background: linear-gradient(180deg, var(--panel), var(--panel-soft)); border:1px solid var(--line); border-radius:16px; padding:20px; margin-bottom:16px; box-shadow:var(--shadow); }
+      .tools { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
+      .tools .grow { flex:1; min-width:240px; }
+      input, select, button, textarea { padding:11px 13px; border-radius:10px; border:1px solid #cfddfa; background:#fff; color:#24395f; font-family: inherit; }
+      button { cursor: pointer; font-weight: 700; transition: all 0.2s; }
+      button.primary { background:linear-gradient(180deg,var(--accent),#1f66c9); border:none; color:#fff; }
+      button.secondary { background:linear-gradient(180deg,#f0f5ff,#dbe7ff); border:1px solid var(--line); color:#38507b; }
+      button.success { background:linear-gradient(180deg,#2ecc71,#27ae60); border:none; color:#fff; }
+      button:disabled { opacity: 0.5; cursor: not-allowed; }
+      table { width:100%; border-collapse: collapse; margin-top: 10px; }
+      th, td { border-bottom:1px solid var(--line); padding:12px 10px; text-align:left; font-size:14px; }
+      th { color:var(--muted); font-weight: 600; }
+      .chip { display:inline-block; padding:3px 10px; border-radius:999px; background: #eef4ff; border:1px solid #d5e3ff; font-size:11px; font-weight: 600; }
+      .muted { color:var(--muted); }
+      .status-bar { display: flex; flex-direction: column; gap: 8px; padding: 16px; background: #f8faff; border-radius: 12px; border: 1px solid var(--line); margin-top: 16px; font-size: 13px; }
+      .status-row { display: flex; justify-content: space-between; align-items: center; }
+      .progress-bg { height: 8px; background: #e7efff; border-radius: 4px; overflow: hidden; margin-top: 4px; }
+      .progress-fill { height: 100%; background: var(--accent); transition: width 0.4s; }
+      .template-card { cursor: pointer; transition: transform 0.2s; border: 1px solid var(--line); padding: 12px; border-radius: 12px; margin-bottom: 8px; font-size: 13px; }
+      .template-card:hover { transform: translateY(-2px); border-color: var(--accent); background: #f0f7ff; }
+      .template-card strong { display: block; margin-bottom: 4px; color: var(--accent); }
+      .template-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 16px; }
+      @media (max-width: 1100px) {
+        body { padding:16px; }
+        .nav { position: static; width: auto; flex-direction: row; flex-wrap: wrap; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="nav">
+      <div class="brand"><span class="brand-dot"></span><span>AgroHabilis Admin</span></div>
+      <a href="/dashboard/admin">🏠 Dashboard</a>
+      <a href="/dashboard/metricas">📊 Métricas</a>
+      <a href="/dashboard/precios">💹 Precios</a>
+      <a href="/dashboard/usuarios">👥 Usuarios</a>
+      <a href="/dashboard/campanas" class="active">🚀 Campañas</a>
+      <a href="/dashboard/comandos">⌨️ Comandos</a>
+      <a href="/dashboard/templates">🧩 Templates</a>
+      <a href="/dashboard/cliente">🙍 Cliente</a>
+    </div>
+
+    <div class="topbar">
+      <h1 style="margin:0;">Campañas de Outreach</h1>
+      <p class="muted" style="width:100%; margin-top:0;">Re-activa a tus productores con mensajes estratégicos.</p>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-top:0;">1. Seleccionar Destinatarios</h3>
+      <div class="tools">
+        <div style="display:flex; flex-direction:column; gap:4px;">
+          <label class="muted" style="font-size:12px;">Inactividad mínima</label>
+          <select id="fDias">
+            <option value="0">Ver todos</option>
+            <option value="3">3 días sin hablar</option>
+            <option value="7" selected>7 días sin hablar</option>
+            <option value="15">15 días sin hablar</option>
+            <option value="30">30 días sin hablar</option>
+          </select>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:4px;">
+          <label class="muted" style="font-size:12px;">Límite</label>
+          <select id="fLimit">
+            <option value="10">10 usuarios</option>
+            <option value="50">50 usuarios</option>
+            <option value="100" selected>100 usuarios</option>
+            <option value="500">500 usuarios</option>
+          </select>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:4px; justify-content:flex-end;">
+          <button id="btnCargar" type="button" class="secondary">Buscar Candidatos</button>
+        </div>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th style="width:30px;"><input type="checkbox" id="selAll" checked /></th>
+            <th>Productor</th>
+            <th>Zona</th>
+            <th>Última Vez</th>
+            <th>Días Inactivo</th>
+            <th>Plan</th>
+          </tr>
+        </thead>
+        <tbody id="listaCandidatos">
+          <tr><td colspan="6" class="muted" style="text-align:center; padding:40px;">Hacé clic en "Buscar Candidatos" para empezar.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-top:0;">2. Mensaje de la Campaña</h3>
+      <p class="muted" style="font-size:13px; margin-bottom:12px;">Elegí un template o escribí uno personalizado. Usá <code>{{nombre}}</code> para personalizar.</p>
+      
+      <div class="template-list">
+        <div class="template-card" onclick="setTemplate('minimal')">
+          <strong>🎈 Minimalista</strong>
+          "Hola {{nombre}}"
+        </div>
+        <div class="template-card" onclick="setTemplate('completo')">
+          <strong>💎 Full Onboarding</strong>
+          "¡Hola {{nombre}}! Paso a contarte que AgroHabilis ahora es multimodal..."
+        </div>
+        <div class="template-card" onclick="setTemplate('saludo')">
+          <strong>👋 Saludo Humanizado</strong>
+          "¡Hola {{nombre}}! ¿Cómo va todo? Pasaba a saludarte..."
+        </div>
+      </div>
+
+      <textarea id="txtMensaje" rows="5" style="width:100%; resize:vertical;" placeholder="Escribí tu mensaje aquí..."></textarea>
+      
+      <div class="tools" style="margin-top:16px;">
+        <button id="btnTest" type="button" class="secondary">Enviar Prueba a Mí</button>
+        <button id="btnLanzar" type="button" class="primary" style="padding: 11px 30px;">🚀 LANZAR CAMPAÑA</button>
+      </div>
+    </div>
+
+    <div id="statusBar" class="status-bar" style="display:none;">
+      <div class="status-row">
+        <strong id="statusTxt">Preparando...</strong>
+        <span id="statusProgress" style="font-weight:700;">0/0</span>
+      </div>
+      <div class="progress-bg"><div id="progressFill" class="progress-fill" style="width:0%;"></div></div>
+      <div id="statusDetail" class="muted" style="font-size:11px; margin-top:4px;"></div>
+    </div>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+      const state = { candidatos: [], selected: new Set() };
+
+      const templates = {
+        minimal: "Hola {{nombre}}",
+        completo: "¡Hola {{nombre}}! 👋 ¿Cómo viene la jornada?\n\nTe escribo para contarte que AgroHabilis creció un montón. Ahora es MULTIMODAL y MULTIFUENTE:\n\n🎤 Voz: Mandame un audio mientras manejás y registro tus ventas o stock.\n📸 Fotos: Mandame foto de un remito y cargo los datos solo.\n📊 Mercado: Preguntame precios de cualquier cultivo (cebada, soja, etc) y te doy el dato al minuto.\n🧠 Análisis: Preguntame '¿Me conviene vender?' y cruzo tus datos propios con el mercado externo para darte una recomendación pro.\n\n¿En qué te puedo ayudar hoy? ¡Cualquier cosa me chiflas!",
+        saludo: "¡Hola {{nombre}}! ¿Cómo va todo? Pasaba a saludarte y ver cómo viene la jornada en tu zona. ¿En qué te puedo dar una mano hoy?",
+      };
+
+      function setTemplate(key) {
+        $("txtMensaje").value = templates[key];
+      }
+
+      async function cargarCandidatos() {
+        const dias = $("fDias").value;
+        const limit = $("fLimit").value;
+        $("listaCandidatos").innerHTML = '<tr><td colspan="6" class="muted" style="text-align:center; padding:40px;">Buscando...</td></tr>';
+        
+        try {
+          const r = await fetch(`/api/dashboard/admin/outreach-candidatos?dias=${dias}&limit=${limit}`, { credentials: "same-origin" });
+          const d = await r.json();
+          if (!d.ok) throw new Error(d.error || "Error en el servidor");
+          
+          state.candidatos = d.items || [];
+          state.selected = new Set(state.candidatos.map(c => c.id));
+          renderCandidatos();
+        } catch (err) {
+          alert("Error al cargar: " + err.message);
+        }
+      }
+
+      function renderCandidatos() {
+        if (!state.candidatos.length) {
+          $("listaCandidatos").innerHTML = '<tr><td colspan="6" class="muted" style="text-align:center; padding:40px;">No se encontraron usuarios.</td></tr>';
+          return;
+        }
+
+        $("listaCandidatos").innerHTML = state.candidatos.map(c => `
+          <tr>
+            <td><input type="checkbox" class="sel-u" data-id="${c.id}" ${state.selected.has(c.id) ? 'checked' : ''} /></td>
+            <td><strong>${c.nombre || 'Productor'}</strong><br/><span class="muted" style="font-size:12px;">${c.whatsapp}</span></td>
+            <td>${c.partido || '-'}, ${c.provincia || '-'}</td>
+            <td>${c.ultima_interaccion ? new Date(c.ultima_interaccion).toLocaleDateString('es-AR') : 'Sin interacciones'}</td>
+            <td><span class="chip">${c.dias_inactivo !== null && c.dias_inactivo !== undefined ? `${c.dias_inactivo} días` : 'Nunca'}</span></td>
+            <td><span class="chip" style="background:#fff;">${String(c.plan || 'gratis').toUpperCase()}</span></td>
+          </tr>
+        `).join('');
+
+        document.querySelectorAll(".sel-u").forEach(cb => {
+          cb.addEventListener('change', () => {
+            const id = Number(cb.getAttribute('data-id'));
+            if (cb.checked) state.selected.add(id);
+            else state.selected.delete(id);
+          });
+        });
+      }
+
+      async function enviarPrueba() {
+        const mensaje = $("txtMensaje").value.trim();
+        if (!mensaje) return alert("Escribí un mensaje.");
+        try {
+          const r = await fetch("/jobs/whatsapp-test", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "same-origin",
+            body: JSON.stringify({ mensaje: mensaje.replace("{{nombre}}", "Admin") })
+          });
+          const d = await r.json();
+          if (d.ok) alert("Prueba enviada.");
+          else throw new Error(d.error);
+        } catch (err) {
+          alert("Error: " + err.message);
+        }
+      }
+
+      async function lanzarCampana() {
+        const ids = Array.from(state.selected);
+        const mensaje = $("txtMensaje").value.trim();
+        
+        if (!ids.length) return alert("Seleccioná al menos un destinatario.");
+        if (!mensaje) return alert("El mensaje está vacío.");
+        if (!confirm(`¿Confirmás el envío masivo a ${ids.length} usuarios?`)) return;
+        
+        $("btnLanzar").disabled = true;
+        $("statusBar").style.display = "flex";
+        $("statusTxt").textContent = "Encolando campaña...";
+        $("statusProgress").textContent = `0/${ids.length}`;
+        $("progressFill").style.width = "0%";
+        $("statusDetail").textContent = "Esperando respuesta del servidor...";
+
+        try {
+          const r = await fetch("/api/dashboard/admin/envio-masivo", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "same-origin",
+            body: JSON.stringify({ usuarioIds: ids, mensaje })
+          });
+          const d = await r.json();
+          if (!d.ok) throw new Error(d.error || "Fallo al iniciar");
+          
+          const jobId = d.jobId;
+          const poll = setInterval(async () => {
+            try {
+              const rs = await fetch(`/api/dashboard/admin/envio-masivo/estado?jobId=${jobId}`, { credentials: "same-origin" });
+              const ds = await rs.json();
+              if (!ds.ok) throw new Error(ds.error);
+              
+              const enviados = ds.enviados || 0;
+              const fallidos = ds.fallidos || 0;
+              const total = ds.total || ids.length;
+              const prog = Math.round(((enviados + fallidos) / total) * 100);
+              
+              $("statusProgress").textContent = `${enviados + fallidos}/${total}`;
+              $("progressFill").style.width = `${prog}%`;
+              $("statusTxt").textContent = ds.estado === 'running' ? "Enviando mensajes..." : 
+                                         ds.estado === 'error' ? "❌ Error en envío" : "✅ Campaña finalizada";
+              
+              if (ds.estado !== 'running') {
+                clearInterval(poll);
+                $("btnLanzar").disabled = false;
+                if (ds.estado === 'error') {
+                   $("statusDetail").textContent = "Error: " + (ds.error || "Desconocido");
+                   alert("La campaña se detuvo por un error: " + ds.error);
+                } else {
+                   $("statusDetail").textContent = `Éxito: ${enviados} enviados, ${fallidos} fallidos.`;
+                   alert(`¡Campaña completada!\n\nSe enviaron ${enviados} mensajes correctamente.`);
+                }
+              } else {
+                $("statusDetail").textContent = "Procesando uno a uno con delay de seguridad...";
+              }
+            } catch (pollErr) {
+              clearInterval(poll);
+              $("btnLanzar").disabled = false;
+              $("statusTxt").textContent = "⚠️ Error de conexión";
+              $("statusDetail").textContent = pollErr.message;
+            }
+          }, 2000);
+          
+        } catch (err) {
+          $("btnLanzar").disabled = false;
+          $("statusTxt").textContent = "❌ Error";
+          $("statusDetail").textContent = err.message;
+          alert("Error: " + err.message);
+        }
+      }
+
+      document.addEventListener('DOMContentLoaded', () => {
+        $("btnCargar").onclick = cargarCandidatos;
+        $("btnTest").onclick = enviarPrueba;
+        $("btnLanzar").onclick = lanzarCampana;
+        $("selAll").onclick = () => {
+          const checked = $("selAll").checked;
+          document.querySelectorAll(".sel-u").forEach(cb => {
+            cb.checked = checked;
+            const id = Number(cb.getAttribute('data-id'));
+            if (checked) state.selected.add(id);
+            else state.selected.delete(id);
+          });
+        };
+      });
+    </script>
+  </body>
+</html>

@@ -14,12 +14,12 @@ const {
 const { iniciarCronEnviador } = require("./jobs/enviador");
 const { obtenerDatosUltimoBoletin } = require("./scrapers/bcrBoletin");
 const { generarResumenMercado } = require("./services/gemini");
-const { generarResumen, marcarResumenEnviado } = require("./services/resumen");
 const {
   buscarPorWhatsapp,
   actualizarUsuario,
   setActivoUsuario,
   eliminarUsuarioSoft,
+  destinoWhatsappParaEnvio,
 } = require("./models/usuario");
 const {
   initializeWhatsApp,
@@ -29,6 +29,7 @@ const {
   enviarCambioPlanWhatsapp,
   getRutaQrWhatsappPng,
 } = require("./config/whatsapp");
+const { iniciarResumen } = require("./services/resumen_interactivo");
 const {
   obtenerUsuarioSistemaId,
   upsertResumenPorFechaMercado,
@@ -50,7 +51,13 @@ const {
   getClienteDashboard,
   iniciarEnvioMasivoAdminAsync,
   obtenerEstadoEnvioMasivoJob,
+  getUltimosPlanesAgente,
+  getAgentRuntimeAdmin,
+  getAgentColaResumen,
+  getOutreachCandidatos,
 } = require("./services/dashboard");
+const { getAdminEditableEnv, postAdminEditableEnv } = require("./services/admin_editable_env");
+const agentToolsRegistry = require("./services/agent/tools");
 const {
   CLIENT_SESSION_COOKIE,
   CLIENT_SESSION_TTL_MS,
@@ -109,12 +116,14 @@ const LOGIN_REDIRECT_TARGETS = new Set([
   "/dashboard/usuarios",
   "/dashboard/metricas",
   "/dashboard/precios",
+  "/dashboard/campanas",
   "/admin.html",
   "/comandos.html",
   "/templates.html",
   "/usuarios.html",
   "/metricas.html",
   "/precios.html",
+  "/campanas.html",
 ]);
 const CLIENT_LOGIN_REDIRECT_TARGETS = new Set([
   "/dashboard/cliente",
@@ -608,8 +617,8 @@ app.get("/dashboard/metricas", (_req, res) => {
   res.sendFile(path.join(__dirname, "..", "frontend", "public", "metricas.html"));
 });
 
-app.get("/dashboard/precios", (_req, res) => {
-  res.sendFile(path.join(__dirname, "..", "frontend", "public", "precios.html"));
+app.get("/dashboard/campanas", (_req, res) => {
+  res.sendFile(path.join(__dirname, "..", "frontend", "public", "campanas.html"));
 });
 
 app.get("/casos-reales", (_req, res) => {
@@ -893,9 +902,140 @@ app.post("/api/admin/enviar-resumen", async (req, res) => {
       }
     }
 
-    const numero = String(req.body?.whatsapp || "").trim();
+    const body = req.body && typeof req.body === "object" ? req.body : {};
+    const usuarioIdsRaw = body.usuario_ids;
+    const usuarioIdRaw = body.usuario_id;
+    const numero = String(body.whatsapp || "").trim();
+
+    const enviarInvitacionResumen = async (usuario) => {
+      const destinoWp = destinoWhatsappParaEnvio(usuario);
+      let ultimoEnvio = null;
+      const out = await iniciarResumen(usuario, {
+        enviar: async (texto) => {
+          ultimoEnvio = await sendMessage(destinoWp, texto);
+        },
+      });
+      return {
+        omitido: Boolean(out?.omitido),
+        motivo: out?.motivo,
+        mensajeId: ultimoEnvio?.id?._serialized || null,
+      };
+    };
+
+    if (Array.isArray(usuarioIdsRaw) && usuarioIdsRaw.length > 0) {
+      const MAX_LOTE = 40;
+      if (usuarioIdsRaw.length > MAX_LOTE) {
+        return res.status(400).json({
+          ok: false,
+          error: `Máximo ${MAX_LOTE} usuario_ids por solicitud`,
+        });
+      }
+      const sleepLote = (ms) => new Promise((r) => setTimeout(r, ms));
+      const results = [];
+      for (let i = 0; i < usuarioIdsRaw.length; i += 1) {
+        const raw = usuarioIdsRaw[i];
+        const id = Number.parseInt(String(raw).trim(), 10);
+        if (!Number.isFinite(id) || id <= 0) {
+          results.push({ usuario_id: raw, ok: false, error: "id inválido" });
+        } else {
+          try {
+            const rU = await query(
+              `
+              SELECT id, nombre, whatsapp, whatsapp_jid, whatsapp_real, plan, plan_activo_hasta
+              FROM usuarios
+              WHERE id = $1 AND activo = true
+              LIMIT 1
+            `,
+              [id]
+            );
+            const usuario = rU.rows[0];
+            if (!usuario) {
+              results.push({
+                usuario_id: id,
+                ok: false,
+                error: "no encontrado o inactivo",
+              });
+            } else {
+              const r = await enviarInvitacionResumen(usuario);
+              if (r.omitido) {
+                results.push({
+                  usuario_id: id,
+                  ok: false,
+                  omitido: true,
+                  motivo: r.motivo,
+                  error: "onboarding o COMPLETAR PERFIL pendiente",
+                });
+              } else {
+                results.push({ usuario_id: id, ok: true, mensajeId: r.mensajeId });
+              }
+            }
+          } catch (err) {
+            results.push({
+              usuario_id: id,
+              ok: false,
+              error: String(err?.message || err),
+            });
+          }
+        }
+        if (i < usuarioIdsRaw.length - 1) {
+          await sleepLote(2000);
+        }
+      }
+      const algunOk = results.some((x) => x.ok);
+      return res.json({
+        ok: algunOk,
+        modo: "resumen_interactivo_lote",
+        detalle:
+          "Invitación sí/no por usuario. Revisar results[] si alguno falló.",
+        results,
+      });
+    }
+
+    if (usuarioIdRaw !== undefined && usuarioIdRaw !== null && String(usuarioIdRaw).trim() !== "") {
+      const idUnico = Number.parseInt(String(usuarioIdRaw).trim(), 10);
+      if (!Number.isFinite(idUnico) || idUnico <= 0) {
+        return res.status(400).json({ ok: false, error: "usuario_id inválido" });
+      }
+      const rU = await query(
+        `
+        SELECT id, nombre, whatsapp, whatsapp_jid, whatsapp_real, plan, plan_activo_hasta
+        FROM usuarios
+        WHERE id = $1 AND activo = true
+        LIMIT 1
+      `,
+        [idUnico]
+      );
+      const usuario = rU.rows[0];
+      if (!usuario) {
+        return res
+          .status(404)
+          .json({ ok: false, error: "No existe usuario activo con ese id" });
+      }
+      const r = await enviarInvitacionResumen(usuario);
+      if (r.omitido) {
+        return res.status(409).json({
+          ok: false,
+          omitido: true,
+          motivo: r.motivo,
+          error:
+            "El usuario tiene pendiente el registro o COMPLETAR PERFIL. Terminá ese paso antes de enviar el resumen.",
+        });
+      }
+      return res.json({
+        ok: true,
+        modo: "resumen_interactivo",
+        usuario_id: idUnico,
+        detalle:
+          "Se envió la invitación al flujo por pasos (sí/no). El resumen completo se guarda al terminar el chat.",
+        mensajeId: r.mensajeId,
+      });
+    }
+
     if (!numero) {
-      return res.status(400).json({ ok: false, error: "Falta body.whatsapp" });
+      return res.status(400).json({
+        ok: false,
+        error: "Falta body.whatsapp, usuario_id o usuario_ids",
+      });
     }
 
     const usuario = await buscarPorWhatsapp(numero);
@@ -905,17 +1045,23 @@ app.post("/api/admin/enviar-resumen", async (req, res) => {
         .json({ ok: false, error: "No existe usuario para ese whatsapp" });
     }
 
-    const generado = await generarResumen(usuario.id);
-    const envio = await sendMessage(usuario.whatsapp, generado.texto);
-    await marcarResumenEnviado(generado.resumenId);
+    const r = await enviarInvitacionResumen(usuario);
+    if (r.omitido) {
+      return res.status(409).json({
+        ok: false,
+        omitido: true,
+        motivo: r.motivo,
+        error:
+          "El usuario tiene pendiente el registro o COMPLETAR PERFIL. Terminá ese paso antes de enviar el resumen.",
+      });
+    }
 
     return res.json({
       ok: true,
-      resumenId: generado.resumenId,
-      model: generado.model,
-      tokensUsados: generado.tokensUsados,
-      mensajeId: envio.id?._serialized || null,
-      resumen: generado.texto,
+      modo: "resumen_interactivo",
+      detalle:
+        "Se envió la invitación al flujo por pasos (sí/no). El resumen completo se guarda al terminar el chat.",
+      mensajeId: r.mensajeId,
     });
   } catch (error) {
     console.error("Fallo enviar resumen admin:", error.message);
@@ -977,6 +1123,83 @@ app.get("/api/dashboard/admin/resumen", async (req, res) => {
     return res.json({ ok: true, data });
   } catch (error) {
     console.error("Fallo dashboard admin resumen:", error.message);
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+app.get("/api/dashboard/admin/agent-plan", async (req, res) => {
+  try {
+    const limit = Number(req.query.limit || 40);
+    const rows = await getUltimosPlanesAgente(limit);
+    res.setHeader("Cache-Control", "private, no-store, max-age=0, must-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    return res.json({ ok: true, rows });
+  } catch (error) {
+    console.error("Fallo dashboard admin agent-plan:", error.message);
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+app.get("/api/dashboard/admin/agent-tools", async (req, res) => {
+  try {
+    res.setHeader("Cache-Control", "private, no-store, max-age=0, must-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    return res.json({ ok: true, tools: agentToolsRegistry.listTools() });
+  } catch (error) {
+    console.error("Fallo dashboard admin agent-tools:", error.message);
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+app.get("/api/dashboard/admin/agent-runtime", async (req, res) => {
+  try {
+    const dias = Number(req.query.dias ?? req.query.days ?? 7);
+    const data = await getAgentRuntimeAdmin({ dias });
+    res.setHeader("Cache-Control", "private, no-store, max-age=0, must-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    return res.json({ ok: true, data });
+  } catch (error) {
+    console.error("Fallo dashboard admin agent-runtime:", error.message);
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+app.get("/api/dashboard/admin/agent-env", async (_req, res) => {
+  try {
+    const data = getAdminEditableEnv();
+    res.setHeader("Cache-Control", "private, no-store, max-age=0, must-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    return res.json({ ok: true, data });
+  } catch (error) {
+    console.error("Fallo dashboard admin agent-env:", error.message);
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+app.post("/api/dashboard/admin/agent-env", async (req, res) => {
+  try {
+    const patch = req.body && typeof req.body === "object" && !Array.isArray(req.body) ? req.body : {};
+    const result = await postAdminEditableEnv(patch);
+    if (!result.ok) {
+      return res.status(400).json(result);
+    }
+    res.setHeader("Cache-Control", "private, no-store, max-age=0, must-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    return res.json({ ok: true, ...result });
+  } catch (error) {
+    console.error("Fallo dashboard admin agent-env POST:", error.message);
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+app.get("/api/dashboard/admin/agent-cola", async (_req, res) => {
+  try {
+    const data = await getAgentColaResumen();
+    res.setHeader("Cache-Control", "private, no-store, max-age=0, must-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    return res.json({ ok: true, ...data });
+  } catch (error) {
+    console.error("Fallo dashboard admin agent-cola:", error.message);
     return res.status(500).json({ ok: false, error: error.message });
   }
 });
@@ -1071,6 +1294,19 @@ app.get("/api/dashboard/admin/pendientes", async (req, res) => {
     return res.json({ ok: true, items });
   } catch (error) {
     console.error("Fallo dashboard admin pendientes:", error.message);
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+app.get("/api/dashboard/admin/outreach-candidatos", async (req, res) => {
+  try {
+    const diasRaw = req.query.dias;
+    const dias = (diasRaw !== undefined && diasRaw !== "") ? Number(diasRaw) : 7;
+    const limit = Number(req.query.limit || 100);
+    const items = await getOutreachCandidatos({ diasInactividad: dias, limit });
+    return res.json({ ok: true, items });
+  } catch (error) {
+    console.error("Fallo dashboard admin outreach-candidatos:", error.message);
     return res.status(500).json({ ok: false, error: error.message });
   }
 });

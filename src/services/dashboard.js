@@ -10,6 +10,59 @@ const { interpolarMensajeMasivo } = require("../utils/interpolar_mensaje_masivo"
 const { WHATSAPP_SISTEMA, obtenerUsuarioSistemaId } = require("./resumenes");
 const { registrarEnvioMasivoEnHistorial } = require("./broadcast_historial");
 
+const buildAgentRuntimeSnapshot = () => {
+  try {
+    const {
+      cursorMode,
+      clasificadorHistorialLimite,
+      historialHiloPromptTurnos,
+      dominioHistorialLimite,
+      scoutMaxTurns,
+      scoutMaxToolCalls,
+      verifyRouterMaxAttempts,
+      oavStepMaxAttemptsCap,
+      inventarioSoloLlm,
+      dialogoHiloSinAtajoHeuristico,
+      agentIaTotal,
+    } = require("./agent/cursor_mode");
+    const {
+      unifiedTurnLoopHabilitado,
+      clasificadorDeferidoAlBucleUnificado,
+    } = require("./agent/ia/unified_turn_loop");
+    const { scoutLoopHabilitado } = require("./agent/ia/tool_loop_scout");
+    return {
+      cursorMode: cursorMode(),
+      agentIaTotal: agentIaTotal(),
+      inventarioSoloLlm: inventarioSoloLlm(),
+      dialogoHiloSinAtajoHeuristico: dialogoHiloSinAtajoHeuristico(),
+      unifiedTurnLoop: unifiedTurnLoopHabilitado(),
+      clasificadorEnBucleUnificado: clasificadorDeferidoAlBucleUnificado(),
+      scoutLoop: scoutLoopHabilitado(),
+      limits: {
+        historialClasificador: clasificadorHistorialLimite(),
+        historialHiloIaTurnos: historialHiloPromptTurnos(),
+        historialDominio: dominioHistorialLimite(),
+        scoutMaxTurns: scoutMaxTurns(),
+        scoutMaxToolCalls: scoutMaxToolCalls(),
+        verifyRouterMaxAttempts: verifyRouterMaxAttempts(),
+        oavStepMaxAttemptsCap: oavStepMaxAttemptsCap(),
+      },
+      apiKeysPresent: {
+        OPENROUTER: Boolean(process.env.OPENROUTER_API_KEY?.trim()),
+        GROQ: Boolean(process.env.GROQ_API_KEY?.trim()),
+        GEMINI: Boolean(process.env.GEMINI_API_KEY?.trim()),
+      },
+      models: {
+        OPENROUTER_MODEL: String(process.env.OPENROUTER_MODEL || "openrouter/free").trim(),
+        GEMINI_MODEL: String(process.env.GEMINI_MODEL || "gemini-flash-latest").trim(),
+      },
+      docEnvRef: ".env.example (sección modo agente / AGENT_*)",
+    };
+  } catch (err) {
+    return { error: String(err?.message || err) };
+  }
+};
+
 /** No tumbar todo el panel si una métrica secundaria falla (SQL, datos raros, tabla ausente). */
 const queryDashboardSeguro = async (etiqueta, text, params = []) => {
   try {
@@ -18,6 +71,39 @@ const queryDashboardSeguro = async (etiqueta, text, params = []) => {
     console.error(`[getAdminDashboard] consulta "${etiqueta}":`, err.message);
     return { rows: [] };
   }
+};
+
+/** Distribución de `ia_provider` en consultas (ventana móvil en días, máx. 90). */
+const getIaProveedorMixDias = async (dias = 7) => {
+  const d = Math.min(90, Math.max(1, Math.floor(Number(dias) || 7)));
+  return queryDashboardSeguro(
+    "ia_proveedor_mix_dias",
+    `
+      SELECT
+        COALESCE(NULLIF(TRIM(ia_provider), ''), '(sin etiqueta)') AS proveedor,
+        COUNT(*)::int AS n
+      FROM historial_consultas
+      WHERE creado_en >= NOW() - ($1::int * INTERVAL '1 day')
+      GROUP BY COALESCE(NULLIF(TRIM(ia_provider), ''), '(sin etiqueta)')
+      ORDER BY n DESC
+      LIMIT 32
+    `,
+    [d]
+  );
+};
+
+/**
+ * Snapshot liviano para admin: flags del agente + mix `ia_provider` (sin el resto del dashboard).
+ * @param {{ dias?: number }} [opts]
+ */
+const getAgentRuntimeAdmin = async ({ dias = 7 } = {}) => {
+  const d = Math.min(90, Math.max(1, Math.floor(Number(dias) || 7)));
+  const mix = await getIaProveedorMixDias(d);
+  return {
+    dias: d,
+    runtime: buildAgentRuntimeSnapshot(),
+    proveedorMix: mix.rows || [],
+  };
 };
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -420,6 +506,8 @@ const getAdminDashboard = async () => {
     ),
   ]);
 
+  const iaProveedorMix7d = await getIaProveedorMixDias(7);
+
   const iaConfig = getIaConfig();
   const conIAHoy = Number(iaHoy.rows[0]?.con_ia || 0);
   const fallbackHoy = Number(iaHoy.rows[0]?.fallback_local || 0);
@@ -622,6 +710,7 @@ const getAdminDashboard = async () => {
           porProveedorHoy: rateLimitPorProveedorHoy,
           serie7d: rateLimitSerie7d,
         },
+        proveedorMix7d: iaProveedorMix7d.rows || [],
       },
       tokens: {
         consultasTotal: tokensGlobal.rows[0]?.tokens_consultas_total || 0,
@@ -654,7 +743,45 @@ const getAdminDashboard = async () => {
         matbaFuentesHoy: matbaFuentesHoy.rows,
       },
     },
+    agentRuntime: buildAgentRuntimeSnapshot(),
   };
+};
+
+/**
+ * Obtiene candidatos para campañas de outreach (usuarios que no hablan hace X días).
+ */
+const getOutreachCandidatos = async ({ diasInactividad = 7, limit = 100 } = {}) => {
+  const dRaw = Number(diasInactividad);
+  const d = Number.isFinite(dRaw) ? Math.max(0, Math.min(365, dRaw)) : 7;
+  const lim = Math.max(1, Math.min(1000, Number(limit) || 100));
+
+  const result = await queryDashboardSeguro(
+    "outreach_candidatos",
+    `
+      WITH ult_con AS (
+        SELECT usuario_id, MAX(creado_en) AS fecha
+        FROM historial_consultas
+        GROUP BY usuario_id
+      )
+      SELECT
+        u.id, u.nombre,
+        COALESCE(NULLIF(u.whatsapp_real, ''), u.whatsapp) AS whatsapp,
+        u.whatsapp_jid,
+        u.provincia, u.partido, u.plan, u.activo, u.creado_en,
+        uc.fecha AS ultima_interaccion,
+        EXTRACT(DAY FROM (NOW() - uc.fecha))::int AS dias_inactivo
+      FROM usuarios u
+      LEFT JOIN ult_con uc ON uc.usuario_id = u.id
+      WHERE u.activo = true
+        AND ($1::int = 0 OR uc.fecha < NOW() - ($1::int * INTERVAL '1 day'))
+        AND u.id NOT IN (1, (SELECT id FROM usuarios WHERE whatsapp = $2))
+      ORDER BY uc.fecha DESC NULLS LAST, u.creado_en DESC
+      LIMIT $3
+    `,
+    [d, WHATSAPP_SISTEMA, lim]
+  );
+
+  return result.rows || [];
 };
 
 const getUltimosUsuarios = async (limit = 20) => {
@@ -1129,6 +1256,8 @@ const getClienteDashboard = async ({ usuarioId }) => {
     gastosRecientes,
     ventasRecientes,
     suscripcionMp,
+    animalesIndividuales,
+    animalesEventos,
   ] = await Promise.all([
     query(
       `
@@ -1272,6 +1401,28 @@ const getClienteDashboard = async ({ usuarioId }) => {
       `,
       [usuario.id]
     ),
+    query(
+      `
+        SELECT a.id, a.caravana, a.categoria, a.estado, a.peso, a.raza, a.fecha_ingreso, l.nombre AS lote_nombre
+        FROM animales_individuales a
+        LEFT JOIN lotes l ON l.id = a.lote_id
+        WHERE a.usuario_id = $1
+        ORDER BY a.actualizado_en DESC
+        LIMIT 50
+      `,
+      [usuario.id]
+    ),
+    query(
+      `
+        SELECT e.id, e.animal_id, a.caravana, e.tipo_evento, e.fecha, e.valor_numerico, e.valor_texto, e.observaciones
+        FROM animales_eventos e
+        JOIN animales_individuales a ON a.id = e.animal_id
+        WHERE e.usuario_id = $1
+        ORDER BY e.fecha DESC, e.creado_en DESC
+        LIMIT 50
+      `,
+      [usuario.id]
+    ),
   ]);
 
   return {
@@ -1290,6 +1441,8 @@ const getClienteDashboard = async ({ usuarioId }) => {
     gastos: gastosRecientes.rows,
     ventas: ventasRecientes.rows,
     suscripcionMp: suscripcionMp.rows[0] || null,
+    animalesIndividuales: animalesIndividuales.rows,
+    animalesEventos: animalesEventos.rows,
     ia: {
       estado: [
         process.env.OPENROUTER_API_KEY?.trim(),
@@ -1313,6 +1466,85 @@ const getClienteDashboard = async ({ usuarioId }) => {
   };
 };
 
+/** Últimas consultas con bloque `agent_plan` en ia_provider_trace (solo admin). */
+const getUltimosPlanesAgente = async (limit = 40) => {
+  const lim = Math.min(200, Math.max(1, Math.floor(Number(limit) || 40)));
+  const r = await queryDashboardSeguro(
+    "agent_plan",
+    `
+      SELECT id, whatsapp, usuario_id, creado_en, ia_provider, ia_provider_trace
+      FROM historial_consultas
+      WHERE jsonb_typeof(COALESCE(ia_provider_trace, '[]'::jsonb)) = 'array'
+        AND EXISTS (
+          SELECT 1
+          FROM jsonb_array_elements(COALESCE(ia_provider_trace, '[]'::jsonb)) AS elem
+          WHERE elem->>'type' = 'agent_plan'
+            AND jsonb_typeof(elem->'steps') = 'array'
+            AND jsonb_array_length(elem->'steps') > 0
+        )
+      ORDER BY id DESC
+      LIMIT $1
+    `,
+    [lim]
+  );
+  const rows = [];
+  for (const row of r.rows || []) {
+    let trace = row.ia_provider_trace;
+    if (typeof trace === "string") {
+      try {
+        trace = JSON.parse(trace);
+      } catch {
+        trace = null;
+      }
+    }
+    let plan = null;
+    if (Array.isArray(trace)) {
+      const block = trace.find((x) => x && x.type === "agent_plan" && Array.isArray(x.steps));
+      if (block) plan = block.steps;
+    }
+    if (plan && plan.length) {
+      rows.push({
+        id: row.id,
+        whatsapp: row.whatsapp,
+        usuario_id: row.usuario_id,
+        creado_en: row.creado_en,
+        ia_provider: row.ia_provider,
+        pasos: plan,
+      });
+    }
+  }
+  return rows;
+};
+
+/** Resumen tabla `agent_tarea_fila` (cola consulta async). Si la tabla no existe, devuelve vacío. */
+const getAgentColaResumen = async () => {
+  const counts = await queryDashboardSeguro(
+    "agent_cola_counts",
+    `
+      SELECT estado, COUNT(*)::int AS n
+      FROM agent_tarea_fila
+      GROUP BY estado
+    `
+  );
+  const recent = await queryDashboardSeguro(
+    "agent_cola_recent",
+    `
+      SELECT id, tipo, estado, intentos, creado_en, iniciado_en, terminado_en,
+             LEFT(COALESCE(payload->>'jid',''), 36) AS jid_preview,
+             LEFT(COALESCE(payload->>'consulta',''), 72) AS consulta_preview,
+             LEFT(COALESCE(error_text,''), 100) AS error_preview
+      FROM agent_tarea_fila
+      ORDER BY id DESC
+      LIMIT 25
+    `
+  );
+  const byEstado = {};
+  for (const row of counts.rows || []) {
+    byEstado[row.estado] = row.n;
+  }
+  return { byEstado, rows: recent.rows || [] };
+};
+
 module.exports = {
   getAdminDashboard,
   getUltimosUsuarios,
@@ -1322,4 +1554,9 @@ module.exports = {
   enviarMensajesMasivosAdmin,
   iniciarEnvioMasivoAdminAsync,
   obtenerEstadoEnvioMasivoJob,
+  getUltimosPlanesAgente,
+  getAgentColaResumen,
+  getAgentRuntimeAdmin,
+  getIaProveedorMixDias,
+  getOutreachCandidatos,
 };
