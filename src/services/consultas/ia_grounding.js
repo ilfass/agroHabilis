@@ -1,6 +1,8 @@
-"use strict";
-
 const { respuestaIndicaCarenciaDatosInternos } = require("./fallbacks");
+const { query } = require("../../config/database");
+const { PREGUNTA_MARCADOR_BROADCAST } = require("../broadcast_historial");
+const { normalizarWhatsapp } = require("../../models/usuario");
+
 
 const envFlagGroundingConsultas = (name) => {
   const v = String(process.env[name] || "").trim().toLowerCase();
@@ -140,6 +142,66 @@ const generarSaludoIAControlado = async (
   const nombre = String(usuario?.nombre || "").trim().split(" ")[0] || "¿cómo estás?";
   const zona = [usuario?.partido, usuario?.provincia].filter(Boolean).join(", ") || "tu zona";
   const plan = String(usuario?.plan || "gratis").toUpperCase();
+
+  const waNorm = normalizarWhatsapp(usuario?.whatsapp || "");
+  let ultimoEsBroadcast = false;
+  let textoBroadcast = "";
+  if (waNorm) {
+    try {
+      const ult = await query(
+        `SELECT pregunta, respuesta 
+         FROM historial_consultas 
+         WHERE whatsapp = $1 
+         ORDER BY creado_en DESC 
+         LIMIT 1`,
+        [waNorm]
+      );
+      if (ult.rows[0] && ult.rows[0].pregunta === PREGUNTA_MARCADOR_BROADCAST) {
+        ultimoEsBroadcast = true;
+        textoBroadcast = ult.rows[0].respuesta || "";
+      }
+    } catch (e) {
+      console.warn("[ia_grounding] Error consultando ultimo broadcast:", e.message);
+    }
+  }
+
+  if (ultimoEsBroadcast) {
+    const system = [
+      "Sos AgroHabilis, el asistente inteligente y experto para el productor agropecuario argentino.",
+      "El productor te está respondiendo a un mensaje de campaña/outreach que le mandaste proactivamente.",
+      "Tu objetivo es dar una bienvenida sumamente cálida, distendida y profesional, explicando las increíbles capacidades de esta nueva versión del asistente, y preguntarle de forma natural qué necesita.",
+      "",
+      "Capacidades de la nueva versión a destacar de forma muy atractiva:",
+      "1. Trazabilidad Animal Individual y Sanidad: Podés consultar y registrar el historial completo de sanidad, tratamientos, vacunas, caravanas, lotes y pesajes por chat (ej. '¿Qué historial tiene la caravana 123?'). ¡Y se sincroniza al instante con tu Panel Web de Cliente profesional!",
+      "2. Registro Multimodal (Audio y Fotos): Podés mandarme un audio de voz explicando una novedad o una foto del campo o de un animal para analizar su estado en tiempo real.",
+      "3. Negocios y Finanzas del Campo: Registrar gastos, ventas, y consultar tu margen del mes escribiendo 'MIS GASTOS', 'MIS VENTAS' o 'MI MARGEN'.",
+      "4. Mercado y Clima en un solo lugar: Consultar precios pizarra de granos, cotizaciones de dólares (blue, bolsa/MEP, oficial), pronósticos de clima local y calcular fletes (ej. 'flete Tandil a Necochea').",
+      "",
+      "Reglas de respuesta:",
+      "- Usá español rioplatense (cálido, cercano, 'che', 'chiflame', etc.) pero muy profesional.",
+      "- NO te limites a 3 líneas. Sé completo, claro y conversacional.",
+      "- No inventes datos. Si explicás qué podés hacer, usá ejemplos sencillos de cómo pedírmelo.",
+      "- Generá una charla distendida y amigable. Hacele una pregunta abierta y entusiasta para que te cuente qué necesita hoy o cómo viene la jornada.",
+    ].join("\n");
+
+    const user = [
+      `Nombre del productor: ${nombre}`,
+      `Zona: ${zona}`,
+      `Plan: ${plan}`,
+      `Mensaje de campaña enviado por nosotros: "${textoBroadcast}"`,
+      `Respuesta del productor: "${pregunta}"`,
+      "",
+      "Generá la respuesta de bienvenida completa, entablando una charla amigable y distendida.",
+    ].join("\n");
+
+    try {
+      const out = await generarConPromptLibre({ system, user });
+      const limpio = limpiarSalidaSaludoIA(out?.texto || "");
+      if (limpio) return limpio;
+    } catch (e) {
+      console.warn("[ia_grounding] Error generating broadcast welcome, fallback to regular:", e.message);
+    }
+  }
 
   const system = [
     "Sos AgroHabilis.",

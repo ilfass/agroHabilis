@@ -290,10 +290,22 @@ async function upsertSaldoDesdeMovimientoConfirmado(movRow) {
     
     if (Array.isArray(pj.animales_individuales) && pj.animales_individuales.length > 0) {
       for (const anim of pj.animales_individuales) {
-        await query(
+        // Insertamos o actualizamos datos maestros del animal
+        const resAnim = await query(
           `
-            INSERT INTO animales_individuales (usuario_id, lote_id, caravana, categoria, estado, observaciones)
-            VALUES ($1, $2, $3, $4, $5, $6)
+            INSERT INTO animales_individuales (
+              usuario_id, lote_id, caravana, categoria, estado, observaciones, 
+              peso, sexo, raza
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            ON CONFLICT (usuario_id, caravana) WHERE caravana IS NOT NULL
+            DO UPDATE SET
+              lote_id = EXCLUDED.lote_id,
+              categoria = EXCLUDED.categoria,
+              estado = EXCLUDED.estado,
+              peso = COALESCE(EXCLUDED.peso, animales_individuales.peso),
+              observaciones = COALESCE(EXCLUDED.observaciones, animales_individuales.observaciones)
+            RETURNING id
           `,
           [
             usuarioId,
@@ -302,8 +314,41 @@ async function upsertSaldoDesdeMovimientoConfirmado(movRow) {
             anim.categoria || etiqueta,
             anim.estado || "sano",
             anim.observaciones || null,
+            anim.peso != null ? Number(anim.peso) : null,
+            anim.sexo || null,
+            anim.raza || null,
           ]
         );
+
+        const animalId = resAnim.rows[0]?.id;
+
+        // Si viene peso, registramos el evento de pesaje en el historial
+        if (animalId && anim.peso != null) {
+          await query(
+            `
+              INSERT INTO animales_eventos (usuario_id, animal_id, tipo_evento, fecha, valor_numerico)
+              VALUES ($1, $2, 'pesaje', $3, $4)
+            `,
+            [usuarioId, animalId, pj.fecha_referencia || new Date(), Number(anim.peso)]
+          );
+        }
+
+        // Si viene estado sanitario u observaciones de salud, registramos evento de sanidad
+        if (animalId && (anim.estado != null || anim.observaciones != null)) {
+          await query(
+            `
+              INSERT INTO animales_eventos (usuario_id, animal_id, tipo_evento, fecha, valor_texto, observaciones)
+              VALUES ($1, $2, 'sanidad', $3, $4, $5)
+            `,
+            [
+              usuarioId, 
+              animalId, 
+              pj.fecha_referencia || new Date(), 
+              anim.estado || 'chequeo', 
+              anim.observaciones || 'Registro sanitario individual'
+            ]
+          );
+        }
       }
     }
   } else if (dominio === "cultivo") {
@@ -322,6 +367,54 @@ async function upsertSaldoDesdeMovimientoConfirmado(movRow) {
       const hectareas = Number(pj.hectareas);
       if (!Number.isFinite(hectareas) || hectareas <= 0) throw new Error("hectareas_cultivo_invalidas");
       cantidad = hectareas;
+    }
+
+    // Actualización de datos maestros del lote si vienen en el mensaje
+    if (loteId && (pj.variedad || pj.fecha_siembra || pj.densidad || pj.rinde_esperado)) {
+      await query(
+        `
+          UPDATE lotes 
+          SET variedad = COALESCE($3, variedad),
+              fecha_siembra = COALESCE($4, fecha_siembra),
+              densidad = COALESCE($5, densidad),
+              rinde_esperado = COALESCE($6, rinde_esperado),
+              cultivo = COALESCE($7, cultivo)
+          WHERE id = $1 AND usuario_id = $2
+        `,
+        [
+          loteId,
+          usuarioId,
+          pj.variedad || null,
+          pj.fecha_siembra || null,
+          pj.densidad != null ? Number(pj.densidad) : null,
+          pj.rinde_esperado != null ? Number(pj.rinde_esperado) : null,
+          cultivo
+        ]
+      );
+    }
+
+    // Registro de monitoreo si viene data específica
+    if (loteId && pj.monitoreo) {
+      const m = pj.monitoreo;
+      await query(
+        `
+          INSERT INTO monitoreo_agricola (
+            usuario_id, lote_id, campana_id, fecha, 
+            estado_fenologico, humedad_suelo, incidencia_sanitaria, observaciones
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        `,
+        [
+          usuarioId,
+          loteId,
+          campanaId,
+          pj.fecha_referencia || new Date(),
+          m.estado_fenologico || null,
+          m.humedad_suelo || null,
+          m.incidencia_sanitaria || null,
+          m.observaciones || null
+        ]
+      );
     }
   } else if (dominio === "insumo") {
     const producto = String(pj.producto || "").trim().slice(0, 120);
@@ -593,6 +686,34 @@ async function listarMovimientos({ usuarioId, limit = 40 }) {
   return r.rows || [];
 }
 
+async function consultarHistorialSanidad({ usuarioId, caravana = null, loteId = null, limit = 20 }) {
+  const cond = ["e.usuario_id = $1"];
+  const vals = [usuarioId];
+  if (caravana) {
+    vals.push(String(caravana).trim());
+    cond.push(`a.caravana = $${vals.length}`);
+  }
+  if (loteId) {
+    vals.push(Number(loteId));
+    cond.push(`a.lote_id = $${vals.length}`);
+  }
+
+  const r = await query(
+    `
+      SELECT e.tipo_evento, e.fecha, e.valor_numerico, e.valor_texto, e.observaciones, 
+             a.caravana, a.categoria, l.nombre AS lote_nombre
+      FROM animales_eventos e
+      JOIN animales_individuales a ON a.id = e.animal_id
+      LEFT JOIN lotes l ON l.id = a.lote_id
+      WHERE ${cond.join(" AND ")}
+      ORDER BY e.fecha DESC, e.creado_en DESC
+      LIMIT $${vals.length + 1}
+    `,
+    [...vals, limit]
+  );
+  return r.rows || [];
+}
+
 function resumenMovimientoParaHumano(row, loteNombre = "", campanaNombre = "") {
   const esDelta = row.efecto === "delta";
   const p = typeof row.payload === "object" && row.payload ? row.payload : JSON.parse(row.payload || "{}");
@@ -672,6 +793,7 @@ module.exports = {
   registroConfirmadoDirecto,
   listarSaldos,
   listarMovimientos,
+  consultarHistorialSanidad,
   resumenMovimientoParaHumano,
   inferirEspecieDesdeEtiqueta,
   fechaISOArgentinaDesdeServicio: fechaISOArgentina,
