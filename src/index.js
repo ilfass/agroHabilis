@@ -2266,16 +2266,16 @@ app.get("/api/dashboard/cliente/calendario", async (req, res) => {
     ] = await Promise.all([
       // 1. Manuales
       query(
-        `SELECT e.id, e.titulo, e.descripcion, e.fecha_inicio, e.fecha_fin, e.categoria, e.lote_id, l.nombre AS lote_nombre, 'manual' AS origen
+        `SELECT e.id, e.titulo, e.descripcion, e.fecha_inicio, e.fecha_fin, e.categoria, e.ubicacion_id, l.nombre AS lote_nombre, 'manual' AS origen
          FROM eventos_calendario e
-         LEFT JOIN lotes l ON l.id = e.lote_id
+         LEFT JOIN ubicaciones l ON l.id = e.ubicacion_id
          WHERE e.usuario_id = $1`,
         [usuarioId]
       ),
       // 2. Siembras
       query(
-        `SELECT id, 'Siembra de ' || cultivo || ' - Lote ' || nombre AS titulo, 'Variedad: ' || COALESCE(variedad, 'N/C') || '. Densidad: ' || COALESCE(densidad::text, 'N/C') AS descripcion, fecha_siembra AS fecha_inicio, fecha_siembra AS fecha_fin, 'agricultura' AS categoria, id AS lote_id, nombre AS lote_nombre, 'siembra' AS origen
-         FROM lotes
+        `SELECT id, 'Siembra de ' || cultivo || ' - Lote ' || nombre AS titulo, 'Variedad: ' || COALESCE(variedad, 'N/C') || '. Densidad: ' || COALESCE(densidad::text, 'N/C') AS descripcion, fecha_siembra AS fecha_inicio, fecha_siembra AS fecha_fin, 'agricultura' AS categoria, id AS ubicacion_id, nombre AS lote_nombre, 'siembra' AS origen
+         FROM ubicaciones
          WHERE usuario_id = $1 AND fecha_siembra IS NOT NULL`,
         [usuarioId]
       ),
@@ -2294,7 +2294,7 @@ app.get("/api/dashboard/cliente/calendario", async (req, res) => {
                 fecha_evento AS fecha_inicio,
                 fecha_evento AS fecha_fin,
                 'ganaderia' AS categoria,
-                lote_id,
+                ubicacion_id,
                 lote_nombre,
                 tipo AS tipo_evento,
                 'pastura' AS origen
@@ -2312,12 +2312,12 @@ app.get("/api/dashboard/cliente/calendario", async (req, res) => {
                 e.fecha AS fecha_inicio,
                 e.fecha AS fecha_fin,
                 'ganaderia' AS categoria,
-                a.lote_id,
+                a.ubicacion_id,
                 l.nombre AS lote_nombre,
                 'animal' AS origen
          FROM animales_eventos e
          JOIN animales_individuales a ON a.id = e.animal_id
-         LEFT JOIN lotes l ON l.id = a.lote_id
+         LEFT JOIN ubicaciones l ON l.id = a.ubicacion_id
          WHERE e.usuario_id = $1`,
         [usuarioId]
       ),
@@ -2329,11 +2329,11 @@ app.get("/api/dashboard/cliente/calendario", async (req, res) => {
                 t.fecha_inicio,
                 t.fecha_fin,
                 'telemetria' AS categoria,
-                t.lote_id,
+                t.ubicacion_id,
                 l.nombre AS lote_nombre,
                 'telemetria' AS origen
          FROM telemetria_labores t
-         LEFT JOIN lotes l ON l.id = t.lote_id
+         LEFT JOIN ubicaciones l ON l.id = t.ubicacion_id
          WHERE t.usuario_id = $1`,
         [usuarioId]
       ),
@@ -2345,7 +2345,7 @@ app.get("/api/dashboard/cliente/calendario", async (req, res) => {
                 r.creado_en AS fecha_inicio,
                 r.creado_en AS fecha_fin,
                 'telemetria' AS categoria,
-                NULL::int AS lote_id,
+                NULL::int AS ubicacion_id,
                 r.lote_nombre,
                 'labor_manual' AS origen
          FROM registro_labores_maquinaria r
@@ -2366,7 +2366,7 @@ app.get("/api/dashboard/cliente/calendario", async (req, res) => {
         fecha_inicio: r.fecha_inicio,
         fecha_fin: r.fecha_fin,
         categoria: r.categoria,
-        lote_id: r.lote_id,
+        ubicacion_id: r.ubicacion_id,
         lote_nombre: r.lote_nombre,
         origen: r.origen
       });
@@ -2381,7 +2381,7 @@ app.get("/api/dashboard/cliente/calendario", async (req, res) => {
         fecha_inicio: r.fecha_inicio,
         fecha_fin: r.fecha_fin,
         categoria: r.categoria,
-        lote_id: r.lote_id,
+        ubicacion_id: r.ubicacion_id,
         lote_nombre: r.lote_nombre,
         origen: r.origen
       });
@@ -2396,7 +2396,7 @@ app.get("/api/dashboard/cliente/calendario", async (req, res) => {
         fecha_inicio: r.fecha_inicio,
         fecha_fin: r.fecha_fin,
         categoria: r.categoria,
-        lote_id: r.lote_id,
+        ubicacion_id: r.ubicacion_id,
         lote_nombre: r.lote_nombre,
         origen: r.origen
       });
@@ -2411,7 +2411,7 @@ app.get("/api/dashboard/cliente/calendario", async (req, res) => {
           fecha_inicio: fechaSugerida.toISOString(),
           fecha_fin: fechaSugerida.toISOString(),
           categoria: 'clima', // Clima/Descanso color dot
-          lote_id: r.lote_id,
+          ubicacion_id: r.ubicacion_id,
           lote_nombre: r.lote_nombre,
           origen: 'pastura_descanso_proyeccion'
         });
@@ -2427,7 +2427,7 @@ app.get("/api/dashboard/cliente/calendario", async (req, res) => {
         fecha_inicio: r.fecha_inicio,
         fecha_fin: r.fecha_fin,
         categoria: r.categoria,
-        lote_id: r.lote_id,
+        ubicacion_id: r.ubicacion_id,
         lote_nombre: r.lote_nombre,
         origen: r.origen
       });
@@ -2442,7 +2442,7 @@ app.get("/api/dashboard/cliente/calendario", async (req, res) => {
         fecha_inicio: r.fecha_inicio,
         fecha_fin: r.fecha_fin,
         categoria: r.categoria,
-        lote_id: r.lote_id,
+        ubicacion_id: r.ubicacion_id,
         lote_nombre: r.lote_nombre,
         origen: r.origen
       });
@@ -2457,7 +2457,7 @@ app.get("/api/dashboard/cliente/calendario", async (req, res) => {
         fecha_inicio: r.fecha_inicio,
         fecha_fin: r.fecha_fin,
         categoria: r.categoria,
-        lote_id: r.lote_id,
+        ubicacion_id: r.ubicacion_id,
         lote_nombre: r.lote_nombre,
         origen: r.origen
       });
@@ -2476,7 +2476,7 @@ app.post("/api/dashboard/cliente/calendario", async (req, res) => {
     if (!usuarioId) {
       return res.status(401).json({ ok: false, error: "No autorizado" });
     }
-    const { titulo, descripcion, fecha_inicio, fecha_fin, categoria, lote_id } = req.body;
+    const { titulo, descripcion, fecha_inicio, fecha_fin, categoria, ubicacion_id } = req.body;
     if (!titulo) {
       return res.status(400).json({ ok: false, error: "Título obligatorio" });
     }
@@ -2485,10 +2485,10 @@ app.post("/api/dashboard/cliente/calendario", async (req, res) => {
     }
 
     const resInsert = await query(
-      `INSERT INTO eventos_calendario (usuario_id, titulo, descripcion, fecha_inicio, fecha_fin, categoria, lote_id)
+      `INSERT INTO eventos_calendario (usuario_id, titulo, descripcion, fecha_inicio, fecha_fin, categoria, ubicacion_id)
        VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING id`,
-      [usuarioId, titulo, descripcion || null, fecha_inicio, fecha_fin || null, categoria || 'admin', lote_id || null]
+      [usuarioId, titulo, descripcion || null, fecha_inicio, fecha_fin || null, categoria || 'admin', ubicacion_id || null]
     );
 
     return res.json({ ok: true, id: resInsert.rows[0].id });
@@ -2538,13 +2538,13 @@ app.post("/api/dashboard/cliente/telemetria/conectar", async (req, res) => {
 
     let loteId = null;
     let loteHectareas = 100;
-    const rLotes = await query("SELECT id, nombre, hectareas FROM lotes WHERE usuario_id = $1 LIMIT 1", [usuarioId]);
+    const rLotes = await query("SELECT id, nombre, hectareas FROM ubicaciones WHERE usuario_id = $1 LIMIT 1", [usuarioId]);
     if (rLotes.rows.length > 0) {
       loteId = rLotes.rows[0].id;
       loteHectareas = Number(rLotes.rows[0].hectareas) || 100;
     } else {
       const rNewLote = await query(
-        "INSERT INTO lotes (usuario_id, nombre, hectareas, cultivo) VALUES ($1, 'Lote Norte', 120, 'Maíz') RETURNING id, hectareas",
+        "INSERT INTO ubicaciones (usuario_id, nombre, hectareas, cultivo) VALUES ($1, 'Lote Norte', 120, 'Maíz') RETURNING id, hectareas",
         [usuarioId]
       );
       loteId = rNewLote.rows[0].id;
@@ -2561,7 +2561,7 @@ app.post("/api/dashboard/cliente/telemetria/conectar", async (req, res) => {
       await query(
         `
           INSERT INTO telemetria_labores 
-            (usuario_id, lote_id, tipo_labor, fecha_inicio, fecha_fin, hectareas_reales, velocidad_promedio, insumo_nombre, dosis_promedio, unidad_dosis, marca_maquinaria, modelo_maquinaria, externo_job_id)
+            (usuario_id, ubicacion_id, tipo_labor, fecha_inicio, fecha_fin, hectareas_reales, velocidad_promedio, insumo_nombre, dosis_promedio, unidad_dosis, marca_maquinaria, modelo_maquinaria, externo_job_id)
           VALUES 
             ($1, $2, 'siembra', CURRENT_DATE - INTERVAL '15 days', CURRENT_DATE - INTERVAL '12 days', $3 * 0.98, 8.5, 'DK 72-10 Híbrido Maíz', 78000, 'semillas/ha', 'John Deere', 'DB88 24 Filas Gen 4', $4)
         `,
@@ -2570,17 +2570,17 @@ app.post("/api/dashboard/cliente/telemetria/conectar", async (req, res) => {
       await query(
         `
           INSERT INTO telemetria_labores 
-            (usuario_id, lote_id, tipo_labor, fecha_inicio, fecha_fin, hectareas_reales, velocidad_promedio, insumo_nombre, dosis_promedio, unidad_dosis, marca_maquinaria, modelo_maquinaria, externo_job_id)
+            (usuario_id, ubicacion_id, tipo_labor, fecha_inicio, fecha_fin, hectareas_reales, velocidad_promedio, insumo_nombre, dosis_promedio, unidad_dosis, marca_maquinaria, modelo_maquinaria, externo_job_id)
           VALUES 
             ($1, $2, 'cosecha', CURRENT_DATE - INTERVAL '2 days', CURRENT_DATE, $3 * 0.99, 5.8, 'Maíz Grano', 9.4, 'tn/ha', 'John Deere', 'S780 Combine & Draper 45ft', $4)
         `,
         [usuarioId, loteId, loteHectareas, `jd_job_harvest_${usuarioId}`]
       );
       
-      await query("DELETE FROM telemetria_lote_zonas WHERE lote_id = $1", [loteId]);
+      await query("DELETE FROM telemetria_lote_zonas WHERE ubicacion_id = $1", [loteId]);
       await query(
         `
-          INSERT INTO telemetria_lote_zonas (lote_id, zona_etiqueta, porcentaje_area, hectareas_zona, rinde_historico)
+          INSERT INTO telemetria_lote_zonas (ubicacion_id, zona_etiqueta, porcentaje_area, hectareas_zona, rinde_historico)
           VALUES 
             ($1, 'Alta Productividad', 0.4500, $2 * 0.45, 11.20),
             ($1, 'Media Productividad', 0.3500, $2 * 0.35, 8.90),
@@ -2592,7 +2592,7 @@ app.post("/api/dashboard/cliente/telemetria/conectar", async (req, res) => {
       await query(
         `
           INSERT INTO telemetria_labores 
-            (usuario_id, lote_id, tipo_labor, fecha_inicio, fecha_fin, hectareas_reales, velocidad_promedio, insumo_nombre, dosis_promedio, unidad_dosis, marca_maquinaria, modelo_maquinaria, externo_job_id)
+            (usuario_id, ubicacion_id, tipo_labor, fecha_inicio, fecha_fin, hectareas_reales, velocidad_promedio, insumo_nombre, dosis_promedio, unidad_dosis, marca_maquinaria, modelo_maquinaria, externo_job_id)
           VALUES 
             ($1, $2, 'pulverizacion', CURRENT_DATE - INTERVAL '10 days', CURRENT_DATE - INTERVAL '9 days', $3, 16.2, 'Glifosato + Atrazina Premium', 2.5, 'litros/ha', 'Climate FieldView', 'Pla Map 3 3600', $4)
         `,
@@ -2602,7 +2602,7 @@ app.post("/api/dashboard/cliente/telemetria/conectar", async (req, res) => {
       await query(
         `
           INSERT INTO telemetria_labores 
-            (usuario_id, lote_id, tipo_labor, fecha_inicio, fecha_fin, hectareas_reales, velocidad_promedio, insumo_nombre, dosis_promedio, unidad_dosis, marca_maquinaria, modelo_maquinaria, externo_job_id)
+            (usuario_id, ubicacion_id, tipo_labor, fecha_inicio, fecha_fin, hectareas_reales, velocidad_promedio, insumo_nombre, dosis_promedio, unidad_dosis, marca_maquinaria, modelo_maquinaria, externo_job_id)
           VALUES 
             ($1, $2, 'fertilizacion', CURRENT_DATE - INTERVAL '8 days', CURRENT_DATE - INTERVAL '7 days', $3 * 1.01, 12.0, 'Urea Granulada 46-0-0', 145.0, 'kg/ha', 'Case IH', 'Patriot 350 Variable Rate', $4)
         `,
@@ -2993,7 +2993,7 @@ app.put("/api/inventario/lotes/:id", async (req, res) => {
 
     const resUpdate = await query(
       `
-        UPDATE lotes
+        UPDATE ubicaciones
         SET nombre = $1, hectareas = $2, cultivo = $3, arrendado = $4, cliente = $5, firma = $6, provincia = $7, partido = $8, tipo = $9, lat = $10, lng = $11
         WHERE id = $12 AND usuario_id = $13
         RETURNING *
@@ -3033,7 +3033,7 @@ app.delete("/api/inventario/lotes/:id", async (req, res) => {
     if (!Number.isInteger(id)) return res.status(400).json({ ok: false, error: "ID inválido" });
 
     const result = await query(
-      `DELETE FROM lotes WHERE id = $1 AND usuario_id = $2 RETURNING id`,
+      `DELETE FROM ubicaciones WHERE id = $1 AND usuario_id = $2 RETURNING id`,
       [id, usuarioId]
     );
 
@@ -3059,7 +3059,7 @@ app.put("/api/inventario/firmas/renombrar", async (req, res) => {
     }
 
     await query(
-      `UPDATE lotes SET firma = $1 WHERE usuario_id = $2 AND (firma = $3 OR (firma IS NULL AND $3 = ''))`,
+      `UPDATE ubicaciones SET firma = $1 WHERE usuario_id = $2 AND (firma = $3 OR (firma IS NULL AND $3 = ''))`,
       [newName, usuarioId, oldName]
     );
 
@@ -3076,7 +3076,7 @@ app.delete("/api/inventario/firmas/:name", async (req, res) => {
     const name = String(req.params.name || "").trim();
 
     await query(
-      `UPDATE lotes SET firma = NULL WHERE usuario_id = $1 AND (firma = $2 OR (firma IS NULL AND $2 = ''))`,
+      `UPDATE ubicaciones SET firma = NULL WHERE usuario_id = $1 AND (firma = $2 OR (firma IS NULL AND $2 = ''))`,
       [usuarioId, name]
     );
 
@@ -3098,7 +3098,7 @@ app.put("/api/inventario/campos/renombrar", async (req, res) => {
     }
 
     await query(
-      `UPDATE lotes SET cliente = $1 WHERE usuario_id = $2 AND (cliente = $3 OR (cliente IS NULL AND $3 = ''))`,
+      `UPDATE ubicaciones SET cliente = $1 WHERE usuario_id = $2 AND (cliente = $3 OR (cliente IS NULL AND $3 = ''))`,
       [newName, usuarioId, oldName]
     );
 
@@ -3115,7 +3115,7 @@ app.delete("/api/inventario/campos/:name", async (req, res) => {
     const name = String(req.params.name || "").trim();
 
     await query(
-      `UPDATE lotes SET cliente = NULL WHERE usuario_id = $1 AND (cliente = $2 OR (cliente IS NULL AND $2 = ''))`,
+      `UPDATE ubicaciones SET cliente = NULL WHERE usuario_id = $1 AND (cliente = $2 OR (cliente IS NULL AND $2 = ''))`,
       [usuarioId, name]
     );
 
@@ -3162,11 +3162,11 @@ app.get("/api/inventario/saldos", async (req, res) => {
   try {
     const usuarioId = req.clienteSession?.user?.id;
     const dominio = req.query?.dominio ? String(req.query.dominio).trim() : undefined;
-    const loteIdRaw = req.query?.lote_id;
+    const loteIdRaw = req.query?.ubicacion_id;
     let loteId;
     if (loteIdRaw !== undefined && loteIdRaw !== "") {
       const n = Number(loteIdRaw);
-      if (!Number.isFinite(n)) return res.status(400).json({ ok: false, error: "lote_id inválido" });
+      if (!Number.isFinite(n)) return res.status(400).json({ ok: false, error: "ubicacion_id inválido" });
       loteId = n;
     }
     const campanaIdRaw = req.query?.campana_id;
@@ -3205,11 +3205,11 @@ app.post("/api/inventario/registro", async (req, res) => {
     }
     const efectoRaw = String(req.body?.efecto || "replace").toLowerCase();
     const efecto = efectoRaw === "delta" ? "delta" : "replace";
-    const loteIdRaw = req.body?.lote_id;
+    const loteIdRaw = req.body?.ubicacion_id;
     let loteId = null;
     if (loteIdRaw !== undefined && loteIdRaw !== "" && loteIdRaw != null) {
       const n = Number(loteIdRaw);
-      if (!Number.isFinite(n)) return res.status(400).json({ ok: false, error: "lote_id inválido" });
+      if (!Number.isFinite(n)) return res.status(400).json({ ok: false, error: "ubicacion_id inválido" });
       loteId = n;
     }
     const campanaIdRaw = req.body?.campana_id;

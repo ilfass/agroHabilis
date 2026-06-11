@@ -746,7 +746,7 @@ function detectarMixtoCultivoInsumoSinHa(textoOriginal = "", borradorInsumo = nu
   };
 }
 
-/** No resuelve lote_id aquí (lo hace el capa whatsapp/API con tus lotes reales). */
+/** No resuelve ubicacion_id aquí (lo hace el capa whatsapp/API con tus lotes reales). */
 function construirBorradorRegistro(textoOriginal = "", intentLiteOverride = null) {
   if (esPlanillaCatalogoLotesMultiples(textoOriginal)) return null;
   const claseIntent = intentLiteOverride || parseIntentInventario(textoOriginal);

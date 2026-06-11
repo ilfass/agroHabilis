@@ -119,21 +119,21 @@ function extraerHeuristico(mensaje) {
 // ─── Resolución de lote ─────────────────────────────────────────────────────
 
 async function resolverLote(usuarioId, nombreTextual) {
-  if (!nombreTextual) return { lote_id: null, lote_nombre: null };
+  if (!nombreTextual) return { ubicacion_id: null, lote_nombre: null };
 
   // Buscar por coincidencia exacta primero, luego parcial (ILIKE)
   const exacto = await query(
-    `SELECT id, nombre FROM lotes
+    `SELECT id, nombre FROM ubicaciones
      WHERE usuario_id = $1 AND LOWER(nombre) = LOWER($2)
      LIMIT 1`,
     [usuarioId, nombreTextual]
   );
   if (exacto.rows.length) {
-    return { lote_id: exacto.rows[0].id, lote_nombre: exacto.rows[0].nombre };
+    return { ubicacion_id: exacto.rows[0].id, lote_nombre: exacto.rows[0].nombre };
   }
 
   const parcial = await query(
-    `SELECT id, nombre FROM lotes
+    `SELECT id, nombre FROM ubicaciones
      WHERE usuario_id = $1
        AND (LOWER(nombre) LIKE '%' || LOWER($2) || '%'
          OR LOWER($2) LIKE '%' || LOWER(nombre) || '%')
@@ -142,18 +142,18 @@ async function resolverLote(usuarioId, nombreTextual) {
     [usuarioId, nombreTextual]
   );
   if (parcial.rows.length) {
-    return { lote_id: parcial.rows[0].id, lote_nombre: parcial.rows[0].nombre };
+    return { ubicacion_id: parcial.rows[0].id, lote_nombre: parcial.rows[0].nombre };
   }
 
   // No encontrado → guardar nombre textual sin FK
-  return { lote_id: null, lote_nombre: nombreTextual };
+  return { ubicacion_id: null, lote_nombre: nombreTextual };
 }
 
 // ─── Inserción ──────────────────────────────────────────────────────────────
 
 async function insertarEventoPastura({
   usuarioId,
-  lote_id,
+  ubicacion_id,
   lote_nombre,
   tipo,
   cabezas,
@@ -162,10 +162,10 @@ async function insertarEventoPastura({
 }) {
   const res = await query(
     `INSERT INTO eventos_pastura
-       (usuario_id, lote_id, lote_nombre, tipo, cabezas, dias_descanso, observacion, fecha_evento)
+       (usuario_id, ubicacion_id, lote_nombre, tipo, cabezas, dias_descanso, observacion, fecha_evento)
      VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_DATE)
      RETURNING id, fecha_evento`,
-    [usuarioId, lote_id || null, lote_nombre || null, tipo, cabezas || null, dias_descanso || null, observacion || null]
+    [usuarioId, ubicacion_id || null, lote_nombre || null, tipo, cabezas || null, dias_descanso || null, observacion || null]
   );
   return res.rows[0];
 }
@@ -230,11 +230,11 @@ const rutaPasturas = async ({ mensaje, usuario }) => {
     );
   }
 
-  const { lote_id, lote_nombre } = await resolverLote(usuario.id, datos.lote_nombre);
+  const { ubicacion_id, lote_nombre } = await resolverLote(usuario.id, datos.lote_nombre);
 
   const fila = await insertarEventoPastura({
     usuarioId: usuario.id,
-    lote_id,
+    ubicacion_id,
     lote_nombre,
     tipo: datos.tipo,
     cabezas: datos.cabezas,
@@ -260,11 +260,11 @@ const rutaPasturas = async ({ mensaje, usuario }) => {
  */
 async function obtenerUltimosEventosPastura(usuarioId) {
   const res = await query(
-    `SELECT DISTINCT ON (COALESCE(lote_id::text, lote_nombre))
-       lote_id, lote_nombre, tipo, cabezas, dias_descanso, fecha_evento, observacion
+    `SELECT DISTINCT ON (COALESCE(ubicacion_id::text, lote_nombre))
+       ubicacion_id, lote_nombre, tipo, cabezas, dias_descanso, fecha_evento, observacion
      FROM eventos_pastura
      WHERE usuario_id = $1
-     ORDER BY COALESCE(lote_id::text, lote_nombre), fecha_evento DESC, id DESC`,
+     ORDER BY COALESCE(ubicacion_id::text, lote_nombre), fecha_evento DESC, id DESC`,
     [usuarioId]
   );
   return res.rows;

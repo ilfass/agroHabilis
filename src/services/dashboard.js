@@ -1391,29 +1391,29 @@ const getClienteDashboard = async ({ usuarioId }) => {
           (
             SELECT m.payload->>'lote_semilla'
             FROM inventario_movimiento m
-            WHERE m.lote_id = l.id AND m.dominio = 'cultivo' AND m.estado = 'confirmado'
+            WHERE m.ubicacion_id = l.id AND m.dominio = 'cultivo' AND m.estado = 'confirmado'
             ORDER BY m.creado_en DESC LIMIT 1
           ) AS lote_semilla,
           (
             SELECT (m.payload->>'humedad')::numeric
             FROM inventario_movimiento m
-            WHERE m.lote_id = l.id AND m.dominio = 'cultivo' AND m.estado = 'confirmado'
+            WHERE m.ubicacion_id = l.id AND m.dominio = 'cultivo' AND m.estado = 'confirmado'
             ORDER BY m.creado_en DESC LIMIT 1
           ) AS humedad,
           (
             SELECT (m.payload->>'costo_arrendamiento')::numeric
             FROM inventario_movimiento m
-            WHERE m.lote_id = l.id AND m.dominio = 'cultivo' AND m.estado = 'confirmado'
+            WHERE m.ubicacion_id = l.id AND m.dominio = 'cultivo' AND m.estado = 'confirmado'
             ORDER BY m.creado_en DESC LIMIT 1
           ) AS costo_arrendamiento
-        FROM lotes l
+        FROM ubicaciones l
         WHERE l.usuario_id = $1 AND l.cultivo IS NOT NULL AND l.cultivo <> ''
         ORDER BY l.nombre
       `,
       [usuario.id]
     ),
     query(
-      `SELECT id, nombre, hectareas, cultivo, arrendado, cliente, firma, provincia, partido, tipo FROM lotes WHERE usuario_id = $1 ORDER BY nombre`,
+      `SELECT id, nombre, hectareas, cultivo, arrendado, cliente, firma, provincia, partido, tipo FROM ubicaciones WHERE usuario_id = $1 ORDER BY nombre`,
       [usuario.id]
     ),
     query(
@@ -1510,7 +1510,7 @@ const getClienteDashboard = async ({ usuarioId }) => {
     query(
       `
         SELECT 
-          s.lote_id,
+          s.ubicacion_id,
           l.nombre AS lote_nombre,
           l.firma,
           l.cliente,
@@ -1527,9 +1527,9 @@ const getClienteDashboard = async ({ usuarioId }) => {
           MAX((m.payload->>'dias_carencia')::numeric) AS dias_carencia
         FROM inventario_saldo s
         LEFT JOIN inventario_movimiento m ON m.id = s.ultimo_movimiento_id
-        LEFT JOIN lotes l ON l.id = s.lote_id
+        LEFT JOIN ubicaciones l ON l.id = s.ubicacion_id
         WHERE s.usuario_id = $1 AND s.dominio = 'ganado'
-        GROUP BY s.lote_id, l.nombre, l.firma, l.cliente, l.provincia, l.partido, l.tipo, s.item_clave, s.etiqueta
+        GROUP BY s.ubicacion_id, l.nombre, l.firma, l.cliente, l.provincia, l.partido, l.tipo, s.item_clave, s.etiqueta
         ORDER BY especie, categoria
       `,
       [usuario.id]
@@ -1545,10 +1545,10 @@ const getClienteDashboard = async ({ usuarioId }) => {
     ),
     query(
       `
-        SELECT g.id, g.perfil, g.categoria, g.descripcion, g.monto, g.moneda, g.fecha, g.creado_en, g.lote_id,
+        SELECT g.id, g.perfil, g.categoria, g.descripcion, g.monto, g.moneda, g.fecha, g.creado_en, g.ubicacion_id,
                l.nombre AS lote_nombre, l.firma, l.cliente, l.provincia, l.partido, l.tipo AS lote_tipo
         FROM gastos g
-        LEFT JOIN lotes l ON l.id = g.lote_id
+        LEFT JOIN ubicaciones l ON l.id = g.ubicacion_id
         WHERE g.usuario_id = $1
         ORDER BY g.fecha DESC, g.creado_en DESC
         LIMIT 20
@@ -1577,10 +1577,10 @@ const getClienteDashboard = async ({ usuarioId }) => {
     ),
     query(
       `
-        SELECT a.id, a.caravana, a.categoria, a.estado, a.peso, a.raza, a.fecha_ingreso, a.lote_id,
+        SELECT a.id, a.caravana, a.categoria, a.estado, a.peso, a.raza, a.fecha_ingreso, a.ubicacion_id,
                l.nombre AS lote_nombre, l.firma, l.cliente, l.provincia, l.partido, l.tipo AS lote_tipo
         FROM animales_individuales a
-        LEFT JOIN lotes l ON l.id = a.lote_id
+        LEFT JOIN ubicaciones l ON l.id = a.ubicacion_id
         WHERE a.usuario_id = $1
         ORDER BY a.actualizado_en DESC
         LIMIT 50
@@ -1590,10 +1590,10 @@ const getClienteDashboard = async ({ usuarioId }) => {
     query(
       `
         SELECT e.id, e.animal_id, a.caravana, e.tipo_evento, e.fecha, e.valor_numerico, e.valor_texto, e.observaciones,
-               a.lote_id, l.nombre AS lote_nombre, l.firma, l.cliente, l.provincia, l.partido, l.tipo AS lote_tipo
+               a.ubicacion_id, l.nombre AS lote_nombre, l.firma, l.cliente, l.provincia, l.partido, l.tipo AS lote_tipo
         FROM animales_eventos e
         JOIN animales_individuales a ON a.id = e.animal_id
-        LEFT JOIN lotes l ON l.id = a.lote_id
+        LEFT JOIN ubicaciones l ON l.id = a.ubicacion_id
         WHERE e.usuario_id = $1
         ORDER BY e.fecha DESC, e.creado_en DESC
         LIMIT 50

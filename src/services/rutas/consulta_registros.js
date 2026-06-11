@@ -155,17 +155,17 @@ async function formatoLotesBrief(usuarioId) {
   // Consulta recuento de animales por lote para este productor
   const resCounts = await H.query(
     `
-      SELECT lote_id, COUNT(*) as cabezas
+      SELECT ubicacion_id, COUNT(*) as cabezas
       FROM animales_individuales
-      WHERE usuario_id = $1 AND lote_id IS NOT NULL
-      GROUP BY lote_id
+      WHERE usuario_id = $1 AND ubicacion_id IS NOT NULL
+      GROUP BY ubicacion_id
     `,
     [usuarioId]
   );
   
   const countsMap = {};
   resCounts.rows.forEach(r => {
-    countsMap[r.lote_id] = Number(r.cabezas);
+    countsMap[r.ubicacion_id] = Number(r.cabezas);
   });
 
   let eventosMap = {};
@@ -173,7 +173,7 @@ async function formatoLotesBrief(usuarioId) {
     const { obtenerUltimosEventosPastura, calcularSemaforoPastura } = require("./pasturas");
     const ultimosEventos = await obtenerUltimosEventosPastura(usuarioId);
     eventosMap = (ultimosEventos || []).reduce((acc, ev) => {
-      if (ev.lote_id) acc.byId[ev.lote_id] = ev;
+      if (ev.ubicacion_id) acc.byId[ev.ubicacion_id] = ev;
       if (ev.lote_nombre) acc.byName[String(ev.lote_nombre).toLowerCase()] = ev;
       return acc;
     }, { byId: {}, byName: {} });
@@ -226,7 +226,7 @@ async function formatoAnimalesIndividualesBrief(usuarioId) {
         SELECT a.caravana, a.categoria, a.estado, a.peso, a.sexo, a.raza, a.observaciones, 
                a.carencia_hasta, a.carencia_detalle, l.nombre as lote_nombre
         FROM animales_individuales a
-        LEFT JOIN lotes l ON l.id = a.lote_id
+        LEFT JOIN ubicaciones l ON l.id = a.ubicacion_id
         WHERE a.usuario_id = $1
         ORDER BY a.caravana ASC, a.creado_en DESC
       `,

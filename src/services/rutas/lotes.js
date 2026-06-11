@@ -24,7 +24,7 @@ async function rutaCrearLote({ args, usuario }) {
     try {
       // Validar duplicados
       const r = await query(
-        `SELECT id FROM lotes WHERE usuario_id = $1 AND LOWER(nombre) = LOWER($2) LIMIT 1`,
+        `SELECT id FROM ubicaciones WHERE usuario_id = $1 AND LOWER(nombre) = LOWER($2) LIMIT 1`,
         [usuario.id, nombre]
       );
 

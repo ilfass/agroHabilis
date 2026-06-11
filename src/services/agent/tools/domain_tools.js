@@ -925,14 +925,14 @@ registerTool({
              tl.dosis_promedio, tl.unidad_dosis, tl.marca_maquinaria, tl.modelo_maquinaria,
              l.nombre AS lote_nombre, l.hectareas AS lote_hectareas
       FROM telemetria_labores tl
-      JOIN lotes l ON l.id = tl.lote_id
+      JOIN ubicaciones l ON l.id = tl.ubicacion_id
       WHERE tl.usuario_id = $1
     `;
     const params = [usuarioId];
 
     if (loteId) {
       params.push(loteId);
-      qLabores += ` AND tl.lote_id = $${params.length}`;
+      qLabores += ` AND tl.ubicacion_id = $${params.length}`;
     }
     if (args.tipo_labor) {
       params.push(args.tipo_labor);
@@ -951,7 +951,7 @@ registerTool({
         `
           SELECT zona_etiqueta, porcentaje_area, hectareas_zona, rinde_historico
           FROM telemetria_lote_zonas
-          WHERE lote_id = $1
+          WHERE ubicacion_id = $1
           ORDER BY porcentaje_area DESC
         `,
         [loteId]

@@ -373,14 +373,14 @@ async function manejarInventarioWhatsapp({ texto = "", usuarioId, numeroWhatsapp
         usuarioId,
         dominio: "ganado",
         payload: payloadCompuesto,
-        loteId: pendiente.lote_id || null,
+        loteId: pendiente.ubicacion_id || null,
         campanaId: pendiente.campana_id || null,
         efecto: "replace",
         fechaReferencia: pendiente.fecha_referencia,
         textoNl: pendiente.texto_nl || texto,
         canal: "whatsapp",
       });
-      const ln2 = await obtenerNombreLote(usuarioId, movComp.lote_id);
+      const ln2 = await obtenerNombreLote(usuarioId, movComp.ubicacion_id);
       const cn2 = await obtenerNombreCampana(usuarioId, movComp.campana_id);
       const cuerpo2 = resumenMovimientoParaHumano(movComp, ln2, cn2);
       const acl2 = await lineasAclaracionRegistroGanado(usuarioId, {
@@ -507,7 +507,7 @@ async function manejarInventarioWhatsapp({ texto = "", usuarioId, numeroWhatsapp
       
       const resumenes = [];
       for (const c of confirmados) {
-        const ln = await obtenerNombreLote(usuarioId, c.lote_id);
+        const ln = await obtenerNombreLote(usuarioId, c.ubicacion_id);
         const cn = await obtenerNombreCampana(usuarioId, c.campana_id);
         resumenes.push(`• *Lote ${ln || "establecimiento"}*: ${resumenMovimientoParaHumano(c, ln, cn)}`);
       }
@@ -529,7 +529,7 @@ async function manejarInventarioWhatsapp({ texto = "", usuarioId, numeroWhatsapp
       if (!ok) return { manejado: true, respuesta: "El borrador caducó o ya no existe. Intentá cargar los datos de nuevo." };
       const resumenOk = `✅ *Listo, guardado en inventario.*\n_${resumenMovimientoParaHumano(
         ok,
-        await obtenerNombreLote(usuarioId, ok.lote_id),
+        await obtenerNombreLote(usuarioId, ok.ubicacion_id),
         await obtenerNombreCampana(usuarioId, ok.campana_id)
       )}_`;
       const cola = await leerColaMultiLote(numeroWhatsapp);
