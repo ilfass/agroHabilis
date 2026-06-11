@@ -39,29 +39,29 @@ CREATE TABLE IF NOT EXISTS ubicaciones (
 );
 
 -- Alter tables to drop old references and add ubicacion_id
-ALTER TABLE telemetria_labores DROP COLUMN IF EXISTS lote_id CASCADE;
-ALTER TABLE telemetria_labores ADD COLUMN IF NOT EXISTS ubicacion_id INTEGER REFERENCES ubicaciones(id) ON DELETE CASCADE;
+ALTER TABLE IF EXISTS telemetria_labores DROP COLUMN IF EXISTS lote_id CASCADE;
+ALTER TABLE IF EXISTS telemetria_labores ADD COLUMN IF NOT EXISTS ubicacion_id INTEGER REFERENCES ubicaciones(id) ON DELETE CASCADE;
 
-ALTER TABLE telemetria_lote_zonas DROP COLUMN IF EXISTS lote_id CASCADE;
-ALTER TABLE telemetria_lote_zonas ADD COLUMN IF NOT EXISTS ubicacion_id INTEGER REFERENCES ubicaciones(id) ON DELETE CASCADE;
+ALTER TABLE IF EXISTS telemetria_lote_zonas DROP COLUMN IF EXISTS lote_id CASCADE;
+ALTER TABLE IF EXISTS telemetria_lote_zonas ADD COLUMN IF NOT EXISTS ubicacion_id INTEGER REFERENCES ubicaciones(id) ON DELETE CASCADE;
 
-ALTER TABLE eventos_calendario DROP COLUMN IF EXISTS lote_id CASCADE;
-ALTER TABLE eventos_calendario ADD COLUMN IF NOT EXISTS ubicacion_id INTEGER REFERENCES ubicaciones(id) ON DELETE CASCADE;
+ALTER TABLE IF EXISTS eventos_calendario DROP COLUMN IF EXISTS lote_id CASCADE;
+ALTER TABLE IF EXISTS eventos_calendario ADD COLUMN IF NOT EXISTS ubicacion_id INTEGER REFERENCES ubicaciones(id) ON DELETE CASCADE;
 
-ALTER TABLE gastos DROP COLUMN IF EXISTS lote_id CASCADE;
-ALTER TABLE gastos ADD COLUMN IF NOT EXISTS ubicacion_id INTEGER REFERENCES ubicaciones(id) ON DELETE SET NULL;
+ALTER TABLE IF EXISTS gastos DROP COLUMN IF EXISTS lote_id CASCADE;
+ALTER TABLE IF EXISTS gastos ADD COLUMN IF NOT EXISTS ubicacion_id INTEGER REFERENCES ubicaciones(id) ON DELETE SET NULL;
 
-ALTER TABLE saldos_inventario DROP COLUMN IF EXISTS lote_id CASCADE;
-ALTER TABLE saldos_inventario ADD COLUMN IF NOT EXISTS ubicacion_id INTEGER REFERENCES ubicaciones(id) ON DELETE CASCADE;
+ALTER TABLE IF EXISTS saldos_inventario DROP COLUMN IF EXISTS lote_id CASCADE;
+ALTER TABLE IF EXISTS saldos_inventario ADD COLUMN IF NOT EXISTS ubicacion_id INTEGER REFERENCES ubicaciones(id) ON DELETE CASCADE;
 
-ALTER TABLE movimientos_inventario DROP COLUMN IF EXISTS lote_id CASCADE;
-ALTER TABLE movimientos_inventario ADD COLUMN IF NOT EXISTS ubicacion_id INTEGER REFERENCES ubicaciones(id) ON DELETE SET NULL;
+ALTER TABLE IF EXISTS movimientos_inventario DROP COLUMN IF EXISTS lote_id CASCADE;
+ALTER TABLE IF EXISTS movimientos_inventario ADD COLUMN IF NOT EXISTS ubicacion_id INTEGER REFERENCES ubicaciones(id) ON DELETE SET NULL;
 
-ALTER TABLE animales_individuales DROP COLUMN IF EXISTS lote_id CASCADE;
-ALTER TABLE animales_individuales ADD COLUMN IF NOT EXISTS ubicacion_id INTEGER REFERENCES ubicaciones(id) ON DELETE SET NULL;
+ALTER TABLE IF EXISTS animales_individuales DROP COLUMN IF EXISTS lote_id CASCADE;
+ALTER TABLE IF EXISTS animales_individuales ADD COLUMN IF NOT EXISTS ubicacion_id INTEGER REFERENCES ubicaciones(id) ON DELETE SET NULL;
 
-ALTER TABLE trazabilidad_aplicaciones DROP COLUMN IF EXISTS lote_id CASCADE;
-ALTER TABLE trazabilidad_aplicaciones ADD COLUMN IF NOT EXISTS ubicacion_id INTEGER REFERENCES ubicaciones(id) ON DELETE CASCADE;
+ALTER TABLE IF EXISTS trazabilidad_aplicaciones DROP COLUMN IF EXISTS lote_id CASCADE;
+ALTER TABLE IF EXISTS trazabilidad_aplicaciones ADD COLUMN IF NOT EXISTS ubicacion_id INTEGER REFERENCES ubicaciones(id) ON DELETE CASCADE;
 
 -- Drop old tables
 DROP TABLE IF EXISTS corrales CASCADE;

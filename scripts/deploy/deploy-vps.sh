@@ -99,10 +99,10 @@ ssh "${VPS_USER}@${VPS_HOST}" << EOF
   npm ci --omit=dev
   echo '==> Validando contexto IA requerido'
   node scripts/db/validate-ai-context.js
-  echo '==> Ejecutando migraciones DB (setup-db.js)'
-  node scripts/db/setup-db.js
   echo '==> Ejecutando migraciones versionadas (db:migrate)'
   npm run db:migrate
+  echo '==> Ejecutando migraciones DB (setup-db.js)'
+  node scripts/db/setup-db.js
   echo '==> Verificando esquema precios (UPSERT fuente / actualizado_en)'
   node scripts/db/verify-precios-upsert-schema.js
   echo '==> Verificando tabla usuario_ganaderia_perfil'
