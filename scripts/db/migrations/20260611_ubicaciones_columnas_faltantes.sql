@@ -1,0 +1,11 @@
+-- Add missed agricultural columns to existing ubicaciones table
+ALTER TABLE ubicaciones ADD COLUMN IF NOT EXISTS cliente VARCHAR(150);
+ALTER TABLE ubicaciones ADD COLUMN IF NOT EXISTS firma VARCHAR(150);
+ALTER TABLE ubicaciones ADD COLUMN IF NOT EXISTS provincia VARCHAR(100);
+ALTER TABLE ubicaciones ADD COLUMN IF NOT EXISTS partido VARCHAR(100);
+ALTER TABLE ubicaciones ADD COLUMN IF NOT EXISTS cultivo VARCHAR(100);
+ALTER TABLE ubicaciones ADD COLUMN IF NOT EXISTS variedad VARCHAR(100);
+ALTER TABLE ubicaciones ADD COLUMN IF NOT EXISTS fecha_siembra DATE;
+ALTER TABLE ubicaciones ADD COLUMN IF NOT EXISTS densidad VARCHAR(50);
+ALTER TABLE ubicaciones ADD COLUMN IF NOT EXISTS rinde_esperado DECIMAL(10,2);
+ALTER TABLE ubicaciones ADD COLUMN IF NOT EXISTS arrendado BOOLEAN DEFAULT false;

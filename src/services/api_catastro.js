@@ -129,10 +129,10 @@ router.post("/lotes", async (req, res) => {
 
     const codigo = await generarCodigo(query, "ubicaciones", PREFIJOS.lotes, uid);
     const { rows } = await query(
-      `INSERT INTO ubicaciones (usuario_id, nombre, campo_id, hectareas, lat, lng, geojson, tipo, codigo)
-       VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9)
+      `INSERT INTO ubicaciones (usuario_id, nombre, campo_id, hectareas, lat, lng, geojson, tipo, codigo, firma, provincia, partido, cultivo, variedad)
+       VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10,$11,$12,$13,$14)
        RETURNING *`,
-      [uid, nombre, campo_id, hectareas, lat, lng, geojson ? JSON.stringify(geojson) : null, tipo, codigo]
+      [uid, nombre, campo_id, hectareas, lat, lng, geojson ? JSON.stringify(geojson) : null, tipo, codigo, firma, provincia, partido, cultivo, variedad]
     );
     res.json({ ok: true, data: rows[0] });
   } catch (e) { res.status(500).json({ ok: false, error: e.message }); }
@@ -161,6 +161,11 @@ router.put("/lotes/:id", async (req, res) => {
 
     if (geojson !== undefined) { sql += `, geojson=$${idx}::jsonb`; params.push(geojson ? JSON.stringify(geojson) : null); idx++; }
     if (tipo !== undefined) { sql += `, tipo=$${idx}`; params.push(tipo); idx++; }
+    if (firma !== undefined) { sql += `, firma=$${idx}`; params.push(firma); idx++; }
+    if (provincia !== undefined) { sql += `, provincia=$${idx}`; params.push(provincia); idx++; }
+    if (partido !== undefined) { sql += `, partido=$${idx}`; params.push(partido); idx++; }
+    if (cultivo !== undefined) { sql += `, cultivo=$${idx}`; params.push(cultivo); idx++; }
+    if (variedad !== undefined) { sql += `, variedad=$${idx}`; params.push(variedad); idx++; }
                     
     sql += ` WHERE id=$${idx} AND usuario_id=$${idx+1} RETURNING *`;
     params.push(req.params.id, uid);

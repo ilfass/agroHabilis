@@ -34,9 +34,31 @@ CREATE TABLE IF NOT EXISTS ubicaciones (
   lat DECIMAL(9,6),
   lng DECIMAL(9,6),
   geojson JSONB,
+  cliente VARCHAR(150),
+  firma VARCHAR(150),
+  provincia VARCHAR(100),
+  partido VARCHAR(100),
+  cultivo VARCHAR(100),
+  variedad VARCHAR(100),
+  fecha_siembra DATE,
+  densidad VARCHAR(50),
+  rinde_esperado DECIMAL(10,2),
+  arrendado BOOLEAN DEFAULT false,
   creado_en TIMESTAMP DEFAULT NOW(),
   UNIQUE (usuario_id, campo_id, nombre)
 );
+
+-- Add missed columns to existing ubicaciones table if they don't exist
+ALTER TABLE ubicaciones ADD COLUMN IF NOT EXISTS cliente VARCHAR(150);
+ALTER TABLE ubicaciones ADD COLUMN IF NOT EXISTS firma VARCHAR(150);
+ALTER TABLE ubicaciones ADD COLUMN IF NOT EXISTS provincia VARCHAR(100);
+ALTER TABLE ubicaciones ADD COLUMN IF NOT EXISTS partido VARCHAR(100);
+ALTER TABLE ubicaciones ADD COLUMN IF NOT EXISTS cultivo VARCHAR(100);
+ALTER TABLE ubicaciones ADD COLUMN IF NOT EXISTS variedad VARCHAR(100);
+ALTER TABLE ubicaciones ADD COLUMN IF NOT EXISTS fecha_siembra DATE;
+ALTER TABLE ubicaciones ADD COLUMN IF NOT EXISTS densidad VARCHAR(50);
+ALTER TABLE ubicaciones ADD COLUMN IF NOT EXISTS rinde_esperado DECIMAL(10,2);
+ALTER TABLE ubicaciones ADD COLUMN IF NOT EXISTS arrendado BOOLEAN DEFAULT false;
 
 -- Alter tables to drop old references and add ubicacion_id
 ALTER TABLE IF EXISTS telemetria_labores DROP COLUMN IF EXISTS lote_id CASCADE;

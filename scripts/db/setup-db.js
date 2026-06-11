@@ -405,6 +405,16 @@ CREATE TABLE IF NOT EXISTS ubicaciones (
   lat DECIMAL(9,6),
   lng DECIMAL(9,6),
   geojson JSONB,
+  cliente VARCHAR(150),
+  firma VARCHAR(150),
+  provincia VARCHAR(100),
+  partido VARCHAR(100),
+  cultivo VARCHAR(100),
+  variedad VARCHAR(100),
+  fecha_siembra DATE,
+  densidad VARCHAR(50),
+  rinde_esperado DECIMAL(10,2),
+  arrendado BOOLEAN DEFAULT false,
   creado_en TIMESTAMP DEFAULT NOW(),
   UNIQUE (usuario_id, campo_id, nombre)
 );
