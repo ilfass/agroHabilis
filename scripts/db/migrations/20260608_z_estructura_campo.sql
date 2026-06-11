@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS firmas (
+  id SERIAL PRIMARY KEY,
+  usuario_id INTEGER REFERENCES usuarios(id) ON DELETE CASCADE,
+  nombre VARCHAR(150) NOT NULL,
+  creado_en TIMESTAMP DEFAULT NOW(),
+  UNIQUE (usuario_id, nombre)
+);
+
+CREATE TABLE IF NOT EXISTS campos (
+  id SERIAL PRIMARY KEY,
+  usuario_id INTEGER REFERENCES usuarios(id) ON DELETE CASCADE,
+  firma_id INTEGER REFERENCES firmas(id) ON DELETE SET NULL,
+  nombre VARCHAR(150) NOT NULL,
+  provincia VARCHAR(100),
+  ciudad VARCHAR(120),
+  creado_en TIMESTAMP DEFAULT NOW(),
+  UNIQUE (usuario_id, nombre)
+);
+
+ALTER TABLE ubicaciones ADD COLUMN IF NOT EXISTS campo_id INTEGER REFERENCES campos(id) ON DELETE SET NULL;

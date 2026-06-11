@@ -77,7 +77,7 @@ async function handlerCmdFinanzas(ctx) {
         route: "CMD_GASTO",
       };
     }
-    const r = await registrarGasto(ctx.jid, consulta);
+    const r = await registrarGasto(ctx.planCtx?.usuario || ctx.jid, consulta);
     return { manejado: true, respuesta: r, route: "CMD_GASTO" };
   }
 
@@ -95,7 +95,7 @@ async function handlerCmdFinanzas(ctx) {
         route: "CMD_VENTA",
       };
     }
-    const r = await registrarVenta(ctx.jid, consulta);
+    const r = await registrarVenta(ctx.planCtx?.usuario || ctx.jid, consulta);
     return { manejado: true, respuesta: r, route: "CMD_VENTA" };
   }
 
@@ -113,7 +113,7 @@ async function handlerCmdFinanzas(ctx) {
           route: lu.route,
         };
       }
-      const r = await lu.fn(ctx.jid);
+      const r = await lu.fn(ctx.planCtx?.usuario || ctx.jid);
       return { manejado: true, respuesta: r, route: lu.route };
     }
   }
@@ -127,7 +127,7 @@ async function handlerCmdFinanzas(ctx) {
         route: "CMD_MI_MARGEN",
       };
     }
-    const r = await obtenerTextoMiMargen(ctx.jid);
+    const r = await obtenerTextoMiMargen(ctx.planCtx?.usuario || ctx.jid);
     return { manejado: true, respuesta: r, route: "CMD_MI_MARGEN" };
   }
 

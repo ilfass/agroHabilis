@@ -1,17 +1,10 @@
 "use strict";
 
 /**
- * Handler: `cupo_excedido` — gate de cupo mensual del plan.
- *
- * Origen: `src/config/whatsapp.js` líneas 1921-1932.
- *
- * Solo aplica si hay usuario registrado. Si superó el cupo del plan,
- * corta acá con upsell. Si no, deja pasar al pipeline IA.
- *
- * Migrado en: P2#10 paso K.
+ * Handler: `cupo_excedido` — gate de cupo semanal del plan (audios, fotos e interacciones).
  */
 
-const { validarCupoConsultasMensual } = require("../planes");
+const { validarLimitesSemanales } = require("../planes");
 
 /**
  * @param {import("../agent/turn_controller").TurnContext} ctx
@@ -19,17 +12,24 @@ const { validarCupoConsultasMensual } = require("../planes");
 async function handlerCupoExcedido(ctx) {
   if (!ctx?.planCtx?.usuario?.id) return { manejado: false };
 
-  const cupo = await validarCupoConsultasMensual({
+  // Detectar si la consulta entrante contenía audio o foto
+  const esAudio = Boolean(ctx.consulta && ctx.consulta.includes("[Audio transcrito:"));
+  const esFoto = Boolean(ctx.consulta && ctx.consulta.includes("[Análisis de archivo:"));
+
+  const cupo = await validarLimitesSemanales({
     usuarioId: ctx.planCtx.usuario.id,
     planEfectivo: ctx.planCtx.planEfectivo,
+    esAudio,
+    esFoto,
   });
+
   if (cupo?.ok) return { manejado: false };
 
   return {
     manejado: true,
-    respuesta: `Alcanzaste el límite de ${cupo?.limite ?? "N"} consultas este mes en Plan Gratis. Pasate a Plan Básico para consultas ilimitadas.`,
+    respuesta: cupo.mensaje || "Alcanzaste tu límite semanal de uso. Pasate a un plan superior para continuar.",
     route: "CUPO_EXCEDIDO",
-    extraLog: { limite: cupo?.limite, restante: cupo?.restante },
+    extraLog: { razon: cupo?.razon, usadas: cupo?.usadas, limite: cupo?.limite },
   };
 }
 

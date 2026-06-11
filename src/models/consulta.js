@@ -29,6 +29,56 @@ const normalizarIaProviderTraceParaDb = (iaProvider, trace) => {
   return [{ value: String(trace) }];
 };
 
+const resolverExactIaProvider = (iaProvider, trace) => {
+  const knownExact = [
+    "gemini_gratis",
+    "gemini_pago",
+    "gemini_vision",
+    "groq",
+    "openrouter",
+    "ollama",
+    "heuristica"
+  ];
+  if (knownExact.includes(iaProvider)) {
+    return iaProvider;
+  }
+
+  if (iaProvider === "broadcast_admin") {
+    return "broadcast_admin";
+  }
+
+  // Buscar en las trazas algún proveedor exitoso
+  const str = trace ? JSON.stringify(trace) : "";
+  if (str.includes('"provider":"openrouter"') || str.includes('"providerUsed":"openrouter"')) {
+    return "openrouter";
+  }
+  if (str.includes('"provider":"groq"') || str.includes('"providerUsed":"groq"')) {
+    return "groq";
+  }
+  if (str.includes('"provider":"ollama"') || str.includes('"providerUsed":"ollama"')) {
+    return "ollama";
+  }
+  if (str.includes('"provider":"gemini"') || str.includes('"providerUsed":"gemini"')) {
+    const { getGeminiApiKeyStatus } = require("../services/gemini_keys");
+    const status = getGeminiApiKeyStatus();
+    return status.activeKeyType === "paga" ? "gemini_pago" : "gemini_gratis";
+  }
+
+  if (
+    iaProvider === "registrar_inventario_pendiente" ||
+    iaProvider === "dialogo_hilo" ||
+    !iaProvider
+  ) {
+    if (!str || str === "[]" || str === "{}") {
+      return "heuristica";
+    }
+  }
+
+  const { getGeminiApiKeyStatus } = require("../services/gemini_keys");
+  const status = getGeminiApiKeyStatus();
+  return status.activeKeyType === "paga" ? "gemini_pago" : "gemini_gratis";
+};
+
 const guardarConsulta = async ({
   usuarioId = null,
   whatsapp,
@@ -48,6 +98,8 @@ const guardarConsulta = async ({
   `;
 
   const traceDb = normalizarIaProviderTraceParaDb(iaProvider, iaProviderTrace);
+  const exactProvider = resolverExactIaProvider(iaProvider, traceDb);
+
   const values = [
     usuarioId,
     whatsapp,
@@ -55,7 +107,7 @@ const guardarConsulta = async ({
     respuesta,
     tokensUsados,
     iaSinContexto,
-    iaProvider,
+    exactProvider,
     traceDb != null ? JSON.stringify(traceDb) : null,
   ];
   const result = await query(sql, values);

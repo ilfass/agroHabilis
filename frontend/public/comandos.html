@@ -5,25 +5,120 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AgroHabilis - Comandos</title>
     <style>
-      :root { --bg:#f3f7ff; --bg-soft:#eef4ff; --panel:#ffffff; --panel-soft:#f7faff; --text:#17233a; --muted:#5f7294; --accent:#2f8bff; --line:#dbe7ff; --shadow:0 12px 30px rgba(39,81,161,.12); }
+      :root {
+        --bg: #07090e;
+        --bg-soft: #0d121f;
+        --panel: #111726;
+        --panel-soft: #192239;
+        --text: #f1f5f9;
+        --muted: #64748b;
+        --accent: #10b981;
+        --accent-soft: rgba(16, 185, 129, 0.12);
+        --line: rgba(255, 255, 255, 0.06);
+        --shadow: 0 20px 40px rgba(0, 0, 0, 0.55);
+      }
       * { box-sizing: border-box; }
-      body { font-family: Inter, Segoe UI, Arial, sans-serif; font-size:15px; margin:0; background: linear-gradient(180deg, var(--bg-soft), var(--bg)); color:var(--text); padding:24px 24px 24px 276px; }
+      body {
+        font-family: Inter, Segoe UI, Arial, sans-serif;
+        font-size:15px;
+        margin:0;
+        background: radial-gradient(1000px 500px at 15% 0%, rgba(16, 185, 129, 0.08), transparent 50%), var(--bg);
+        color:var(--text);
+        padding:24px 24px 24px 276px;
+      }
       .topbar { display:flex; gap:10px; align-items:center; margin-bottom:16px; flex-wrap:wrap; }
-      .nav { position: fixed; left: 18px; top: 18px; width: 230px; display:flex; flex-direction:column; gap:8px; padding:12px; border:1px solid var(--line); border-radius:16px; background:#fff; box-shadow: var(--shadow); margin-bottom:14px; }
-      .nav .brand { display:flex; align-items:center; gap:10px; padding:8px 10px 12px; border-bottom:1px solid #e7efff; margin-bottom:4px; font-weight:800; color:#1e3b6e; }
-      .brand-dot { width:10px; height:10px; border-radius:999px; background:#2f8bff; box-shadow:0 0 0 4px rgba(47,139,255,.12); }
-      .nav a { text-decoration:none; padding:9px 12px; border-radius:10px; border:1px solid #d5e3ff; color:#38507b; background:#fff; font-size:13px; font-weight:600; width:100%; }
-      .nav a.active { background: linear-gradient(180deg, var(--accent), #1f66c9); border:none; color:#fff; font-weight:700; }
-      .card { background: linear-gradient(180deg, var(--panel), var(--panel-soft)); border:1px solid var(--line); border-radius:16px; padding:16px; margin-bottom:14px; box-shadow:var(--shadow); }
+      .nav {
+        position: fixed;
+        left: 18px;
+        top: 18px;
+        width: 230px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 16px;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background: var(--bg-soft);
+        box-shadow: var(--shadow);
+        margin-bottom: 14px;
+      }
+      .nav .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 10px 16px;
+        border-bottom: 1px solid var(--line);
+        margin-bottom: 8px;
+        font-weight: 800;
+        color: var(--text);
+      }
+      .brand-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        background: var(--accent);
+        box-shadow: 0 0 10px var(--accent);
+      }
+      .nav a {
+        text-decoration: none;
+        padding: 9px 12px;
+        border-radius: 10px;
+        border: 1px solid transparent;
+        color: var(--muted);
+        background: transparent;
+        font-size: 13px;
+        font-weight: 600;
+        width: 100%;
+        transition: all 0.2s ease;
+      }
+      .nav a.active {
+        background: var(--accent-soft);
+        border-color: rgba(16, 185, 129, 0.25);
+        color: var(--accent);
+        font-weight: 700;
+      }
+      .nav a:hover:not(.active) {
+        background: var(--panel-soft);
+        color: var(--text);
+        transform: translateX(3px);
+      }
+      .card {
+        background: linear-gradient(170deg, var(--panel) 0%, rgba(17, 23, 38, 0.8) 100%);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 20px;
+        margin-bottom: 16px;
+        box-shadow: var(--shadow);
+      }
       .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap:10px; }
       .row { display:grid; grid-template-columns: 1fr 2fr auto; gap:8px; padding:10px 0; border-bottom:1px solid var(--line); align-items:center; }
-      .cmd { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color:#9fe9bf; }
+      .cmd { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color:var(--accent); font-weight: 700; }
       .muted { color:var(--muted); }
-      a.btn, button.btn { text-decoration:none; padding:10px 12px; border-radius:8px; background: linear-gradient(180deg, var(--accent), #1f7a3f); color:#07210f; font-weight:700; border:none; cursor:pointer; }
-      input, select { padding:11px 13px; border-radius:10px; border:1px solid #cfddfa; background:#fff; color:#24395f; }
+      a.btn, button.btn {
+        text-decoration: none;
+        padding: 10px 14px;
+        border-radius: 10px;
+        background: linear-gradient(180deg, var(--accent), #059669);
+        color: #06090e;
+        font-weight: 700;
+        border: none;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+      a.btn:hover, button.btn:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(16, 185, 129, 0.35); }
+      input, select {
+        padding: 10px 14px;
+        border-radius: 10px;
+        border: 1px solid var(--line);
+        background: var(--bg-soft);
+        color: var(--text);
+        transition: all 0.2s ease;
+      }
+      input:focus, select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
       .tools { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
       .empty { color:var(--muted); font-size:12px; padding:8px 0; }
-      .copy-mini { padding:6px 8px; border-radius:6px; border:1px solid #3d5689; background:#0f1930; color:var(--text); cursor:pointer; font-size:12px; }
+      .copy-mini { padding:6px 10px; border-radius:8px; border: 1px solid var(--line); background:var(--panel-soft); color:var(--text); cursor:pointer; font-size:12px; font-weight: 600; transition: all 0.2s ease; }
+      .copy-mini:hover { border-color: var(--accent); color: var(--accent); }
       .page-head { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:14px; }
       .crumb { color:var(--muted); font-size:13px; }
       @media (max-width: 1100px) {
@@ -55,6 +150,9 @@
       <a href="/dashboard/metricas">📊 Métricas</a>
       <a href="/dashboard/precios">💹 Precios</a>
       <a href="/dashboard/usuarios">👥 Usuarios</a>
+      <a href="/dashboard/campanas">🚀 Campañas</a>
+      <a href="/dashboard/planes">🤖 Planes</a>
+      <a href="/dashboard/ia">🧠 IA & Gemini</a>
       <a href="/dashboard/comandos" class="active">⌨️ Comandos</a>
       <a href="/dashboard/templates">🧩 Templates</a>
       <a href="/dashboard/cliente">🙍 Cliente</a>

@@ -6,7 +6,8 @@
  * @param {{ nombre?: string|null }} u
  */
 const interpolarMensajeMasivo = (plantilla, u) => {
-  const nombre = String(u?.nombre || "").trim() || "productor";
+  const nombreRaw = String(u?.nombre || "").trim();
+  const nombre = nombreRaw.split(/\s+/)[0] || "productor";
   let t = String(plantilla || "");
   t = t.replace(/\{\{\}\s*nombrer\s*\}+/gi, nombre);
   t = t.replace(/\{\{\s*(nombre|nombrer)\s*\}\}/gi, nombre);

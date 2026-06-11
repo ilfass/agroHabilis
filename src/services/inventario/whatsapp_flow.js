@@ -27,7 +27,9 @@
  *      decide si el mensaje es inventario o no consultando lotes/saldos.
  *
  * Esta capa solo:
- *   a) Detecta intent inventario (registro / consulta / multi-lote / ambiguo).
+ *   a) Detecta intent: **IA** primero; si no hay `INVENTARIO_SOLO_LLM` ni
+ *      `AGENT_CURSOR_MODE`, también `parseIntentInventario`. En modo solo‑IA,
+ *      solo partición estructural multi‑lote (`detectarCargaMultiLote`) además del LLM.
  *   b) Crea borrador pendiente que pide confirmación.
  *   c) Procesa SI/NO y maneja la cola multi-lote.
  *
@@ -52,6 +54,8 @@ const {
   construirBorradorConsulta,
   parseIntentInventario,
   extraerHectareasDesdeTexto,
+  detectarCargaMultiLote,
+  parseRegistroGanadoMultipleHeuristic,
 } = require("./nl_heuristica");
 const {
   borradorRegistroDesdeLlm,
@@ -60,6 +64,7 @@ const {
   inventarioLlmHabilitado,
 } = require("./nl_llm");
 const conversacionEstadoService = require("../conversacion_estado");
+const { inventarioSoloLlm } = require("../agent/cursor_mode");
 
 /**
  * Cola de bloques pendientes cuando el usuario manda varios «Lote N» en un solo mensaje.
@@ -86,6 +91,17 @@ const esNegacion = (t = "") => {
   const n = normTxt(t);
   return /^(no|nop|cancelar|cancelemos|me equivoque|me equivoqu[eé])\b/i.test(raw) || u === "NO";
 };
+
+const esConfirmarTodos = (t = "") => {
+  const n = normTxt(t);
+  return [
+    "todos", "guardar todos", "confirmar todos", "si a todo", "si a todos", "si a todos los lotes",
+    "agregar todo junto", "agregar todos juntos", "guardar todo junto", "guardar todos juntos",
+    "confirmar todo junto", "confirmar todos juntos", "cargar todo junto", "cargar todos juntos",
+    "si a todo junto", "si a todos juntos", "todo junto", "todos juntos", "si todo junto", "si todos juntos"
+  ].includes(n) || /^(todos|guardar todos|confirmar todos|si a todo|si a todos|si a todos los lotes|si a todo junto|si a todos juntos|guardar todo junto|guardar todos juntos|confirmar todo junto|confirmar todos juntos|agregar todo junto|agregar todos juntos|cargar todos|cargar todo junto|cargar todos juntos|todo junto|todos juntos)\b/i.test(n);
+};
+
 
 async function obtenerNombreLote(usuarioId, loteId) {
   if (!loteId) return "";
@@ -380,7 +396,7 @@ async function manejarInventarioWhatsapp({ texto = "", usuarioId, numeroWhatsapp
     }
   }
 
-  if (pendiente && (esAfirmacion(tr) || esNegacion(tr))) {
+  if (pendiente && (esAfirmacion(tr) || esNegacion(tr) || esConfirmarTodos(tr))) {
     const pp = payloadMovimiento(pendiente);
     if (pp?.modo === "autocrear_lote_y_continuar") {
       if (esNegacion(tr)) {
@@ -425,6 +441,87 @@ async function manejarInventarioWhatsapp({ texto = "", usuarioId, numeroWhatsapp
         ]
           .filter((x) => String(x || "").trim() !== "")
           .join("\n"),
+      };
+    }
+    if (esConfirmarTodos(tr)) {
+      const ok = await confirmarMovimientoPorId(pendiente.id, usuarioId);
+      if (!ok) return { manejado: true, respuesta: "El borrador caducó o ya no existe. Intentá cargar los datos de nuevo." };
+      const confirmados = [ok];
+      
+      const cola = await leerColaMultiLote(numeroWhatsapp);
+      if (cola && Array.isArray(cola.restantes) && cola.restantes.length > 0) {
+        const { resolverLotePorNombre: rLote, crearLoteUsuario: cLote, resolverCampanaPorNombre: rCamp, crearCampanaUsuario: cCamp, registroConfirmadoDirecto } = require("./core");
+        for (const b of cola.restantes) {
+          let borrador = construirBorradorRegistro(b.fragmento, null);
+          if (!borrador && llmInventarioDisponible) {
+            const lotesPre = await listarLotesUsuario(usuarioId);
+            const campsPre = await listarCampanasUsuario(usuarioId);
+            borrador = await borradorRegistroDesdeLlm(b.fragmento, {
+              lotes: lotesPre,
+              campanas: campsPre,
+              forzarCapaUsuario: forzarCapaUsuarioLlm,
+            });
+          }
+          if (borrador) {
+            let loteId = null;
+            if (borrador.lote_nombre_fragmento) {
+              const lt = await rLote(usuarioId, borrador.lote_nombre_fragmento);
+              if (lt?.id) loteId = lt.id;
+              else {
+                const creado = await cLote({
+                  usuarioId,
+                  nombre: borrador.lote_nombre_fragmento,
+                });
+                loteId = creado.id;
+              }
+            }
+            let campanaId = null;
+            if (borrador.campana_nombre_fragmento) {
+              const cm = await rCamp(usuarioId, borrador.campana_nombre_fragmento);
+              if (cm?.id) campanaId = cm.id;
+              else {
+                const nuevaCamp = await cCamp({
+                  usuarioId,
+                  nombre: borrador.campana_nombre_fragmento,
+                });
+                campanaId = nuevaCamp.id;
+              }
+            }
+            const movDir = await registroConfirmadoDirecto({
+              usuarioId,
+              dominio: borrador.dominio,
+              payload: borrador.payload,
+              loteId,
+              campanaId,
+              efecto: borrador.efecto === "delta" ? "delta" : "replace",
+              textoNl: borrador.texto_original || b.fragmento,
+              fechaReferencia: borrador.fecha_referencia,
+              canal: "whatsapp",
+            });
+            confirmados.push(movDir);
+          }
+        }
+      }
+      
+      await descartarColaMultiLote(numeroWhatsapp);
+      
+      const resumenes = [];
+      for (const c of confirmados) {
+        const ln = await obtenerNombreLote(usuarioId, c.lote_id);
+        const cn = await obtenerNombreCampana(usuarioId, c.campana_id);
+        resumenes.push(`• *Lote ${ln || "establecimiento"}*: ${resumenMovimientoParaHumano(c, ln, cn)}`);
+      }
+      
+      return {
+        manejado: true,
+        respuesta: [
+          `✅ *¡Listo! Registré la siembra de cebada en cada lote tal como me lo compartiste.*`,
+          "",
+          `### Resumen de la carga (campo – lote – ha efectivas)`,
+          resumenes.join("\n"),
+          "",
+          `🎉 Cargué *${confirmados.length} lote(s)* en total.`,
+        ].join("\n"),
       };
     }
     if (esAfirmacion(tr)) {
@@ -522,15 +619,65 @@ async function manejarInventarioWhatsapp({ texto = "", usuarioId, numeroWhatsapp
   const consultaInventarioForzada = intentForced?.clase === "consulta";
 
   let intentLite = null;
-  let borradorPrefetchDesdeLlm = null;
+  let borradorPrefetchDesdeLlm = opciones?._borradorPrefetch || null;
   let intentInventarioInferidoSoloLlm = false;
   let intentoAgenteUnificado = false;
 
+  // Si viene con un borrador pre-construido (del primer bloque multi-lote),
+  // marcar directamente como registro para saltear toda la detección.
+  if (borradorPrefetchDesdeLlm) {
+    intentLite = { clase: "registro" };
+    intentInventarioInferidoSoloLlm = true;
+  }
+
+  const soloInv = inventarioSoloLlm();
   const llmInventarioDisponible =
     inventarioLlmHabilitado() || (forzarCapaUsuarioLlm && Boolean(process.env.GEMINI_API_KEY?.trim()));
 
+  /**
+   * Detectar si el texto proviene de un OCR de planilla visual ([Análisis de archivo:]).
+   * En ese caso, la heurística `detectarCargaMultiLote` puede fallar o introducir ruido
+   * (ej: capturar "Lote y" del encabezado, o confundir el año de campaña con hectáreas).
+   * Siempre enviamos al motor de IA si la API está disponible.
+   */
+  const esPlanillaOcrTxt = texto.includes("[Análisis de archivo:") ||
+    texto.includes("[Analisis de archivo:") ||
+    (texto.toLowerCase().includes("columnas de la tabla") && texto.toLowerCase().includes("haefectiva")) ||
+    (texto.toLowerCase().includes("columnas:") && (texto.match(/\|/g) || []).length >= 4);
+
+  // 1. Pre-chequeo estructural multi-lote antes de invocar la extracción LLM unitaria
+  // OMITIDO si es una planilla OCR (la IA lo hará mejor).
+  let multiLoteHeuristico = null;
+  if (!consultaInventarioForzada && !esPlanillaOcrTxt) {
+    multiLoteHeuristico = detectarCargaMultiLote(texto);
+  }
+
+  if (multiLoteHeuristico) {
+    intentLite = {
+      clase: "multi_lote",
+      bloques: multiLoteHeuristico.bloques,
+      bloques_sin_carga: multiLoteHeuristico.bloques_sin_carga || [],
+    };
+  }
+
+  // 2. Pre-chequeo estructural de múltiples categorías animales antes del LLM monoregistro
+  let borradorGanadoMulti = null;
+  if (!consultaInventarioForzada && !intentLite && !esPlanillaOcrTxt) {
+    borradorGanadoMulti = parseRegistroGanadoMultipleHeuristic(texto);
+  }
+
+  if (borradorGanadoMulti) {
+    borradorPrefetchDesdeLlm = borradorGanadoMulti;
+    intentLite = { clase: "registro" };
+    intentInventarioInferidoSoloLlm = true;
+  }
+
   let agenteInv = null;
-  if (llmInventarioDisponible && !consultaInventarioForzada) {
+  // 3. Extracción vía LLM clásica si:
+  //    a) No se detectaron estructuras heurísticas, O
+  //    b) Es una planilla OCR (siempre pasa por IA para extraón precisa)
+  const necesitaLlm = (!intentLite || esPlanillaOcrTxt) && llmInventarioDisponible && !consultaInventarioForzada;
+  if (necesitaLlm) {
     intentoAgenteUnificado = true;
     const lotesPrefetch = await listarLotesUsuario(usuarioId);
     const campPrefetch = await listarCampanasUsuario(usuarioId);
@@ -569,6 +716,20 @@ async function manejarInventarioWhatsapp({ texto = "", usuarioId, numeroWhatsapp
         intentLite = { clase: "registro" };
         intentInventarioInferidoSoloLlm = true;
       }
+      if (agenteInv.accion === "multi_lote" && Array.isArray(agenteInv.bloques) && agenteInv.bloques.length >= 2) {
+        // La IA siempre gana si:
+        //  a) No había heurístico previo, O
+        //  b) La IA encontró MAS bloques que el heurístico (extrae mejor en planillas)
+        const bloquesAi = agenteInv.bloques.length;
+        const bloquesHeuristico = intentLite?.clase === "multi_lote" ? (intentLite.bloques?.length || 0) : 0;
+        if (!intentLite || bloquesAi > bloquesHeuristico) {
+          intentLite = {
+            clase: "multi_lote",
+            bloques: agenteInv.bloques,
+            bloques_sin_carga: agenteInv.bloques_sin_carga || [],
+          };
+        }
+      }
     }
   }
 
@@ -580,9 +741,29 @@ async function manejarInventarioWhatsapp({ texto = "", usuarioId, numeroWhatsapp
     }
   }
 
-  if (!intentLite) intentLite = parseIntentInventario(texto);
+  if (!intentLite && !soloInv) {
+    intentLite = parseIntentInventario(texto);
+  } else if (!intentLite && soloInv) {
+    const multiOnly = detectarCargaMultiLote(texto);
+    if (multiOnly && Array.isArray(multiOnly.bloques) && multiOnly.bloques.length >= 2) {
+      intentLite = {
+        clase: "multi_lote",
+        bloques: multiOnly.bloques,
+        bloques_sin_carga: multiOnly.bloques_sin_carga || [],
+      };
+    }
+  }
 
-  if (!intentLite) return { manejado: false };
+  if (!intentLite) {
+    if (soloInv && !llmInventarioDisponible && tr.length >= 6 && /\d/.test(tr)) {
+      return {
+        manejado: true,
+        respuesta:
+          "Modo *inventario solo‑IA* activo (`INVENTARIO_SOLO_LLM` o `AGENT_CURSOR_MODE`) y falta *GEMINI_API_KEY* en el servidor para interpretar el mensaje. Definila en `.env` o desactivá ese modo.",
+      };
+    }
+    return { manejado: false };
+  }
   if (intentLite.clase === "ambiguo") {
     return {
       manejado: true,
@@ -609,7 +790,7 @@ async function manejarInventarioWhatsapp({ texto = "", usuarioId, numeroWhatsapp
      */
     const previewProcesar = bloques
       .map((b, i) => {
-        const resumen = resumirFragmentoMultiLote(b.fragmento);
+        const resumen = b.resumen || resumirFragmentoMultiLote(b.fragmento);
         return `  ${i + 1}. *Lote ${b.lote_nombre}* — ${resumen || "_carga detectada_"}`;
       })
       .join("\n");
@@ -620,11 +801,46 @@ async function manejarInventarioWhatsapp({ texto = "", usuarioId, numeroWhatsapp
           .join(", ") + (sinCarga.length > 12 ? "…" : "")
       : "";
 
+    /**
+     * FIX: En vez de re-invocar manejarInventarioWhatsapp recursivamente
+     * (que entra al pipeline completo y puede fallar por estado de sesión),
+     * construimos el borrador del primer bloque directamente desde el fragmento
+     * que la IA ya generó como frase bien formada.
+     */
+    let borradorPrimero = construirBorradorRegistro(primero.fragmento, null);
+    if (!borradorPrimero && llmInventarioDisponible) {
+      // Fallback: si la heurística no pudo, usar LLM directamente sobre el fragmento
+      const lotesPre = await listarLotesUsuario(usuarioId);
+      const campsPre = await listarCampanasUsuario(usuarioId);
+      borradorPrimero = await borradorRegistroDesdeLlm(primero.fragmento, {
+        lotes: lotesPre,
+        campanas: campsPre,
+        forzarCapaUsuario: forzarCapaUsuarioLlm,
+      });
+    }
+
+    if (!borradorPrimero) {
+      return {
+        manejado: true,
+        respuesta: [
+          `📋 *Plan detectado* (${bloques.length} lotes con carga${sinCarga.length ? `, ${sinCarga.length} sin hacienda` : ""}):`,
+          previewProcesar,
+          previewIgnorar ? `\n⏭️ _Ignoro: ${previewIgnorar}._` : "",
+          "",
+          `⚠️ No pude interpretar el primer lote (*Lote ${primero.lote_nombre}*) porque parece tener varias cargas mezcladas.`,
+          "Mandalos separados, uno por lote, con cantidad y categoría clara.",
+        ]
+          .filter(Boolean)
+          .join("\n"),
+      };
+    }
+
+    // Usar el resto del pipeline de guardar borrador, pero con el texto del fragmento
     const r = await manejarInventarioWhatsapp({
       texto: primero.fragmento,
       usuarioId,
       numeroWhatsapp,
-      opciones: { ...opciones, _saltarMultiLote: true },
+      opciones: { ...opciones, _saltarMultiLote: true, _borradorPrefetch: borradorPrimero },
     });
 
     if (!r?.manejado) {
@@ -668,7 +884,7 @@ async function manejarInventarioWhatsapp({ texto = "", usuarioId, numeroWhatsapp
   }
 
   if (intentLite.clase === "consulta") {
-    const bd = construirBorradorConsulta(texto, intentForced);
+    const bd = construirBorradorConsulta(texto, intentForced?.clase === "consulta" ? intentForced : intentLite);
     if (!bd) return { manejado: false };
     const txt = await responderConsultaInventario(usuarioId, bd, numeroWhatsapp);
     return { manejado: true, respuesta: txt };
@@ -680,7 +896,7 @@ async function manejarInventarioWhatsapp({ texto = "", usuarioId, numeroWhatsapp
     intentLite.clase === "registro" &&
     !intentInventarioInferidoSoloLlm &&
     (!intentoAgenteUnificado || agenteInv == null) &&
-    (permiteIntentarLlmTrasFalloHeuristica(texto) || forzarCapaUsuarioLlm || inventarioLlmHabilitado())
+    (soloInv || permiteIntentarLlmTrasFalloHeuristica(texto) || forzarCapaUsuarioLlm || inventarioLlmHabilitado())
   ) {
     const lotes = await listarLotesUsuario(usuarioId);
     const campanas = await listarCampanasUsuario(usuarioId);
@@ -744,11 +960,12 @@ async function manejarInventarioWhatsapp({ texto = "", usuarioId, numeroWhatsapp
       const cm = await resolverCampanaPorNombre(usuarioId, borrador.campana_nombre_fragmento);
       if (cm?.id) campanaIdMixto = cm.id;
       else {
-        const lista = await listadoNombresCampanas(usuarioId);
-        return {
-          manejado: true,
-          respuesta: `Mencionaste una *campaña* y no coincide con las cargadas *«${borrador.campana_nombre_fragmento}»*.${lista ? `\n\nTenés:\n${lista}\n\nCreá una en Mi Panel o corregí el nombre.` : "\n\nCreá primero una campaña en Mi Panel (Inventario)."}`,
-        };
+        const { crearCampanaUsuario } = require("./core");
+        const nuevaCamp = await crearCampanaUsuario({
+          usuarioId,
+          nombre: borrador.campana_nombre_fragmento,
+        });
+        campanaIdMixto = nuevaCamp.id;
       }
     }
     await crearRegistroPendiente({
@@ -804,11 +1021,12 @@ async function manejarInventarioWhatsapp({ texto = "", usuarioId, numeroWhatsapp
     const cm = await resolverCampanaPorNombre(usuarioId, borrador.campana_nombre_fragmento);
     if (cm?.id) campanaId = cm.id;
     else {
-      const lista = await listadoNombresCampanas(usuarioId);
-      return {
-        manejado: true,
-        respuesta: `Mencionaste una *campaña* y no coincide con las cargadas *«${borrador.campana_nombre_fragmento}»*.${lista ? `\n\nTenés:\n${lista}\n\nCreá una en Mi Panel o corregí el nombre.` : "\n\nCreá primero una campaña en Mi Panel (Inventario)."}`,
-      };
+      const { crearCampanaUsuario } = require("./core");
+      const nuevaCamp = await crearCampanaUsuario({
+        usuarioId,
+        nombre: borrador.campana_nombre_fragmento,
+      });
+      campanaId = nuevaCamp.id;
     }
   }
 

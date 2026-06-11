@@ -24,7 +24,7 @@ async function precioRecienteSuficiente(cultivo) {
   const t = r.rows[0]?.t;
   if (!t) return false;
   const ageMs = Date.now() - new Date(t).getTime();
-  return ageMs < 4 * 60 * 60 * 1000;
+  return ageMs < 10 * 60 * 60 * 1000;
 }
 
 function pedidoTipoCambioSinCultivo(clasificacion, mensaje = "") {
@@ -141,14 +141,39 @@ const rutaPrecio = async ({ clasificacion, mensaje, usuario }) => {
 
   const ok = await precioRecienteSuficiente(cultivo);
   if (!ok && typeof recolectarPreciosCACFresco === "function") {
-    try {
-      await recolectarPreciosCACFresco();
-    } catch (_e) {
-      /* BD existente */
-    }
+    // Se ejecuta en segundo plano para no bloquear ni demorar la respuesta de WhatsApp
+    recolectarPreciosCACFresco().catch((err) => {
+      console.warn("[precio] Error en segundo plano de recolectarPreciosCACFresco:", err.message || err);
+    });
   }
 
-  const base = await H.responderDatosCultivo(cultivo, nivelPrecio);
+  let base = await H.responderDatosCultivo(cultivo, nivelPrecio);
+
+  // Inyectamos SIEMPRE las posiciones de futuros disponibles para este cultivo (sin usar regex)
+  try {
+    const cultivoSqlLike = cultivo ? `%${cultivo}%` : "%soja%";
+    const rFut = await query(
+      `
+        SELECT posicion, precio_usd, variacion, volumen, fecha, fuente
+        FROM futuros_posiciones
+        WHERE LOWER(cultivo) LIKE LOWER($1)
+          AND fecha = (SELECT MAX(fecha) FROM futuros_posiciones WHERE LOWER(cultivo) LIKE LOWER($1))
+        ORDER BY posicion
+        LIMIT 8
+      `,
+      [cultivoSqlLike]
+    );
+
+    if (rFut.rows.length) {
+      const lineasFut = rFut.rows.map(
+        (f) => `  · Posición: ${f.posicion} | Precio: USD ${f.precio_usd}${f.variacion ? ` (Var: ${f.variacion})` : ""} | Fuente: ${f.fuente} | Fecha Ref: ${f.fecha.toISOString().split("T")[0]}`
+      );
+      base += `\n\n--- Posiciones de Futuros (MATba-Rofex / CBOT) ---\n` + lineasFut.join("\n");
+    }
+  } catch (errFut) {
+    console.warn("[precio] Error al inyectar futuros posiciones:", errFut.message || errFut);
+  }
+
   const human = await H.humanizarRespuestaPrecioConIA({
     pregunta: mensaje,
     textoBase: base,

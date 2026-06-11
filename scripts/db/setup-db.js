@@ -216,6 +216,21 @@ ALTER TABLE historial_consultas
 ALTER TABLE historial_consultas
   ADD COLUMN IF NOT EXISTS ia_provider_trace JSONB;
 
+CREATE TABLE IF NOT EXISTS agent_tarea_fila (
+  id BIGSERIAL PRIMARY KEY,
+  tipo VARCHAR(64) NOT NULL DEFAULT 'consulta_whatsapp',
+  payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+  estado VARCHAR(32) NOT NULL DEFAULT 'pending',
+  intentos INT NOT NULL DEFAULT 0,
+  creado_en TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  iniciado_en TIMESTAMPTZ,
+  terminado_en TIMESTAMPTZ,
+  error_text TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_agent_tarea_fila_estado_creado
+  ON agent_tarea_fila (estado, creado_en ASC);
+
 CREATE TABLE IF NOT EXISTS whatsapp_interaccion_log (
   id BIGSERIAL PRIMARY KEY,
   whatsapp_norm VARCHAR(24) NOT NULL,
@@ -267,7 +282,7 @@ ALTER TABLE suscripciones
 
 ALTER TABLE suscripciones
   ADD CONSTRAINT chk_suscripciones_plan_objetivo
-  CHECK (LOWER(plan_objetivo) IN ('basico', 'pro', 'gratis')) NOT VALID;
+  CHECK (LOWER(plan_objetivo) IN ('basico', 'pro', 'gratis', 'pro_max')) NOT VALID;
 
 CREATE TABLE IF NOT EXISTS suscripciones_webhooks (
   id BIGSERIAL PRIMARY KEY,
@@ -354,15 +369,44 @@ CREATE TABLE IF NOT EXISTS campanas_agricolas (
   creado_en TIMESTAMP DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS lotes (
+
+CREATE TABLE IF NOT EXISTS firmas (
   id SERIAL PRIMARY KEY,
   usuario_id INTEGER REFERENCES usuarios(id) ON DELETE CASCADE,
-  campana_id INTEGER REFERENCES campanas_agricolas(id),
-  nombre VARCHAR(100),
+  nombre VARCHAR(150) NOT NULL,
+  codigo VARCHAR(10),
+  creado_en TIMESTAMP DEFAULT NOW(),
+  UNIQUE (usuario_id, nombre)
+);
+
+CREATE TABLE IF NOT EXISTS campos (
+  id SERIAL PRIMARY KEY,
+  usuario_id INTEGER REFERENCES usuarios(id) ON DELETE CASCADE,
+  firma_id INTEGER REFERENCES firmas(id) ON DELETE SET NULL,
+  nombre VARCHAR(150) NOT NULL,
+  codigo VARCHAR(10),
+  provincia VARCHAR(100),
+  ciudad VARCHAR(120),
+  creado_en TIMESTAMP DEFAULT NOW(),
+  UNIQUE (usuario_id, nombre)
+);
+
+CREATE TABLE IF NOT EXISTS ubicaciones (
+  id SERIAL PRIMARY KEY,
+  usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  campo_id INTEGER REFERENCES campos(id) ON DELETE SET NULL,
+  ubicacion_padre_id INTEGER REFERENCES ubicaciones(id) ON DELETE CASCADE,
+  tipo VARCHAR(50) NOT NULL,
+  nombre VARCHAR(150) NOT NULL,
+  codigo VARCHAR(10),
   hectareas DECIMAL(10,2),
-  cultivo VARCHAR(50),
-  arrendado BOOLEAN DEFAULT false,
-  creado_en TIMESTAMP DEFAULT NOW()
+  capacidad_cabezas INTEGER,
+  tipo_encierre VARCHAR(50),
+  lat DECIMAL(9,6),
+  lng DECIMAL(9,6),
+  geojson JSONB,
+  creado_en TIMESTAMP DEFAULT NOW(),
+  UNIQUE (usuario_id, campo_id, nombre)
 );
 
 CREATE TABLE IF NOT EXISTS stock_ganadero (
@@ -394,7 +438,7 @@ CREATE TABLE IF NOT EXISTS gastos (
   monto DECIMAL(12,2) NOT NULL,
   moneda VARCHAR(5) DEFAULT 'ARS',
   fecha DATE NOT NULL,
-  lote_id INTEGER REFERENCES lotes(id),
+  ubicacion_id INTEGER REFERENCES ubicaciones(id),
   creado_en TIMESTAMP DEFAULT NOW()
 );
 
@@ -600,7 +644,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS ux_precios_insumos_producto_fuente_fecha
 ALTER TABLE usuarios
   DROP CONSTRAINT IF EXISTS chk_usuarios_plan;
 ALTER TABLE usuarios
-  ADD CONSTRAINT chk_usuarios_plan CHECK (plan IS NULL OR LOWER(plan) IN ('gratis', 'basico', 'pro')) NOT VALID;
+  ADD CONSTRAINT chk_usuarios_plan CHECK (plan IS NULL OR LOWER(plan) IN ('gratis', 'basico', 'pro', 'pro_max')) NOT VALID;
 
 ALTER TABLE precios
   DROP CONSTRAINT IF EXISTS chk_precios_precio_positivo;
@@ -741,6 +785,101 @@ CREATE INDEX IF NOT EXISTS idx_precios_insumos_fecha_categoria_producto
   ON precios_insumos (fecha DESC, categoria, producto);
 CREATE INDEX IF NOT EXISTS idx_precios_hacienda_fecha_categoria
   ON precios_hacienda (fecha DESC, categoria);
+
+ALTER TABLE usuarios
+  ADD COLUMN IF NOT EXISTS ultima_invitacion_resumen_interactivo DATE;
+
+CREATE TABLE IF NOT EXISTS conversacion_estado (
+  id SERIAL PRIMARY KEY,
+  whatsapp VARCHAR(20) NOT NULL UNIQUE,
+  flujo VARCHAR(50) NOT NULL,
+  paso VARCHAR(50) NOT NULL,
+  contexto JSONB DEFAULT '{}'::jsonb,
+  expira_en TIMESTAMPTZ NOT NULL,
+  creado_en TIMESTAMPTZ DEFAULT NOW(),
+  actualizado_en TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_conversacion_whatsapp
+  ON conversacion_estado(whatsapp);
+
+-- Telemetría Agrícola de Nube a Nube
+CREATE TABLE IF NOT EXISTS telemetria_conexiones (
+  id SERIAL PRIMARY KEY,
+  usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  proveedor VARCHAR(50) NOT NULL,
+  leaf_user_id VARCHAR(100) UNIQUE NOT NULL,
+  estado VARCHAR(20) DEFAULT 'activo',
+  creado_en TIMESTAMPTZ DEFAULT NOW(),
+  actualizado_en TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(usuario_id, proveedor)
+);
+
+CREATE TABLE IF NOT EXISTS telemetria_labores (
+  id BIGSERIAL PRIMARY KEY,
+  usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  ubicacion_id INTEGER NOT NULL REFERENCES ubicaciones(id) ON DELETE CASCADE,
+  campana_id INTEGER REFERENCES campanas_agricolas(id) ON DELETE SET NULL,
+  tipo_labor VARCHAR(30) NOT NULL,
+  fecha_inicio DATE NOT NULL,
+  fecha_fin DATE NOT NULL,
+  hectareas_reales DECIMAL(10,2) NOT NULL,
+  velocidad_promedio DECIMAL(5,2),
+  insumo_nombre VARCHAR(120),
+  dosis_promedio DECIMAL(12,4) NOT NULL,
+  unidad_dosis VARCHAR(24) NOT NULL,
+  marca_maquinaria VARCHAR(50),
+  modelo_maquinaria VARCHAR(80),
+  externo_job_id VARCHAR(120) UNIQUE,
+  payload_adicional JSONB DEFAULT '{}'::jsonb,
+  creado_en TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_telemetria_labores_lote_fecha 
+  ON telemetria_labores (ubicacion_id, fecha_fin DESC);
+CREATE INDEX IF NOT EXISTS idx_telemetria_labores_tipo 
+  ON telemetria_labores (usuario_id, tipo_labor);
+
+CREATE TABLE IF NOT EXISTS telemetria_lote_zonas (
+  id SERIAL PRIMARY KEY,
+  ubicacion_id INTEGER NOT NULL REFERENCES ubicaciones(id) ON DELETE CASCADE,
+  campana_id INTEGER REFERENCES campanas_agricolas(id) ON DELETE CASCADE,
+  zona_etiqueta VARCHAR(50) NOT NULL,
+  porcentaje_area DECIMAL(5,4) NOT NULL,
+  hectareas_zona DECIMAL(10,2) NOT NULL,
+  rinde_historico DECIMAL(10,2),
+  creado_en TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(ubicacion_id, campana_id, zona_etiqueta)
+);
+
+CREATE INDEX IF NOT EXISTS idx_telemetria_lote_zonas_ubicacion 
+  ON telemetria_lote_zonas (ubicacion_id);
+
+CREATE TABLE IF NOT EXISTS eventos_calendario (
+  id SERIAL PRIMARY KEY,
+  usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  titulo VARCHAR(150) NOT NULL,
+  descripcion TEXT,
+  fecha_inicio TIMESTAMPTZ NOT NULL,
+  fecha_fin TIMESTAMPTZ,
+  categoria VARCHAR(30) DEFAULT 'admin',
+  ubicacion_id INTEGER REFERENCES ubicaciones(id) ON DELETE CASCADE,
+  creado_en TIMESTAMPTZ DEFAULT NOW(),
+  actualizado_en TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_eventos_calendario_usuario ON eventos_calendario(usuario_id, fecha_inicio);
+
+
+
+
+
+-- Códigos visibles para entidades de campo
+
+CREATE UNIQUE INDEX IF NOT EXISTS ux_firmas_usuario_codigo ON firmas (usuario_id, codigo) WHERE codigo IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS ux_campos_usuario_codigo ON campos (usuario_id, codigo) WHERE codigo IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS ux_ubicaciones_usuario_codigo ON ubicaciones (usuario_id, codigo) WHERE codigo IS NOT NULL;
+
 `;
 
 const seedUsuarioSistemaSQL = `

@@ -17,28 +17,122 @@ const normalizarWhatsapp = (numeroWhatsapp = "") => {
   return extraerIdentidadWhatsapp(numeroWhatsapp).numero;
 };
 
-const buscarPorWhatsapp = async (numeroWhatsapp) => {
+/**
+ * Destino para envío saliente (whatsapp-web.js): prioriza teléfono real (`getNumberId`);
+ * si no hay, usa `whatsapp_jid` (@lid / @c.us) para cuentas que solo tienen LID en `whatsapp`.
+ */
+const destinoWhatsappParaEnvio = (usuario = {}) => {
+  const realRaw = String(usuario.whatsapp_real || "").trim();
+  if (realRaw) {
+    const soloDigitos = realRaw.replace(/\D/g, "");
+    if (soloDigitos.length >= 8) return soloDigitos;
+  }
+  const jid = String(usuario.whatsapp_jid || "").trim();
+  if (jid.includes("@")) return jid;
+  return String(usuario.whatsapp || "").trim();
+};
+
+const obtenerVariantesTelefono = (value = "") => {
+  const base = String(value || "").replace(/\D/g, "");
+  if (!base) return [];
+  const out = new Set([base]);
+  if (base.startsWith("549") && base.length > 3) out.add(`54${base.slice(3)}`);
+  if (base.startsWith("54") && !base.startsWith("549") && base.length > 2) out.add(`549${base.slice(2)}`);
+  return Array.from(out).filter(Boolean);
+};
+
+const buscarPorWhatsapp = async (numeroWhatsapp, numeroRealOptional) => {
   const identidad = extraerIdentidadWhatsapp(numeroWhatsapp);
   if (!identidad.numero && !identidad.jid) return null;
 
+  const numeroBuscado = identidad.numero || "";
+  const variantes = obtenerVariantesTelefono(numeroBuscado);
+
+  const realNumCanon = numeroRealOptional ? normalizarWhatsapp(numeroRealOptional) : null;
+  const variantesReal = realNumCanon ? obtenerVariantesTelefono(realNumCanon) : [];
+
+  // 1. Primero verificamos si es un Teléfono Autorizado (Delegado) ACTIVO
+  const delegadoResult = await query(
+    `
+      SELECT t.usuario_principal_id, t.nombre_contacto, t.rol, t.aceptado, t.whatsapp_autorizado,
+             u.nombre AS nombre_principal, u.email, u.whatsapp AS whatsapp_principal,
+             u.whatsapp_jid, u.whatsapp_real,
+             u.provincia, u.partido, u.lat, u.lng, u.plan, u.activo, u.tipo_comercializacion
+      FROM telefonos_autorizados t
+      JOIN usuarios u ON t.usuario_principal_id = u.id
+      WHERE (
+        regexp_replace(COALESCE(t.whatsapp_autorizado, ''), '\\D', '', 'g') = ANY($1::text[])
+        OR (
+          $2::text[] <> '{}'::text[] AND
+          regexp_replace(COALESCE(t.whatsapp_autorizado, ''), '\\D', '', 'g') = ANY($2::text[])
+        )
+      )
+        AND t.activo = true
+        AND u.activo = true
+      LIMIT 1
+    `,
+    [variantes, variantesReal]
+  );
+
+  if (delegadoResult.rows[0]) {
+    const row = delegadoResult.rows[0];
+    return {
+      id: row.usuario_principal_id,
+      nombre: row.nombre_principal,
+      email: row.email,
+      whatsapp: row.whatsapp_principal,
+      whatsapp_jid: row.whatsapp_jid,
+      whatsapp_real: row.whatsapp_real,
+      provincia: row.provincia,
+      partido: row.partido,
+      lat: row.lat,
+      lng: row.lng,
+      plan: row.plan,
+      activo: row.activo,
+      tipo_comercializacion: row.tipo_comercializacion,
+      es_delegado: true,
+      nombre_operario: row.nombre_contacto,
+      rol_operario: row.rol,
+      delegado_pendiente: !row.aceptado,
+      whatsapp_autorizado: row.whatsapp_autorizado,
+    };
+  }
+
+  // 2. Si no es un delegado activo, buscamos si el número pertenece a un Usuario Principal
   const result = await query(
     `
       SELECT id, nombre, email, whatsapp, whatsapp_jid, whatsapp_real, provincia, partido, lat, lng, plan, activo, tipo_comercializacion
       FROM usuarios
       WHERE (
-        $1::text <> '' AND (
-          regexp_replace(COALESCE(whatsapp, ''), '\\D', '', 'g') = $1
-          OR regexp_replace(COALESCE(whatsapp_real, ''), '\\D', '', 'g') = $1
-          OR regexp_replace(COALESCE(whatsapp_jid, ''), '\\D', '', 'g') = $1
+        $1::text[] <> '{}'::text[] AND (
+          regexp_replace(COALESCE(whatsapp, ''), '\\D', '', 'g') = ANY($1::text[])
+          OR regexp_replace(COALESCE(whatsapp_real, ''), '\\D', '', 'g') = ANY($1::text[])
+          OR regexp_replace(COALESCE(whatsapp_jid, ''), '\\D', '', 'g') = ANY($1::text[])
         )
       )
       OR ($2::text IS NOT NULL AND whatsapp_jid = $2::text)
+      OR (
+        $3::text[] <> '{}'::text[] AND (
+          regexp_replace(COALESCE(whatsapp, ''), '\\D', '', 'g') = ANY($3::text[])
+          OR regexp_replace(COALESCE(whatsapp_real, ''), '\\D', '', 'g') = ANY($3::text[])
+          OR regexp_replace(COALESCE(whatsapp_jid, ''), '\\D', '', 'g') = ANY($3::text[])
+        )
+      )
       LIMIT 1
     `,
-    [identidad.numero || "", identidad.jid]
+    [variantes, identidad.jid, variantesReal]
   );
 
-  return result.rows[0] || null;
+  if (result.rows[0]) {
+    return {
+      ...result.rows[0],
+      es_delegado: false,
+      nombre_operario: result.rows[0].nombre,
+      rol_operario: "dueño",
+    };
+  }
+
+  return null;
 };
 
 const crearUsuario = async (datos) => {
@@ -137,8 +231,8 @@ const guardarCultivosUsuario = async ({
   }
 };
 
-const obtenerPerfil = async (numeroWhatsapp) => {
-  const usuario = await buscarPorWhatsapp(numeroWhatsapp);
+const obtenerPerfil = async (numeroWhatsapp, numeroRealOptional) => {
+  const usuario = await buscarPorWhatsapp(numeroWhatsapp, numeroRealOptional);
   if (!usuario) return null;
 
   const cultivosResult = await query(
@@ -438,6 +532,7 @@ const eliminarUsuarioSoft = async (usuarioId) => {
 
 module.exports = {
   normalizarWhatsapp,
+  destinoWhatsappParaEnvio,
   buscarPorWhatsapp,
   crearUsuario,
   actualizarUsuario,

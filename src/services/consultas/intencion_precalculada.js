@@ -49,6 +49,15 @@ const fusionarIntencionPrecalculada = (clasificacion, precalc, mensaje = "") => 
     };
   }
 
+  if (tipo === "consulta_registros") {
+    return {
+      ...clasificacion,
+      intencion: "consulta_registros",
+      requiere_datos_propios: true,
+      confianza: "alta",
+    };
+  }
+
   if (tipo === "meta_fecha" || tipo === "meta_hora") {
     return {
       ...clasificacion,

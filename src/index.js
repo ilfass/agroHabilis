@@ -117,6 +117,7 @@ const LOGIN_REDIRECT_TARGETS = new Set([
   "/dashboard/metricas",
   "/dashboard/precios",
   "/dashboard/campanas",
+  "/dashboard/planes",
   "/admin.html",
   "/comandos.html",
   "/templates.html",
@@ -124,6 +125,9 @@ const LOGIN_REDIRECT_TARGETS = new Set([
   "/metricas.html",
   "/precios.html",
   "/campanas.html",
+  "/planes.html",
+  "/dashboard/ia",
+  "/ia.html",
 ]);
 const CLIENT_LOGIN_REDIRECT_TARGETS = new Set([
   "/dashboard/cliente",
@@ -260,7 +264,13 @@ const buildClientLoginRedirect = (req) => {
 
 const requireClientePageAuth = async (req, res, next) => {
   const ses = await leerSesionCliente(req);
-  if (ses.ok) return next();
+  if (ses.ok) {
+    const plan = String(ses.user?.plan || "").toLowerCase();
+    if (plan === "gratis" || !plan) {
+      return res.redirect("/dashboard/cliente/login?error=plan_restricted");
+    }
+    return next();
+  }
   return res.redirect(buildClientLoginRedirect(req));
 };
 
@@ -268,6 +278,14 @@ const requireClienteApiAuth = ({ requirePasswordChanged = true } = {}) => async 
   const ses = await leerSesionCliente(req);
   if (!ses.ok) {
     return res.status(401).json({ ok: false, error: "No autorizado" });
+  }
+  const plan = String(ses.user?.plan || "").toLowerCase();
+  if (plan === "gratis" || !plan) {
+    return res.status(403).json({
+      ok: false,
+      error: "El acceso al Panel Web requiere un Plan Básico o superior. ¡Podés actualizar tu plan desde WhatsApp!",
+      code: "PLAN_RESTRICTED",
+    });
   }
   if (requirePasswordChanged && ses.mustChangePassword) {
     return res.status(403).json({
@@ -333,6 +351,20 @@ const registerPasswordResetAttempt = (key) => {
   passwordResetAttemptsByKey.set(key, rec);
 };
 
+// Prevent browser caching of HTML pages to ensure updates are visible immediately
+app.use((req, res, next) => {
+  if (
+    req.path === "/" ||
+    req.path.startsWith("/dashboard") ||
+    req.path.endsWith(".html")
+  ) {
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+  }
+  next();
+});
+
 app.use(async (req, res, next) => {
   if (LOGIN_REDIRECT_TARGETS.has(req.path) || req.path.startsWith("/api/dashboard/admin")) {
     if (req.path.startsWith("/api/dashboard/admin")) {
@@ -344,9 +376,9 @@ app.use(async (req, res, next) => {
     return requireClientePageAuth(req, res, next);
   }
   if (
-    req.path === "/api/dashboard/cliente" ||
-    req.path === "/api/dashboard/cliente/perfil" ||
-    req.path.startsWith("/api/inventario/")
+    req.path.startsWith("/api/dashboard/cliente") ||
+    req.path.startsWith("/api/inventario/") ||
+    req.path.startsWith("/api/catastro/")
   ) {
     return requireClienteApiAuth({ requirePasswordChanged: true })(req, res, next);
   }
@@ -442,6 +474,13 @@ app.post("/api/auth/cliente/login", async (req, res) => {
     });
     if (!out.ok) {
       registerClientLoginFailed(key);
+      if (out.reason === "plan_restricted") {
+        return res.status(403).json({
+          ok: false,
+          error: "El acceso al Panel Web requiere un Plan Básico o superior. ¡Podés actualizar tu plan desde WhatsApp!",
+          code: "PLAN_RESTRICTED",
+        });
+      }
       return res.status(401).json({ ok: false, error: "Credenciales inválidas" });
     }
     clearClientLoginAttempts(key);
@@ -476,6 +515,10 @@ app.post("/api/auth/cliente/logout", async (req, res) => {
 app.get("/api/auth/cliente/session", async (req, res) => {
   const ses = await leerSesionCliente(req);
   if (!ses.ok) return res.json({ ok: false });
+  const plan = String(ses.user?.plan || "").toLowerCase();
+  if (plan === "gratis" || !plan) {
+    return res.json({ ok: false, error: "plan_restricted" });
+  }
   return res.json({
     ok: true,
     session: {
@@ -515,6 +558,8 @@ app.get("/api/health", (_req, res) => {
     version: "1.0.0",
   });
 });
+
+app.use("/api/catastro", require("./services/api_catastro"));
 
 app.get("/health", (_req, res) => {
   res.json({
@@ -617,8 +662,20 @@ app.get("/dashboard/metricas", (_req, res) => {
   res.sendFile(path.join(__dirname, "..", "frontend", "public", "metricas.html"));
 });
 
+app.get("/dashboard/ia", (_req, res) => {
+  res.sendFile(path.join(__dirname, "..", "frontend", "public", "ia.html"));
+});
+
 app.get("/dashboard/campanas", (_req, res) => {
   res.sendFile(path.join(__dirname, "..", "frontend", "public", "campanas.html"));
+});
+
+app.get("/dashboard/planes", (_req, res) => {
+  res.sendFile(path.join(__dirname, "..", "frontend", "public", "planes.html"));
+});
+
+app.get("/dashboard/precios", (_req, res) => {
+  res.sendFile(path.join(__dirname, "..", "frontend", "public", "precios.html"));
 });
 
 app.get("/casos-reales", (_req, res) => {
@@ -1208,11 +1265,128 @@ app.get("/api/dashboard/admin/usuarios", async (req, res) => {
   try {
     const limit = Number(req.query.limit || 20);
     const usuarios = await getUltimosUsuarios(limit);
+
+    // Buscamos todos los delegados/integrantes de campo
+    const telefonos = await query(
+      `
+        SELECT t.id, t.usuario_principal_id, t.whatsapp_autorizado, t.nombre_contacto, t.rol, t.activo, t.aceptado, t.creado_en,
+               u.nombre AS owner_nombre, u.whatsapp AS owner_whatsapp
+        FROM telefonos_autorizados t
+        LEFT JOIN usuarios u ON u.id = t.usuario_principal_id
+        ORDER BY t.creado_en DESC
+      `
+    );
+
+    // Mapeamos los delegados a un formato virtual de usuario
+    const virtualUsers = telefonos.rows.map(t => ({
+      id: `t_${t.id}`,
+      nombre: t.nombre_contacto,
+      whatsapp: t.whatsapp_autorizado,
+      whatsapp_real: t.whatsapp_autorizado,
+      whatsapp_jid: null,
+      provincia: "",
+      partido: "",
+      plan: "gratis",
+      activo: t.activo && t.aceptado,
+      creado_en: t.creado_en,
+      perfil_productivo: t.rol ? `rol:${t.rol}` : "delegado",
+      consultas_total: 0,
+      tokens_consultas: 0,
+      ultima_consulta: null,
+      cultivos_activos: 0,
+      movimientos_stock_ganadero: 0,
+      es_invitado: true,
+      aceptado: t.aceptado,
+      rol: t.rol,
+      usuario_principal_id: t.usuario_principal_id,
+      owner_nombre: t.owner_nombre,
+    }));
+
+    // Combinamos ambas listas y ordenamos por fecha de creación descendente
+    const allUsers = [...usuarios, ...virtualUsers];
+    allUsers.sort((a, b) => new Date(b.creado_en) - new Date(a.creado_en));
+
     res.setHeader("Cache-Control", "private, no-store, max-age=0, must-revalidate");
     res.setHeader("Pragma", "no-cache");
-    return res.json({ ok: true, usuarios });
+    return res.json({ ok: true, usuarios: allUsers });
   } catch (error) {
     console.error("Fallo dashboard admin usuarios:", error.message);
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+app.get("/api/dashboard/admin/telefonos", async (req, res) => {
+  try {
+    const result = await query(
+      `
+        SELECT t.id, t.usuario_principal_id, t.whatsapp_autorizado, t.nombre_contacto, t.rol, t.activo, t.aceptado, t.creado_en,
+               u.nombre AS owner_nombre, u.whatsapp AS owner_whatsapp
+        FROM telefonos_autorizados t
+        LEFT JOIN usuarios u ON u.id = t.usuario_principal_id
+        ORDER BY t.creado_en DESC
+      `
+    );
+    res.setHeader("Cache-Control", "private, no-store, max-age=0, must-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    return res.json({ ok: true, telefonos: result.rows });
+  } catch (error) {
+    console.error("Fallo dashboard admin telefonos:", error.message);
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+
+app.get("/api/dashboard/admin/planes", async (req, res) => {
+  try {
+    const r = await query(
+      `SELECT plan_nombre, precio, limite_audios_semanal, limite_fotos_semanal, limite_consultas_semanal
+       FROM planes_config
+       ORDER BY precio ASC`
+    );
+    res.setHeader("Cache-Control", "private, no-store, max-age=0, must-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    return res.json({ ok: true, data: r.rows });
+  } catch (error) {
+    console.error("Fallo api /api/dashboard/admin/planes:", error.message);
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+app.post("/api/dashboard/admin/planes/update", async (req, res) => {
+  try {
+    const { plan_nombre, precio, limite_audios_semanal, limite_fotos_semanal, limite_consultas_semanal } = req.body;
+    if (!plan_nombre) {
+      return res.status(400).json({ ok: false, error: "plan_nombre es requerido" });
+    }
+    const r = await query(
+      `UPDATE planes_config
+       SET precio = $2,
+           limite_audios_semanal = $3,
+           limite_fotos_semanal = $4,
+           limite_consultas_semanal = $5,
+           actualizado_en = NOW()
+       WHERE plan_nombre = $1
+       RETURNING *`,
+      [
+        plan_nombre,
+        Number(precio || 0),
+        Number(limite_audios_semanal),
+        Number(limite_fotos_semanal),
+        Number(limite_consultas_semanal)
+      ]
+    );
+    if (!r.rows[0]) {
+      return res.status(404).json({ ok: false, error: "Plan no encontrado" });
+    }
+    try {
+      const { actualizarPrecioCache } = require("./services/planes");
+      actualizarPrecioCache(plan_nombre, precio);
+    } catch (e) {
+      console.error("[index] Error al actualizar caché de precios de planes:", e.message);
+    }
+    return res.json({ ok: true, data: r.rows[0] });
+  } catch (error) {
+    console.error("Fallo api /api/dashboard/admin/planes/update:", error.message);
     return res.status(500).json({ ok: false, error: error.message });
   }
 });
@@ -1579,7 +1753,7 @@ app.get("/api/dashboard/admin/templates/preview", async (req, res) => {
     const template = String(req.query.template || "").trim().toLowerCase();
     const planReq = String(req.query.plan || "").trim().toLowerCase();
     const usuarioIdReq = req.query.usuarioId ? Number(req.query.usuarioId) : null;
-    const plan = ["gratis", "basico", "pro"].includes(planReq) ? planReq : "gratis";
+    const plan = ["gratis", "basico", "pro", "pro_max"].includes(planReq) ? planReq : "gratis";
     if (!template) {
       return res.status(400).json({ ok: false, error: "Falta query.template" });
     }
@@ -1646,10 +1820,14 @@ app.get("/api/dashboard/admin/templates/preview", async (req, res) => {
 
 app.post("/api/dashboard/admin/usuario-accion", async (req, res) => {
   try {
-    const usuarioId = Number(req.body?.usuarioId);
+    const rawId = req.body?.usuarioId;
+    const isDelegate = typeof rawId === "string" && rawId.startsWith("t_");
+    const delegateId = isDelegate ? Number(rawId.replace("t_", "")) : null;
+    const usuarioId = isDelegate ? null : Number(rawId);
     const accion = String(req.body?.accion || "").trim().toLowerCase();
     const planObjetivoRaw = req.body?.planObjetivo;
-    if (!usuarioId || !accion) {
+
+    if ((!usuarioId && !delegateId) || !accion) {
       return res.status(400).json({ ok: false, error: "Falta usuarioId o accion" });
     }
     if (usuarioId === 1) {
@@ -1657,36 +1835,52 @@ app.post("/api/dashboard/admin/usuario-accion", async (req, res) => {
     }
 
     let usuario = null;
-    if (accion === "pausar") {
-      usuario = await setActivoUsuario(usuarioId, false);
-    } else if (accion === "activar") {
-      usuario = await setActivoUsuario(usuarioId, true);
-    } else if (accion === "eliminar") {
-      usuario = await eliminarUsuarioSoft(usuarioId);
-    } else if (accion === "cambiar_plan") {
-      const planObjetivo = String(planObjetivoRaw || "").trim().toLowerCase();
-      if (!["gratis", "basico", "pro"].includes(planObjetivo)) {
-        return res.status(400).json({ ok: false, error: "planObjetivo inválido. Usar: gratis|basico|pro" });
+
+    if (isDelegate) {
+      if (accion === "pausar") {
+        const r = await query(`UPDATE telefonos_autorizados SET activo = false WHERE id = $1 RETURNING id, nombre_contacto AS nombre, activo`, [delegateId]);
+        usuario = r.rows[0] || null;
+      } else if (accion === "activar") {
+        const r = await query(`UPDATE telefonos_autorizados SET activo = true WHERE id = $1 RETURNING id, nombre_contacto AS nombre, activo`, [delegateId]);
+        usuario = r.rows[0] || null;
+      } else if (accion === "eliminar") {
+        const r = await query(`DELETE FROM telefonos_autorizados WHERE id = $1 RETURNING id, nombre_contacto AS nombre`, [delegateId]);
+        usuario = r.rows[0] || { id: delegateId, nombre: "Delegado Eliminado" };
+      } else {
+        return res.status(400).json({ ok: false, error: "Acción no soportada para integrante de equipo" });
       }
-      const rPlan = await query(
-        `
-          UPDATE usuarios
-          SET plan = $2, plan_activo_hasta = NULL
-          WHERE id = $1
-          RETURNING id, nombre, whatsapp, plan, activo
-        `,
-        [usuarioId, planObjetivo]
-      );
-      usuario = rPlan.rows[0] || null;
     } else {
-      return res.status(400).json({
-        ok: false,
-        error: "Accion invalida. Usar: activar|pausar|eliminar|cambiar_plan",
-      });
+      if (accion === "pausar") {
+        usuario = await setActivoUsuario(usuarioId, false);
+      } else if (accion === "activar") {
+        usuario = await setActivoUsuario(usuarioId, true);
+      } else if (accion === "eliminar") {
+        usuario = await eliminarUsuarioSoft(usuarioId);
+      } else if (accion === "cambiar_plan") {
+        const planObjetivo = String(planObjetivoRaw || "").trim().toLowerCase();
+        if (!["gratis", "basico", "pro", "pro_max"].includes(planObjetivo)) {
+          return res.status(400).json({ ok: false, error: "planObjetivo inválido. Usar: gratis|basico|pro|pro_max" });
+        }
+        const rPlan = await query(
+          `
+            UPDATE usuarios
+            SET plan = $2, plan_activo_hasta = NULL
+            WHERE id = $1
+            RETURNING id, nombre, whatsapp, plan, activo
+          `,
+          [usuarioId, planObjetivo]
+        );
+        usuario = rPlan.rows[0] || null;
+      } else {
+        return res.status(400).json({
+          ok: false,
+          error: "Accion invalida. Usar: activar|pausar|eliminar|cambiar_plan",
+        });
+      }
     }
 
     if (!usuario) {
-      return res.status(404).json({ ok: false, error: "Usuario no encontrado" });
+      return res.status(404).json({ ok: false, error: "Usuario o delegado no encontrado" });
     }
     return res.json({ ok: true, accion, usuario });
   } catch (error) {
@@ -1748,10 +1942,10 @@ app.post("/api/dashboard/admin/ejecutar-cambio-plan-wsp", async (req, res) => {
         error: "Falta body.whatsapp (número con código país o JID …@lid)",
       });
     }
-    if (!["basico", "pro", "gratis"].includes(planObjetivo)) {
+    if (!["basico", "pro", "pro_max", "gratis"].includes(planObjetivo)) {
       return res.status(400).json({
         ok: false,
-        error: "planObjetivo inválido. Usar: basico | pro | gratis",
+        error: "planObjetivo inválido. Usar: basico | pro | pro_max | gratis",
       });
     }
     const resultado = await enviarCambioPlanWhatsapp({
@@ -1851,6 +2045,882 @@ app.get("/api/dashboard/cliente", async (req, res) => {
   }
 });
 
+app.post("/api/dashboard/cliente/consulta", async (req, res) => {
+  try {
+    const usuarioId = req.clienteSession?.user?.id;
+    if (!usuarioId) {
+      return res.status(401).json({ ok: false, error: "No autorizado" });
+    }
+    const { consulta } = req.body;
+    if (!consulta || !consulta.trim()) {
+      return res.status(400).json({ ok: false, error: "Consulta vacía" });
+    }
+
+    // 1. Obtener datos del usuario
+    const usuarioResult = await query(
+      `
+        SELECT id, nombre, email, whatsapp, provincia, partido, plan, activo, lat, lng
+        FROM usuarios
+        WHERE id = $1
+        LIMIT 1
+      `,
+      [usuarioId]
+    );
+    const usuario = usuarioResult.rows[0];
+    if (!usuario) {
+      return res.status(404).json({ ok: false, error: "Usuario no encontrado" });
+    }
+
+    // Formateador de fecha simple YYYY-MM-DD
+    const formatToISODate = (val) => {
+      if (!val) return null;
+      const d = new Date(val);
+      if (isNaN(d.getTime())) return null;
+      return d.toISOString().slice(0, 10);
+    };
+
+    // 2. Obtener precios de hoy (todos los precios de la fecha máxima)
+    const maxFechaPreciosRes = await query("SELECT MAX(fecha) AS fecha FROM precios");
+    const maxFechaPrecios = maxFechaPreciosRes.rows[0]?.fecha;
+    let preciosItems = [];
+    if (maxFechaPrecios) {
+      const preciosRes = await query(
+        "SELECT cultivo, mercado, precio, moneda FROM precios WHERE fecha = $1",
+        [maxFechaPrecios]
+      );
+      preciosItems = preciosRes.rows;
+    }
+    const precios = { fecha: formatToISODate(maxFechaPrecios), items: preciosItems };
+
+    // 3. Obtener tipo de cambio de hoy
+    const maxFechaTipoCambioRes = await query("SELECT MAX(fecha) AS fecha FROM tipo_cambio");
+    const maxFechaTipoCambio = maxFechaTipoCambioRes.rows[0]?.fecha;
+    let tipoCambioItems = [];
+    if (maxFechaTipoCambio) {
+      const tipoCambioRes = await query(
+        "SELECT tipo, valor FROM tipo_cambio WHERE fecha = $1",
+        [maxFechaTipoCambio]
+      );
+      tipoCambioItems = tipoCambioRes.rows;
+    }
+    const tipoCambio = { fecha: formatToISODate(maxFechaTipoCambio), items: tipoCambioItems };
+
+    // 4. Obtener clima de su zona si tiene coordenadas
+    let climaItems = [];
+    if (usuario.lat != null && usuario.lng != null) {
+      try {
+        const { obtenerClimaFresco } = require("./templates/base");
+        const cl = await obtenerClimaFresco(usuario.lat, usuario.lng);
+        climaItems = cl?.items || [];
+      } catch (eClima) {
+        console.error("Error al obtener clima para consulta chat:", eClima.message);
+      }
+    }
+
+    // 5. Llamar a construirRespuestaInteligenteGeneral
+    const { construirRespuestaInteligenteGeneral } = require("./services/consultas/legacy_helpers");
+    const respuesta = await construirRespuestaInteligenteGeneral({
+      pregunta: consulta.trim(),
+      usuario,
+      precios,
+      tipoCambio,
+      clima: climaItems,
+      nivel: "INTERMEDIO"
+    });
+
+    // 6. Guardar la consulta en historial_consultas
+    try {
+      const { guardarConsulta } = require("./models/consulta");
+      await guardarConsulta({
+        usuarioId: usuario.id,
+        whatsapp: usuario.whatsapp,
+        pregunta: consulta.trim(),
+        respuesta: respuesta,
+        tokensUsados: null
+      });
+    } catch (eSave) {
+      console.error("Error al guardar consulta en historial desde panel web:", eSave.message);
+    }
+
+    return res.json({ ok: true, respuesta });
+  } catch (error) {
+    console.error("Error en POST /api/dashboard/cliente/consulta:", error.message);
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+app.get("/api/dashboard/cliente/clima", async (req, res) => {
+  try {
+    const lat = req.query.lat ? Number(req.query.lat) : null;
+    const lng = req.query.lng ? Number(req.query.lng) : null;
+    if (lat === null || lng === null || !Number.isFinite(lat) || !Number.isFinite(lng)) {
+      return res.status(400).json({ ok: false, error: "lat y lng obligatorios" });
+    }
+    const { obtenerClimaFresco } = require("./templates/base");
+    const cl = await obtenerClimaFresco(lat, lng);
+    return res.json({ ok: true, clima: cl?.items || [] });
+  } catch (error) {
+    console.error("Fallo GET /api/dashboard/cliente/clima:", error.message);
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+app.get("/api/dashboard/cliente/clima/horas", async (req, res) => {
+  try {
+    const lat = req.query.lat ? Number(req.query.lat) : null;
+    const lng = req.query.lng ? Number(req.query.lng) : null;
+    if (lat === null || lng === null || !Number.isFinite(lat) || !Number.isFinite(lng)) {
+      return res.status(400).json({ ok: false, error: "lat y lng obligatorios" });
+    }
+    const axios = require("axios");
+    const response = await axios.get("https://api.open-meteo.com/v1/forecast", {
+      params: {
+        latitude: lat,
+        longitude: lng,
+        hourly: "temperature_2m,relative_humidity_2m,wind_speed_10m,precipitation_probability,precipitation",
+        timezone: "America/Argentina/Buenos_Aires",
+        forecast_days: 2,
+        windspeed_unit: "kmh"
+      },
+      timeout: 10000
+    });
+    
+    const hourly = response.data?.hourly;
+    if (!hourly || !Array.isArray(hourly.time)) {
+      return res.json({ ok: true, horas: [] });
+    }
+    
+    const horas = hourly.time.map((time, i) => {
+      const temp = hourly.temperature_2m?.[i];
+      const hum = hourly.relative_humidity_2m?.[i];
+      const wind = hourly.wind_speed_10m?.[i];
+      const precipProb = hourly.precipitation_probability?.[i];
+      const precip = hourly.precipitation?.[i];
+      
+      // Determine spraying condition
+      let pulverizacion = "optimo"; // green
+      const detallesPulv = [];
+      
+      if (wind >= 15) {
+        pulverizacion = "no_recomendado"; // red
+        detallesPulv.push("Viento excesivo (>=15 km/h)");
+      } else if (wind > 10) {
+        pulverizacion = "moderado"; // yellow
+        detallesPulv.push("Viento moderado (10-15 km/h)");
+      }
+      
+      if (hum < 40) {
+        pulverizacion = "no_recomendado";
+        detallesPulv.push("Humedad baja (<40%)");
+      } else if (hum > 80) {
+        pulverizacion = "moderado";
+        detallesPulv.push("Humedad alta (>80%)");
+      }
+      
+      if (temp >= 30) {
+        pulverizacion = "no_recomendado";
+        detallesPulv.push("Temperatura alta (>=30°C)");
+      } else if (temp < 10) {
+        pulverizacion = "moderado";
+        detallesPulv.push("Temperatura baja (<10°C)");
+      }
+      
+      if (precipProb > 30 || precip > 0) {
+        pulverizacion = "no_recomendado";
+        detallesPulv.push("Probabilidad de lluvia o precipitación");
+      }
+      
+      return {
+        fecha: time,
+        temperatura: temp,
+        humedad: hum,
+        viento: wind,
+        probabilidad_lluvia: precipProb,
+        precipitacion: precip,
+        pulverizacion,
+        motivo_pulverizacion: detallesPulv.join(", ") || "Condiciones óptimas"
+      };
+    });
+    
+    return res.json({ ok: true, horas });
+  } catch (error) {
+    console.error("Fallo GET /api/dashboard/cliente/clima/horas:", error.message);
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+app.get("/api/dashboard/cliente/calendario", async (req, res) => {
+  try {
+    const usuarioId = req.clienteSession?.user?.id;
+    if (!usuarioId) {
+      return res.status(401).json({ ok: false, error: "No autorizado" });
+    }
+
+    const [
+      manualRes,
+      siembraRes,
+      pasturaRes,
+      animalRes,
+      telemetriaRes,
+      laborManualRes
+    ] = await Promise.all([
+      // 1. Manuales
+      query(
+        `SELECT e.id, e.titulo, e.descripcion, e.fecha_inicio, e.fecha_fin, e.categoria, e.lote_id, l.nombre AS lote_nombre, 'manual' AS origen
+         FROM eventos_calendario e
+         LEFT JOIN lotes l ON l.id = e.lote_id
+         WHERE e.usuario_id = $1`,
+        [usuarioId]
+      ),
+      // 2. Siembras
+      query(
+        `SELECT id, 'Siembra de ' || cultivo || ' - Lote ' || nombre AS titulo, 'Variedad: ' || COALESCE(variedad, 'N/C') || '. Densidad: ' || COALESCE(densidad::text, 'N/C') AS descripcion, fecha_siembra AS fecha_inicio, fecha_siembra AS fecha_fin, 'agricultura' AS categoria, id AS lote_id, nombre AS lote_nombre, 'siembra' AS origen
+         FROM lotes
+         WHERE usuario_id = $1 AND fecha_siembra IS NOT NULL`,
+        [usuarioId]
+      ),
+      // 3. Pasturas
+      query(
+        `SELECT id, 
+                CASE 
+                  WHEN tipo = 'ingreso_animales' THEN 'Ingreso a pastoreo - Lote ' || COALESCE(lote_nombre, '')
+                  WHEN tipo = 'retiro_animales' THEN 'Retiro de animales - Lote ' || COALESCE(lote_nombre, '')
+                  WHEN tipo = 'inicio_descanso' THEN 'Inicio de descanso - Lote ' || COALESCE(lote_nombre, '')
+                  WHEN tipo = 'rebrote' THEN 'Rebrote registrado - Lote ' || COALESCE(lote_nombre, '')
+                  WHEN tipo = 'pesaje_pasto' THEN 'Pesaje de pasto - Lote ' || COALESCE(lote_nombre, '')
+                  ELSE 'Pastura - Lote ' || COALESCE(lote_nombre, '')
+                END AS titulo,
+                COALESCE(observacion, '') || CASE WHEN cabezas IS NOT NULL THEN '. Cabezas: ' || cabezas::text ELSE '' END AS descripcion,
+                fecha_evento AS fecha_inicio,
+                fecha_evento AS fecha_fin,
+                'ganaderia' AS categoria,
+                lote_id,
+                lote_nombre,
+                tipo AS tipo_evento,
+                'pastura' AS origen
+         FROM eventos_pastura
+         WHERE usuario_id = $1`,
+        [usuarioId]
+      ),
+      // 4. Animales (veterinaria)
+      query(
+        `SELECT e.id,
+                UPPER(e.tipo_evento) || ' - Animal Caravana: ' || a.caravana AS titulo,
+                'Detalle: ' || COALESCE(e.valor_texto, '') || 
+                CASE WHEN e.valor_numerico IS NOT NULL THEN ' (Valor: ' || e.valor_numerico::text || ')' ELSE '' END || 
+                '. Obs: ' || COALESCE(e.observaciones, '') AS descripcion,
+                e.fecha AS fecha_inicio,
+                e.fecha AS fecha_fin,
+                'ganaderia' AS categoria,
+                a.lote_id,
+                l.nombre AS lote_nombre,
+                'animal' AS origen
+         FROM animales_eventos e
+         JOIN animales_individuales a ON a.id = e.animal_id
+         LEFT JOIN lotes l ON l.id = a.lote_id
+         WHERE e.usuario_id = $1`,
+        [usuarioId]
+      ),
+      // 5. Telemetria labores
+      query(
+        `SELECT t.id,
+                'Labor de ' || UPPER(t.tipo_labor) || ' - Lote ' || COALESCE(l.nombre, '') AS titulo,
+                'Insumo: ' || COALESCE(t.insumo_nombre, 'N/C') || '. Dosis promedio: ' || COALESCE(t.dosis_promedio::text, 'N/C') || ' ' || COALESCE(t.unidad_dosis, '') || '. Maquinaria: ' || COALESCE(t.marca_maquinaria, '') || ' ' || COALESCE(t.modelo_maquinaria, '') AS descripcion,
+                t.fecha_inicio,
+                t.fecha_fin,
+                'telemetria' AS categoria,
+                t.lote_id,
+                l.nombre AS lote_nombre,
+                'telemetria' AS origen
+         FROM telemetria_labores t
+         LEFT JOIN lotes l ON l.id = t.lote_id
+         WHERE t.usuario_id = $1`,
+        [usuarioId]
+      ),
+      // 6. Labor manual (WhatsApp machinery)
+      query(
+        `SELECT r.id,
+                'Labor de ' || UPPER(r.tipo_labor) || ' - Lote ' || COALESCE(r.lote_nombre, '') AS titulo,
+                'Insumo: ' || COALESCE(r.producto_insumo, 'N/C') || '. Dosis promedio: ' || COALESCE(r.dosis_promedio::text, 'N/C') || '. Hectáreas reales: ' || COALESCE(r.hectareas_reales::text, 'N/C') AS descripcion,
+                r.creado_en AS fecha_inicio,
+                r.creado_en AS fecha_fin,
+                'telemetria' AS categoria,
+                NULL::int AS lote_id,
+                r.lote_nombre,
+                'labor_manual' AS origen
+         FROM registro_labores_maquinaria r
+         WHERE r.usuario_id = $1`,
+        [usuarioId]
+      )
+    ]);
+
+    const items = [];
+
+    // Add manual events
+    manualRes.rows.forEach(r => {
+      items.push({
+        id: `manual_${r.id}`,
+        dbId: r.id,
+        titulo: r.titulo,
+        descripcion: r.descripcion,
+        fecha_inicio: r.fecha_inicio,
+        fecha_fin: r.fecha_fin,
+        categoria: r.categoria,
+        lote_id: r.lote_id,
+        lote_nombre: r.lote_nombre,
+        origen: r.origen
+      });
+    });
+
+    // Add sowing events
+    siembraRes.rows.forEach(r => {
+      items.push({
+        id: `siembra_${r.id}`,
+        titulo: r.titulo,
+        descripcion: r.descripcion,
+        fecha_inicio: r.fecha_inicio,
+        fecha_fin: r.fecha_fin,
+        categoria: r.categoria,
+        lote_id: r.lote_id,
+        lote_nombre: r.lote_nombre,
+        origen: r.origen
+      });
+    });
+
+    // Add pasture events & projected rest release
+    pasturaRes.rows.forEach(r => {
+      items.push({
+        id: `pastura_${r.id}`,
+        titulo: r.titulo,
+        descripcion: r.descripcion,
+        fecha_inicio: r.fecha_inicio,
+        fecha_fin: r.fecha_fin,
+        categoria: r.categoria,
+        lote_id: r.lote_id,
+        lote_nombre: r.lote_nombre,
+        origen: r.origen
+      });
+
+      if (r.tipo_evento === 'retiro_animales' || r.tipo_evento === 'inicio_descanso') {
+        const fechaBase = new Date(r.fecha_inicio);
+        const fechaSugerida = new Date(fechaBase.getTime() + (35 * 24 * 60 * 60 * 1000));
+        items.push({
+          id: `pastura_proyeccion_${r.id}`,
+          titulo: `Liberación sugerida - Lote ${r.lote_nombre || ''}`,
+          descripcion: `35 días de descanso sugeridos completados desde el ${fechaBase.toLocaleDateString('es-AR')}`,
+          fecha_inicio: fechaSugerida.toISOString(),
+          fecha_fin: fechaSugerida.toISOString(),
+          categoria: 'clima', // Clima/Descanso color dot
+          lote_id: r.lote_id,
+          lote_nombre: r.lote_nombre,
+          origen: 'pastura_descanso_proyeccion'
+        });
+      }
+    });
+
+    // Add animal events
+    animalRes.rows.forEach(r => {
+      items.push({
+        id: `animal_${r.id}`,
+        titulo: r.titulo,
+        descripcion: r.descripcion,
+        fecha_inicio: r.fecha_inicio,
+        fecha_fin: r.fecha_fin,
+        categoria: r.categoria,
+        lote_id: r.lote_id,
+        lote_nombre: r.lote_nombre,
+        origen: r.origen
+      });
+    });
+
+    // Add telemetria events
+    telemetriaRes.rows.forEach(r => {
+      items.push({
+        id: `telemetria_${r.id}`,
+        titulo: r.titulo,
+        descripcion: r.descripcion,
+        fecha_inicio: r.fecha_inicio,
+        fecha_fin: r.fecha_fin,
+        categoria: r.categoria,
+        lote_id: r.lote_id,
+        lote_nombre: r.lote_nombre,
+        origen: r.origen
+      });
+    });
+
+    // Add manual labor events
+    laborManualRes.rows.forEach(r => {
+      items.push({
+        id: `labor_manual_${r.id}`,
+        titulo: r.titulo,
+        descripcion: r.descripcion,
+        fecha_inicio: r.fecha_inicio,
+        fecha_fin: r.fecha_fin,
+        categoria: r.categoria,
+        lote_id: r.lote_id,
+        lote_nombre: r.lote_nombre,
+        origen: r.origen
+      });
+    });
+
+    return res.json({ ok: true, items });
+  } catch (error) {
+    console.error("Fallo GET /api/dashboard/cliente/calendario:", error.message);
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+app.post("/api/dashboard/cliente/calendario", async (req, res) => {
+  try {
+    const usuarioId = req.clienteSession?.user?.id;
+    if (!usuarioId) {
+      return res.status(401).json({ ok: false, error: "No autorizado" });
+    }
+    const { titulo, descripcion, fecha_inicio, fecha_fin, categoria, lote_id } = req.body;
+    if (!titulo) {
+      return res.status(400).json({ ok: false, error: "Título obligatorio" });
+    }
+    if (!fecha_inicio) {
+      return res.status(400).json({ ok: false, error: "Fecha de inicio obligatoria" });
+    }
+
+    const resInsert = await query(
+      `INSERT INTO eventos_calendario (usuario_id, titulo, descripcion, fecha_inicio, fecha_fin, categoria, lote_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING id`,
+      [usuarioId, titulo, descripcion || null, fecha_inicio, fecha_fin || null, categoria || 'admin', lote_id || null]
+    );
+
+    return res.json({ ok: true, id: resInsert.rows[0].id });
+  } catch (error) {
+    console.error("Fallo POST /api/dashboard/cliente/calendario:", error.message);
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+app.delete("/api/dashboard/cliente/calendario/:id", async (req, res) => {
+  try {
+    const usuarioId = req.clienteSession?.user?.id;
+    if (!usuarioId) {
+      return res.status(401).json({ ok: false, error: "No autorizado" });
+    }
+    const id = req.params.id;
+    const resDelete = await query(
+      `DELETE FROM eventos_calendario WHERE id = $1 AND usuario_id = $2`,
+      [id, usuarioId]
+    );
+    return res.json({ ok: true });
+  } catch (error) {
+    console.error("Fallo DELETE /api/dashboard/cliente/calendario/:id:", error.message);
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+app.post("/api/dashboard/cliente/telemetria/conectar", async (req, res) => {
+  try {
+    const usuarioId = req.clienteSession?.user?.id;
+    if (!usuarioId) return res.status(401).json({ ok: false, error: "No autorizado" });
+    
+    const { proveedor } = req.body;
+    if (!proveedor) return res.status(400).json({ ok: false, error: "Falta el proveedor" });
+    
+    const leafUserId = `leaf_usr_${proveedor}_${usuarioId}_${Math.random().toString(36).substring(2, 7)}`;
+    
+    await query(
+      `
+        INSERT INTO telemetria_conexiones (usuario_id, proveedor, leaf_user_id, estado, actualizado_en)
+        VALUES ($1, $2, $3, 'activo', NOW())
+        ON CONFLICT (usuario_id, proveedor) 
+        DO UPDATE SET estado = 'activo', leaf_user_id = EXCLUDED.leaf_user_id, actualizado_en = NOW()
+      `,
+      [usuarioId, proveedor, leafUserId]
+    );
+
+    let loteId = null;
+    let loteHectareas = 100;
+    const rLotes = await query("SELECT id, nombre, hectareas FROM lotes WHERE usuario_id = $1 LIMIT 1", [usuarioId]);
+    if (rLotes.rows.length > 0) {
+      loteId = rLotes.rows[0].id;
+      loteHectareas = Number(rLotes.rows[0].hectareas) || 100;
+    } else {
+      const rNewLote = await query(
+        "INSERT INTO lotes (usuario_id, nombre, hectareas, cultivo) VALUES ($1, 'Lote Norte', 120, 'Maíz') RETURNING id, hectareas",
+        [usuarioId]
+      );
+      loteId = rNewLote.rows[0].id;
+      loteHectareas = 120;
+    }
+
+    const marca = proveedor === 'john_deere' ? 'John Deere' : proveedor === 'climate_fieldview' ? 'Climate FieldView' : 'Case IH';
+    await query("DELETE FROM telemetria_labores WHERE usuario_id = $1 AND marca_maquinaria = $2", [
+      usuarioId,
+      marca
+    ]);
+
+    if (proveedor === 'john_deere') {
+      await query(
+        `
+          INSERT INTO telemetria_labores 
+            (usuario_id, lote_id, tipo_labor, fecha_inicio, fecha_fin, hectareas_reales, velocidad_promedio, insumo_nombre, dosis_promedio, unidad_dosis, marca_maquinaria, modelo_maquinaria, externo_job_id)
+          VALUES 
+            ($1, $2, 'siembra', CURRENT_DATE - INTERVAL '15 days', CURRENT_DATE - INTERVAL '12 days', $3 * 0.98, 8.5, 'DK 72-10 Híbrido Maíz', 78000, 'semillas/ha', 'John Deere', 'DB88 24 Filas Gen 4', $4)
+        `,
+        [usuarioId, loteId, loteHectareas, `jd_job_seeding_${usuarioId}`]
+      );
+      await query(
+        `
+          INSERT INTO telemetria_labores 
+            (usuario_id, lote_id, tipo_labor, fecha_inicio, fecha_fin, hectareas_reales, velocidad_promedio, insumo_nombre, dosis_promedio, unidad_dosis, marca_maquinaria, modelo_maquinaria, externo_job_id)
+          VALUES 
+            ($1, $2, 'cosecha', CURRENT_DATE - INTERVAL '2 days', CURRENT_DATE, $3 * 0.99, 5.8, 'Maíz Grano', 9.4, 'tn/ha', 'John Deere', 'S780 Combine & Draper 45ft', $4)
+        `,
+        [usuarioId, loteId, loteHectareas, `jd_job_harvest_${usuarioId}`]
+      );
+      
+      await query("DELETE FROM telemetria_lote_zonas WHERE lote_id = $1", [loteId]);
+      await query(
+        `
+          INSERT INTO telemetria_lote_zonas (lote_id, zona_etiqueta, porcentaje_area, hectareas_zona, rinde_historico)
+          VALUES 
+            ($1, 'Alta Productividad', 0.4500, $2 * 0.45, 11.20),
+            ($1, 'Media Productividad', 0.3500, $2 * 0.35, 8.90),
+            ($1, 'Baja Productividad (Loma)', 0.2000, $2 * 0.20, 6.10)
+        `,
+        [loteId, loteHectareas]
+      );
+    } else if (proveedor === 'climate_fieldview') {
+      await query(
+        `
+          INSERT INTO telemetria_labores 
+            (usuario_id, lote_id, tipo_labor, fecha_inicio, fecha_fin, hectareas_reales, velocidad_promedio, insumo_nombre, dosis_promedio, unidad_dosis, marca_maquinaria, modelo_maquinaria, externo_job_id)
+          VALUES 
+            ($1, $2, 'pulverizacion', CURRENT_DATE - INTERVAL '10 days', CURRENT_DATE - INTERVAL '9 days', $3, 16.2, 'Glifosato + Atrazina Premium', 2.5, 'litros/ha', 'Climate FieldView', 'Pla Map 3 3600', $4)
+        `,
+        [usuarioId, loteId, loteHectareas, `cfv_job_spray_${usuarioId}`]
+      );
+    } else if (proveedor === 'case_ih') {
+      await query(
+        `
+          INSERT INTO telemetria_labores 
+            (usuario_id, lote_id, tipo_labor, fecha_inicio, fecha_fin, hectareas_reales, velocidad_promedio, insumo_nombre, dosis_promedio, unidad_dosis, marca_maquinaria, modelo_maquinaria, externo_job_id)
+          VALUES 
+            ($1, $2, 'fertilizacion', CURRENT_DATE - INTERVAL '8 days', CURRENT_DATE - INTERVAL '7 days', $3 * 1.01, 12.0, 'Urea Granulada 46-0-0', 145.0, 'kg/ha', 'Case IH', 'Patriot 350 Variable Rate', $4)
+        `,
+        [usuarioId, loteId, loteHectareas, `case_job_fert_${usuarioId}`]
+      );
+    }
+
+    return res.json({ ok: true, message: `Proveedor ${proveedor} conectado con éxito y datos de telemetría simulados.` });
+  } catch (error) {
+    console.error("Error al conectar telemetría:", error.message);
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+app.post("/api/dashboard/cliente/telemetria/desconectar", async (req, res) => {
+  try {
+    const usuarioId = req.clienteSession?.user?.id;
+    if (!usuarioId) return res.status(401).json({ ok: false, error: "No autorizado" });
+    
+    const { proveedor } = req.body;
+    if (!proveedor) return res.status(400).json({ ok: false, error: "Falta el proveedor" });
+
+    await query(
+      `
+        UPDATE telemetria_conexiones 
+        SET estado = 'desconectado', actualizado_en = NOW()
+        WHERE usuario_id = $1 AND proveedor = $2
+      `,
+      [usuarioId, proveedor]
+    );
+
+    const marca = proveedor === 'john_deere' ? 'John Deere' : proveedor === 'climate_fieldview' ? 'Climate FieldView' : 'Case IH';
+    await query(
+      `
+        DELETE FROM telemetria_labores
+        WHERE usuario_id = $1 AND marca_maquinaria = $2
+      `,
+      [usuarioId, marca]
+    );
+
+    return res.json({ ok: true, message: `Proveedor ${proveedor} desconectado y sus labores eliminadas.` });
+  } catch (error) {
+    console.error("Error al desconectar telemetría:", error.message);
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+app.get("/api/dashboard/cliente/telefonos", async (req, res) => {
+  try {
+    const usuarioId = req.clienteSession?.user?.id;
+    const result = await query(
+      `
+        SELECT id, whatsapp_autorizado, nombre_contacto, rol, activo, aceptado, creado_en
+        FROM telefonos_autorizados
+        WHERE usuario_principal_id = $1
+        ORDER BY creado_en DESC
+      `,
+      [usuarioId]
+    );
+    return res.json({ ok: true, telefonos: result.rows });
+  } catch (error) {
+    console.error("Fallo listar telefonos delegados:", error.message);
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+app.post("/api/dashboard/cliente/telefonos", async (req, res) => {
+  try {
+    const usuarioId = req.clienteSession?.user?.id;
+    const { whatsapp_autorizado, nombre_contacto, rol } = req.body;
+
+    const whatsappNorm = String(whatsapp_autorizado || "").replace(/\D/g, "");
+    if (!whatsappNorm || whatsappNorm.length < 8) {
+      return res.status(400).json({
+        ok: false,
+        error: "Número de WhatsApp inválido. Ingresá solo dígitos (ej. 549...).",
+      });
+    }
+
+    if (!nombre_contacto || !String(nombre_contacto).trim()) {
+      return res.status(400).json({ ok: false, error: "El nombre de contacto es obligatorio." });
+    }
+
+    const rolNorm = String(rol || "").trim().toLowerCase().slice(0, 20) || "operario";
+
+    const { variantesTelefono } = require("./services/cliente_auth");
+    const variantes = variantesTelefono(whatsappNorm);
+
+    // Validar que el número no esté registrado como usuario principal de pago
+    const checkUser = await query(
+      `
+        SELECT id FROM usuarios 
+        WHERE (regexp_replace(COALESCE(whatsapp, ''), '\\D', '', 'g') = ANY($1::text[])
+           OR regexp_replace(COALESCE(whatsapp_real, ''), '\\D', '', 'g') = ANY($1::text[]))
+          AND plan <> 'gratis' AND plan IS NOT NULL
+        LIMIT 1
+      `,
+      [variantes]
+    );
+    if (checkUser.rows.length > 0) {
+      return res.status(400).json({
+        ok: false,
+        error: "Este número ya está registrado como una cuenta principal premium en el sistema.",
+      });
+    }
+
+    // Validar plan de suscripción del dueño del campo y sus límites de integrantes
+    const ownerUser = await query(`SELECT plan, plan_activo_hasta FROM usuarios WHERE id = $1`, [usuarioId]);
+    const planEfectivo = require("./services/planes").resolverPlanEfectivo({
+      plan: ownerUser.rows[0]?.plan || "gratis",
+      planActivoHasta: ownerUser.rows[0]?.plan_activo_hasta
+    });
+
+    const LIMITES_MIEMBROS = {
+      gratis: 0,
+      basico: 3,
+      pro: 6,
+      pro_max: 9999
+    };
+    const limiteMax = LIMITES_MIEMBROS[planEfectivo] || 0;
+
+    if (limiteMax === 0) {
+      return res.status(403).json({
+        ok: false,
+        error: "Para poder agregar integrantes de equipo de campo, necesitás subir a un plan superior (Básico, Pro o Pro Max)."
+      });
+    }
+
+    // Contar cuántos integrantes activos tiene actualmente el dueño
+    const countActive = await query(
+      `SELECT COUNT(*) FROM telefonos_autorizados WHERE usuario_principal_id = $1 AND activo = true`,
+      [usuarioId]
+    );
+    const actuales = parseInt(countActive.rows[0].count, 10);
+
+    // Upsert o insertar el número autorizado
+    const checkExist = await query(
+      `
+        SELECT id, activo FROM telefonos_autorizados 
+        WHERE regexp_replace(COALESCE(whatsapp_autorizado, ''), '\\D', '', 'g') = ANY($1::text[])
+      `,
+      [variantes]
+    );
+
+    const isNew = checkExist.rows.length === 0 || !checkExist.rows[0].activo;
+
+    if (isNew && actuales >= limiteMax) {
+      return res.status(403).json({
+        ok: false,
+        error: `Alcanzaste el límite de integrantes permitido para tu Plan ${planEfectivo.toUpperCase()} (máximo: ${limiteMax}). Subí de plan para agregar más.`
+      });
+    }
+
+    let result;
+    if (checkExist.rows.length > 0) {
+      result = await query(
+        `
+          UPDATE telefonos_autorizados 
+          SET usuario_principal_id = $1, nombre_contacto = $2, rol = $3, activo = true, aceptado = false, whatsapp_autorizado = $4
+          WHERE id = $5
+          RETURNING id, whatsapp_autorizado, nombre_contacto, rol, activo, aceptado, creado_en
+        `,
+        [usuarioId, String(nombre_contacto).trim(), rolNorm, whatsappNorm, checkExist.rows[0].id]
+      );
+    } else {
+      result = await query(
+        `
+          INSERT INTO telefonos_autorizados (usuario_principal_id, whatsapp_autorizado, nombre_contacto, rol, activo, aceptado)
+          VALUES ($1, $2, $3, $4, true, false)
+          RETURNING id, whatsapp_autorizado, nombre_contacto, rol, activo, aceptado, creado_en
+        `,
+        [usuarioId, whatsappNorm, String(nombre_contacto).trim(), rolNorm]
+      );
+    }
+
+    // Enviar mensaje de invitación por WhatsApp al operario
+    try {
+      const { sendMessage } = require("./config/whatsapp");
+      const nombrePrincipal = req.clienteSession?.user?.nombre;
+      const nombreNorm = String(nombre_contacto).trim();
+
+      // Verificar si ya es un usuario principal en el sistema
+      const checkIsAlreadyUser = await query(
+        `
+          SELECT id FROM usuarios 
+          WHERE regexp_replace(COALESCE(whatsapp, ''), '\\D', '', 'g') = ANY($1::text[])
+             OR regexp_replace(COALESCE(whatsapp_real, ''), '\\D', '', 'g') = ANY($1::text[])
+          LIMIT 1
+        `,
+        [variantes]
+      );
+      const yaEsUsuario = checkIsAlreadyUser.rows.length > 0;
+
+      let msgInvitacion;
+      if (yaEsUsuario) {
+        msgInvitacion = `¡Hola *${nombreNorm}*! 🌾\n\n` +
+          `*${nombrePrincipal || "Un administrador"}* te ha invitado a formar parte de su equipo de campo en *AgroHabilis* con el rol de *${rolNorm.toUpperCase()}*.\n\n` +
+          `⚠️ *AVISO IMPORTANTE:* Detectamos que ya tenés una cuenta individual registrada en el sistema. Al aceptar formar parte de este equipo, *dejarás de interactuar con tu perfil personal* y todos tus registros futuros (gastos, siembras, hacienda) *se guardarán directamente en el establecimiento de ${nombrePrincipal || "quien te invitó"}*.\n\n` +
+          `Para aceptar unirte al equipo de ${nombrePrincipal || "tu administrador"} como ${rolNorm.toUpperCase()}, respondé con la palabra *SI*.\n\n` +
+          `Si preferís mantener tu cuenta individual independiente y rechazar esta delegación, respondé *NO*.`;
+      } else {
+        msgInvitacion = `¡Hola *${nombreNorm}*! 🌾\n\n` +
+          `*${nombrePrincipal || "Un administrador"}* te ha invitado a formar parte de su equipo de campo en *AgroHabilis* con el rol de *${rolNorm.toUpperCase()}*.\n\n` +
+          `Tu cuenta operará bajo los límites del **Plan Gratis** de AgroHabilis (con límite de 25 consultas semanales, 4 audios y hasta 2 fotos por semana).\n\n` +
+          `Para aceptar esta invitación y poder registrar datos o consultar al asistente desde tu WhatsApp, respondé con la palabra *SI*.\n\n` +
+          `Si querés rechazar la invitación, respondé *NO*.`;
+      }
+
+      await sendMessage(whatsappNorm, msgInvitacion);
+    } catch (errWp) {
+      console.error("No se pudo enviar invitacion por WhatsApp al delegado:", errWp.message);
+    }
+
+    return res.json({ ok: true, telefono: result.rows[0] });
+  } catch (error) {
+    console.error("Fallo agregar telefono delegado:", error.message);
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+app.delete("/api/dashboard/cliente/telefonos/:id", async (req, res) => {
+  try {
+    const usuarioId = req.clienteSession?.user?.id;
+    const id = Number(req.params.id);
+
+    if (!Number.isInteger(id)) {
+      return res.status(400).json({ ok: false, error: "ID inválido" });
+    }
+
+    const result = await query(
+      `
+        DELETE FROM telefonos_autorizados 
+        WHERE id = $1 AND usuario_principal_id = $2
+        RETURNING id
+      `,
+      [id, usuarioId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ ok: false, error: "Teléfono no encontrado o no pertenece a tu cuenta." });
+    }
+
+    return res.json({ ok: true });
+  } catch (error) {
+    console.error("Fallo eliminar telefono delegado:", error.message);
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+app.post("/api/dashboard/cliente/telefonos/:id/reenviar", async (req, res) => {
+  try {
+    const usuarioId = req.clienteSession?.user?.id;
+    const id = Number(req.params.id);
+
+    if (!Number.isInteger(id)) {
+      return res.status(400).json({ ok: false, error: "ID inválido" });
+    }
+
+    const result = await query(
+      `
+        SELECT id, whatsapp_autorizado, nombre_contacto, rol, activo, aceptado
+        FROM telefonos_autorizados
+        WHERE id = $1 AND usuario_principal_id = $2
+      `,
+      [id, usuarioId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ ok: false, error: "Integrante no encontrado o no pertenece a tu cuenta." });
+    }
+
+    const t = result.rows[0];
+    if (t.aceptado) {
+      return res.status(400).json({ ok: false, error: "Este integrante ya aceptó la invitación." });
+    }
+
+    const { sendMessage } = require("./config/whatsapp");
+    const { variantesTelefono } = require("./services/cliente_auth");
+    const nombrePrincipal = req.clienteSession?.user?.nombre;
+    const nombreNorm = t.nombre_contacto;
+    const whatsappNorm = t.whatsapp_autorizado;
+    const rolNorm = t.rol;
+
+    const variantes = variantesTelefono(whatsappNorm);
+    const checkIsAlreadyUser = await query(
+      `
+        SELECT id FROM usuarios 
+        WHERE regexp_replace(COALESCE(whatsapp, ''), '\\D', '', 'g') = ANY($1::text[])
+           OR regexp_replace(COALESCE(whatsapp_real, ''), '\\D', '', 'g') = ANY($1::text[])
+        LIMIT 1
+      `,
+      [variantes]
+    );
+    const yaEsUsuario = checkIsAlreadyUser.rows.length > 0;
+
+    let msgInvitacion;
+    if (yaEsUsuario) {
+      msgInvitacion = `¡Hola *${nombreNorm}*! 🌾\n\n` +
+        `*${nombrePrincipal || "Un administrador"}* te ha vuelto a invitar a formar parte de su equipo de campo en *AgroHabilis* con el rol de *${rolNorm.toUpperCase()}*.\n\n` +
+        `⚠️ *AVISO IMPORTANTE:* Detectamos que ya tenés una cuenta individual registrada en el sistema. Al aceptar formar parte de este equipo, *dejarás de interactuar con tu perfil personal* y todos tus registros futuros (gastos, siembras, hacienda) *se guardarán directamente en el establecimiento de ${nombrePrincipal || "quien te invitó"}*.\n\n` +
+        `Para aceptar unirte al equipo de ${nombrePrincipal || "tu administrador"} como ${rolNorm.toUpperCase()}, respondé con la palabra *SI*.\n\n` +
+        `Si preferís mantener tu cuenta individual independiente y rechazar esta delegación, respondé *NO*.`;
+    } else {
+      msgInvitacion = `¡Hola *${nombreNorm}*! 🌾\n\n` +
+        `*${nombrePrincipal || "Un administrador"}* te ha vuelto a invitar a formar parte de su equipo de campo en *AgroHabilis* con el rol de *${rolNorm.toUpperCase()}*.\n\n` +
+        `Tu cuenta operará bajo los límites del **Plan Gratis** de AgroHabilis (con límite de 25 consultas semanales, 4 audios y hasta 2 fotos por semana).\n\n` +
+        `Para aceptar esta invitación y poder registrar datos o consultar al asistente desde tu WhatsApp, respondé con la palabra *SI*.\n\n` +
+        `Si querés rechazar la invitación, respondé *NO*.`;
+    }
+
+    await sendMessage(whatsappNorm, msgInvitacion);
+    return res.json({ ok: true, message: "Invitación re-enviada con éxito." });
+  } catch (error) {
+    console.error("Fallo re-enviar invitacion delegado:", error.message);
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
 app.get("/api/inventario/lotes", async (req, res) => {
   try {
     const usuarioId = req.clienteSession?.user?.id;
@@ -1871,16 +2941,187 @@ app.post("/api/inventario/lotes", async (req, res) => {
       req.body?.hectareas === undefined || req.body?.hectareas === "" ? null : Number(req.body.hectareas);
     const cultivo = req.body?.cultivo != null ? String(req.body.cultivo).trim() : null;
     const arrendado = Boolean(req.body?.arrendado);
+    const cliente = req.body?.cliente != null ? String(req.body.cliente).trim() : null;
+    const firma = req.body?.firma != null ? String(req.body.firma).trim() : null;
+    const provincia = req.body?.provincia != null ? String(req.body.provincia).trim() : null;
+    const partido = req.body?.partido != null ? String(req.body.partido).trim() : null;
+    const tipo = req.body?.tipo != null ? String(req.body.tipo).trim() : 'lote';
+    const lat = req.body?.lat != null && req.body?.lat !== "" ? Number(req.body.lat) : null;
+    const lng = req.body?.lng != null && req.body?.lng !== "" ? Number(req.body.lng) : null;
+
     const lote = await invCrearLote({
       usuarioId,
       nombre,
       hectareas: Number.isFinite(hectareas) ? hectareas : null,
       cultivo: cultivo || null,
       arrendado,
+      cliente: cliente || null,
+      firma: firma || null,
+      provincia: provincia || null,
+      partido: partido || null,
+      tipo: tipo || 'lote',
+      lat: Number.isFinite(lat) ? lat : null,
+      lng: Number.isFinite(lng) ? lng : null,
     });
     return res.json({ ok: true, lote });
   } catch (error) {
     console.error("Fallo POST /api/inventario/lotes:", error.message);
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+app.put("/api/inventario/lotes/:id", async (req, res) => {
+  try {
+    const usuarioId = req.clienteSession?.user?.id;
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return res.status(400).json({ ok: false, error: "ID inválido" });
+
+    const nombre = String(req.body?.nombre || "").trim();
+    if (!nombre) return res.status(400).json({ ok: false, error: "nombre obligatorio" });
+
+    const hectareas =
+      req.body?.hectareas === undefined || req.body?.hectareas === "" ? null : Number(req.body.hectareas);
+    const cultivo = req.body?.cultivo != null ? String(req.body.cultivo).trim() : null;
+    const arrendado = Boolean(req.body?.arrendado);
+    const cliente = req.body?.cliente != null ? String(req.body.cliente).trim() : null;
+    const firma = req.body?.firma != null ? String(req.body.firma).trim() : null;
+    const provincia = req.body?.provincia != null ? String(req.body.provincia).trim() : null;
+    const partido = req.body?.partido != null ? String(req.body.partido).trim() : null;
+    const tipo = req.body?.tipo != null ? String(req.body.tipo).trim() : 'lote';
+    const lat = req.body?.lat != null && req.body?.lat !== "" ? Number(req.body.lat) : null;
+    const lng = req.body?.lng != null && req.body?.lng !== "" ? Number(req.body.lng) : null;
+
+    const resUpdate = await query(
+      `
+        UPDATE lotes
+        SET nombre = $1, hectareas = $2, cultivo = $3, arrendado = $4, cliente = $5, firma = $6, provincia = $7, partido = $8, tipo = $9, lat = $10, lng = $11
+        WHERE id = $12 AND usuario_id = $13
+        RETURNING *
+      `,
+      [
+        nombre,
+        Number.isFinite(hectareas) ? hectareas : null,
+        cultivo || null,
+        arrendado,
+        cliente || null,
+        firma || null,
+        provincia || null,
+        partido || null,
+        tipo || 'lote',
+        Number.isFinite(lat) ? lat : null,
+        Number.isFinite(lng) ? lng : null,
+        id,
+        usuarioId
+      ]
+    );
+
+    if (resUpdate.rows.length === 0) {
+      return res.status(404).json({ ok: false, error: "Lote no encontrado o no pertenece a tu cuenta." });
+    }
+
+    return res.json({ ok: true, lote: resUpdate.rows[0] });
+  } catch (error) {
+    console.error("Fallo PUT /api/inventario/lotes:", error.message);
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+app.delete("/api/inventario/lotes/:id", async (req, res) => {
+  try {
+    const usuarioId = req.clienteSession?.user?.id;
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return res.status(400).json({ ok: false, error: "ID inválido" });
+
+    const result = await query(
+      `DELETE FROM lotes WHERE id = $1 AND usuario_id = $2 RETURNING id`,
+      [id, usuarioId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ ok: false, error: "Lote no encontrado o no pertenece a tu cuenta." });
+    }
+
+    return res.json({ ok: true, message: "Lote eliminado con éxito." });
+  } catch (error) {
+    console.error("Fallo DELETE /api/inventario/lotes:", error.message);
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+app.put("/api/inventario/firmas/renombrar", async (req, res) => {
+  try {
+    const usuarioId = req.clienteSession?.user?.id;
+    const oldName = String(req.body?.oldName || "").trim();
+    const newName = String(req.body?.newName || "").trim();
+
+    if (!oldName || !newName) {
+      return res.status(400).json({ ok: false, error: "oldName y newName son obligatorios" });
+    }
+
+    await query(
+      `UPDATE lotes SET firma = $1 WHERE usuario_id = $2 AND (firma = $3 OR (firma IS NULL AND $3 = ''))`,
+      [newName, usuarioId, oldName]
+    );
+
+    return res.json({ ok: true, message: "Firmas renombradas con éxito." });
+  } catch (error) {
+    console.error("Fallo renombrar firmas:", error.message);
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+app.delete("/api/inventario/firmas/:name", async (req, res) => {
+  try {
+    const usuarioId = req.clienteSession?.user?.id;
+    const name = String(req.params.name || "").trim();
+
+    await query(
+      `UPDATE lotes SET firma = NULL WHERE usuario_id = $1 AND (firma = $2 OR (firma IS NULL AND $2 = ''))`,
+      [usuarioId, name]
+    );
+
+    return res.json({ ok: true, message: "Firma eliminada de los lotes." });
+  } catch (error) {
+    console.error("Fallo eliminar firma:", error.message);
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+app.put("/api/inventario/campos/renombrar", async (req, res) => {
+  try {
+    const usuarioId = req.clienteSession?.user?.id;
+    const oldName = String(req.body?.oldName || "").trim();
+    const newName = String(req.body?.newName || "").trim();
+
+    if (!oldName || !newName) {
+      return res.status(400).json({ ok: false, error: "oldName y newName son obligatorios" });
+    }
+
+    await query(
+      `UPDATE lotes SET cliente = $1 WHERE usuario_id = $2 AND (cliente = $3 OR (cliente IS NULL AND $3 = ''))`,
+      [newName, usuarioId, oldName]
+    );
+
+    return res.json({ ok: true, message: "Campos renombrados con éxito." });
+  } catch (error) {
+    console.error("Fallo renombrar campos:", error.message);
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+app.delete("/api/inventario/campos/:name", async (req, res) => {
+  try {
+    const usuarioId = req.clienteSession?.user?.id;
+    const name = String(req.params.name || "").trim();
+
+    await query(
+      `UPDATE lotes SET cliente = NULL WHERE usuario_id = $1 AND (cliente = $2 OR (cliente IS NULL AND $2 = ''))`,
+      [usuarioId, name]
+    );
+
+    return res.json({ ok: true, message: "Campo eliminado de los lotes." });
+  } catch (error) {
+    console.error("Fallo eliminar campo:", error.message);
     return res.status(500).json({ ok: false, error: error.message });
   }
 });
@@ -2108,13 +3349,67 @@ app.post("/api/dashboard/cliente/perfil", async (req, res) => {
       });
     }
 
-    const actualizado = await actualizarUsuario(usuarioRow.id, {
-      nombre,
-      email,
-      provincia,
-      partido,
-      tipo_comercializacion: tipoCom,
-    });
+    const actualizado = await (async () => {
+      const zonas = req.body?.zonas;
+      let primaryProv = provincia;
+      let primaryPart = partido;
+
+      if (Array.isArray(zonas)) {
+        const { geocodificarZona } = require("./services/onboarding");
+        await query("DELETE FROM usuario_zonas WHERE usuario_id = $1", [usuarioRow.id]);
+        
+        const processedZonas = [];
+        for (let i = 0; i < zonas.length; i++) {
+          const z = zonas[i];
+          const prov = String(z.provincia || "").trim();
+          const part = String(z.partido || "").trim();
+          if (!prov || !part) continue;
+
+          let lat = z.lat != null ? Number(z.lat) : null;
+          let lng = z.lng != null ? Number(z.lng) : null;
+
+          if (lat === null || lng === null || !Number.isFinite(lat) || !Number.isFinite(lng)) {
+            try {
+              const geo = await geocodificarZona({ partido: part, provincia: prov });
+              if (geo && !geo.error && !geo.noMatch) {
+                lat = geo.lat;
+                lng = geo.lng;
+              }
+            } catch (err) {
+              console.error("Error geocodificando zona en perfil:", err.message);
+            }
+          }
+
+          await query(
+            `
+              INSERT INTO usuario_zonas (usuario_id, provincia, partido, lat, lng, prioridad, activa)
+              VALUES ($1, $2, $3, $4, $5, $6, true)
+              ON CONFLICT (usuario_id, provincia, partido) DO NOTHING
+            `,
+            [usuarioRow.id, prov, part, lat, lng, i + 1]
+          );
+          processedZonas.push({ provincia: prov, partido: part, lat, lng });
+        }
+
+        if (processedZonas.length > 0) {
+          primaryProv = processedZonas[0].provincia;
+          primaryPart = processedZonas[0].partido;
+          await query(
+            `UPDATE usuarios SET lat = $1, lng = $2 WHERE id = $3`,
+            [processedZonas[0].lat, processedZonas[0].lng, usuarioRow.id]
+          );
+        }
+      }
+
+      return actualizarUsuario(usuarioRow.id, {
+        nombre,
+        email,
+        provincia: primaryProv,
+        partido: primaryPart,
+        tipo_comercializacion: tipoCom,
+      });
+    })();
+
     if (!actualizado) {
       return res.status(404).json({ ok: false, error: "No se pudo actualizar usuario" });
     }
@@ -2172,8 +3467,21 @@ const programarJobs = () => {
     },
     { timezone: tz }
   );
+  cron.schedule(
+    "0 8,12,16,20 * * *",
+    async () => {
+      try {
+        const { ejecutarAutodiagnosticoIA } = require("./services/ia_health_check");
+        const res = await ejecutarAutodiagnosticoIA();
+        console.log(`[IA Health Check] Cron ejecutado: status=${res.status} latencia=${(res.elapsed/1000).toFixed(2)}s`);
+      } catch (error) {
+        console.error("[IA Health Check] Error en cron periódico:", error.message);
+      }
+    },
+    { timezone: tz }
+  );
   console.log(
-    "Cron configurado: pipeline diario + monitor de fuentes cada 30 min + reconcile MP cada 10 min (AR)."
+    "Cron configurado: pipeline diario + monitor de fuentes cada 30 min + reconcile MP cada 10 min + autodiagnóstico IA (AR)."
   );
 };
 
@@ -2188,6 +3496,16 @@ const startServer = async () => {
   iniciarCronRecolector();
   iniciarCronEnviador();
   programarJobs();
+  
+  // Ejecutar un autodiagnóstico inicial asíncrono no-bloqueante al iniciar
+  setTimeout(async () => {
+    try {
+      const { ejecutarAutodiagnosticoIA } = require("./services/ia_health_check");
+      await ejecutarAutodiagnosticoIA();
+    } catch (error) {
+      console.error("[IA Health Check] Error en autodiagnóstico inicial:", error.message);
+    }
+  }, 5000);
   try {
     await limpiarSesionesExpiradas();
   } catch (error) {

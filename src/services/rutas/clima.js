@@ -21,7 +21,7 @@ async function climaBdMenosDe3h(usuario) {
   return Date.now() - new Date(t).getTime() < 3 * 60 * 60 * 1000;
 }
 
-const rutaClima = async ({ mensaje, usuario }) => {
+const rutaClima = async ({ mensaje, usuario, periodo }) => {
   const frescoBd = usuario ? await climaBdMenosDe3h(usuario) : false;
   if (!frescoBd && usuario) {
     try {
@@ -31,11 +31,40 @@ const rutaClima = async ({ mensaje, usuario }) => {
     }
   }
 
-  const base = await H.responderClimaPuntual({ usuario, texto: mensaje });
+  let esConversacionActiva = false;
+  if (usuario?.id) {
+    try {
+      const rHist = await query(
+        `SELECT creado_en FROM historial_consultas 
+         WHERE usuario_id = $1 
+         ORDER BY creado_en DESC LIMIT 1`,
+        [usuario.id]
+      );
+      const ult = rHist.rows[0]?.creado_en;
+      if (ult && (Date.now() - new Date(ult).getTime()) < 15 * 60 * 1000) {
+        esConversacionActiva = true;
+      }
+    } catch (_err) {
+      /* ignoramos error de consulta */
+    }
+  }
+
+  const base = await H.responderClimaPuntual({ usuario, texto: mensaje, periodo });
   try {
+    const systemPrompt = [
+      "Sos AgroHabilis, un asistente de inteligencia agropecuaria para productores argentinos.",
+      "Tu tarea es mejorar y redactar el pronóstico del clima recibido en el Texto base, adaptándolo a un tono sumamente cordial y profesional argentino (es-AR, usando voseo obligatorio: querés, podés, tenés).",
+      "Pautas cruciales:",
+      "1) Calidad del lenguaje: Escribí en un español rioplatense perfecto y natural. NUNCA mezcles palabras en inglés ni uses traducciones literales incorrectas (por ejemplo: jamás digas 'partials', 'deceived', 'conocedores' ni otras palabras fuera de lugar o mal escritas). Traducí cualquier término inglés si aparece (ej. 'partials' -> parcialmente nublado).",
+      "2) Concisión y Claridad: Máximo 5 líneas. Hacé la respuesta extremadamente fácil de leer y prolija.",
+      "3) Fidelidad a los datos: Respetá estrictamente los números (temperaturas, milímetros de lluvia, heladas) del Texto base. Jamás inventes valores ni pronósticos que no figuren allí.",
+      esConversacionActiva
+        ? "4) Conversación activa: Ya venís chateando con el productor. NO saludes al inicio ni vuelvas a decir '¡Hola!' ni introducciones repetitivas. Respondé directamente sobre el clima de forma natural y fluida."
+        : "4) Saludo cálido: Podés abrir con un saludo breve y cordial si es la primera interacción, pero mantenelo ágil."
+    ].join("\n");
+
     const r = await H.generarConPromptLibre({
-      system:
-        "Sos AgroHabilis. Mejorá la redacción del clima en tono cordial (es-AR), máximo 5 líneas, sin inventar números distintos al bloque base.",
+      system: systemPrompt,
       user: `Pregunta del productor:\n${mensaje}\n\nTexto base (no contradecir):\n${base}`,
     });
     const texto = String(r?.texto || "").trim();

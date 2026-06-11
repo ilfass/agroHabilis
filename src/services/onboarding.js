@@ -7,18 +7,25 @@ const {
   guardarCultivosUsuario,
   actualizarUsuario,
   obtenerPerfil,
+  destinoWhatsappParaEnvio,
 } = require("../models/usuario");
 const { renderTemplate } = require("../templates");
-const { resolverPlanEfectivo } = require("./planes");
+const { resolverPlanEfectivo, PLAN_PRICES_CACHE } = require("./planes");
 
-const MENSAJE_BIENVENIDA = `Hola! Soy AgroHabilis 🌾, tu asistente agropecuario.
+const obtenerMensajeBienvenida = () => {
+  const pBasico = `$${Number(PLAN_PRICES_CACHE.basico || 22000).toLocaleString("es-AR")}`;
+  const pPro = `$${Number(PLAN_PRICES_CACHE.pro || 29000).toLocaleString("es-AR")}`;
+  const pProMax = `$${Number(PLAN_PRICES_CACHE.pro_max || 50000).toLocaleString("es-AR")}`;
+  return `Hola! Soy AgroHabilis 🌾, tu asistente agropecuario.
 Arrancás en Plan GRATIS y podés cambiarlo cuando quieras:
 - GRATIS: $0/mes
-- BASICO: $9.000/mes (QUIERO PLAN BASICO)
-- PRO: $18.000/mes (QUIERO PLAN PRO)
+- BASICO: ${pBasico}/mes (QUIERO PLAN BASICO)
+- PRO: ${pPro}/mes (QUIERO PLAN PRO)
+- PRO MAX: ${pProMax}/mes (QUIERO PLAN PRO MAX)
 
 Para empezar solo necesito tres datos rápidos.
 ¿Cuál es tu nombre y apellido?`;
+};
 
 const MENSAJE_PASO_2 =
   "¿En qué provincia y partido trabajás?\n" +
@@ -167,7 +174,7 @@ const parseZonasProvinciaPartido = (texto = "") => {
 };
 
 const geocodificarZona = async ({ partido, provincia }) => {
-  if (!partido || !provincia) return null;
+  if (!partido || !provincia) return { lat: null, lng: null, error: true };
   try {
     const response = await axios.get("https://nominatim.openstreetmap.org/search", {
       params: {
@@ -181,13 +188,21 @@ const geocodificarZona = async ({ partido, provincia }) => {
       },
       validateStatus: (s) => s === 200,
     });
+    
+    // Si la respuesta es un array vacío, Nominatim resolvió ok pero no encontró nada
+    if (Array.isArray(response.data) && response.data.length === 0) {
+      return { lat: null, lng: null, noMatch: true };
+    }
+
     const row = Array.isArray(response.data) ? response.data[0] : null;
     const lat = Number(row?.lat);
     const lng = Number(row?.lon);
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      return { lat: null, lng: null, noMatch: true };
+    }
     return { lat, lng };
   } catch (_error) {
-    return null;
+    return { lat: null, lng: null, error: true };
   }
 };
 
@@ -281,7 +296,7 @@ const iniciarOnboarding = async (numeroWhatsapp) => {
     datosTemporales: {},
     completado: false,
   });
-  return MENSAJE_BIENVENIDA;
+  return obtenerMensajeBienvenida();
 };
 
 const upsertPerfilProductivo = async (usuarioId, tipo) => {
@@ -392,31 +407,23 @@ const finalizarOnboarding = async ({ numeroWhatsapp, datos }) => {
     completado: true,
   });
 
-  let primerResumenOk = false;
-  let primerResumenMensaje = null;
-  const intentosMax = 2;
-  for (let intento = 1; intento <= intentosMax; intento += 1) {
-    try {
-      const generado = await renderTemplate("bienvenida", usuario, { enviar: false });
-      primerResumenMensaje = generado?.mensaje || null;
-      primerResumenOk = true;
-      break;
-    } catch (error) {
-      console.error(
-        `[Onboarding] No se pudo enviar primer resumen (intento ${intento}/${intentosMax}):`,
-        error.message
-      );
-      if (intento < intentosMax) {
-        await sleep(4000);
-      }
-    }
+  const { guardarConsulta } = require("../models/consulta");
+  const nombreUsuario = datos.nombre ? datos.nombre.split(" ")[0] : "productor";
+  const finalReply = `¡Listo, ${nombreUsuario}! Ya registré tus datos y configuré tu establecimiento. 🌾✨\n\nAhora sí, ¿querés que te cuente lo que podés consultarme o hacer conmigo como tu asistente del campo?`;
+
+  try {
+    await guardarConsulta({
+      usuarioId: usuario.id,
+      whatsapp: normalizarWhatsapp(numeroWhatsapp),
+      pregunta: "Completar Onboarding",
+      respuesta: finalReply,
+      iaProvider: "heuristica",
+    });
+  } catch (errLog) {
+    console.warn("[onboarding] Error al guardar consulta final de onboarding en historial:", errLog.message);
   }
 
-  if (primerResumenOk) {
-    // El cierre de onboarding queda integrado dentro del primer resumen.
-    return primerResumenMensaje || "✅ Perfil completado. Escribí *MI RESUMEN* para ver tu informe inicial.";
-  }
-  return "No pude enviarte el primer resumen en este momento ❗ Escribí *MI RESUMEN* y te lo mando al instante.";
+  return finalReply;
 };
 
 const procesarPasoOnboarding = async (numeroWhatsapp, mensaje) => {
@@ -445,27 +452,40 @@ const procesarPasoOnboarding = async (numeroWhatsapp, mensaje) => {
 
   if (estado.paso_actual === 2) {
     const zonas = parseZonasProvinciaPartido(texto);
-    const maxZonasOnboarding = 1;
-    const zonasLimitadas = zonas.slice(0, maxZonasOnboarding);
-    if (!zonasLimitadas.length) {
+    if (!zonas.length) {
       return "No pude leer la zona. Formato: Provincia, Partido - Provincia, Partido. Ej: Buenos Aires, Tandil - Córdoba, Río Cuarto";
     }
-    datos.zonas = zonasLimitadas;
-    datos.provincia = zonasLimitadas[0].provincia;
-    datos.partido = zonasLimitadas[0].partido;
+
+    const zonasValidas = [];
+    const zonasNoReconocidas = [];
+    for (const z of zonas) {
+      const geo = await geocodificarZona({ partido: z.partido, provincia: z.provincia });
+      if (geo.noMatch) {
+        zonasNoReconocidas.push(`${z.provincia}, ${z.partido}`);
+      } else {
+        zonasValidas.push({
+          provincia: z.provincia,
+          partido: z.partido,
+          lat: geo.lat,
+          lng: geo.lng
+        });
+      }
+    }
+
+    if (zonasNoReconocidas.length > 0) {
+      return `Lo siento, no logré reconocer la ubicación: *${zonasNoReconocidas.join(" / ")}*.\n\nPor favor, verificá que los nombres de la Provincia y el Partido estén bien escritos (ejemplo: *Buenos Aires, Tandil*) y volvé a enviármelos.`;
+    }
+
+    datos.zonas = zonasValidas;
+    datos.provincia = zonasValidas[0].provincia;
+    datos.partido = zonasValidas[0].partido;
     await actualizarEstadoOnboarding({
       numeroWhatsapp,
       pasoActual: 3,
       datosTemporales: datos,
       completado: false,
     });
-    const primera = zonasLimitadas[0];
-    const ackZonaUnica =
-      zonas.length > maxZonasOnboarding
-        ? `En plan *Gratis* solo registro *una* zona: *${primera.provincia}, ${primera.partido}*. ` +
-          `No guardé las otras ${zonas.length - maxZonasOnboarding} (con plan Básico podés hasta 3 y con Pro hasta 6).\n\n`
-        : "";
-    return ackZonaUnica + MENSAJE_PASO_3;
+    return MENSAJE_PASO_3;
   }
 
   if (estado.paso_actual === 3) {
@@ -579,7 +599,7 @@ const procesarCompletarPerfil = async (numeroWhatsapp, mensaje) => {
     plan: perfil?.plan,
     planActivoHasta: perfil?.plan_activo_hasta,
   });
-  const maxZonasPorPlan = planEfectivo === "pro" ? 6 : planEfectivo === "basico" ? 3 : 1;
+  const maxZonasPorPlan = 999;
   const opcion = extra.opcion;
   const paso = extra.paso;
 
@@ -725,7 +745,7 @@ const procesarCompletarPerfil = async (numeroWhatsapp, mensaje) => {
     return {
       enFlujo: true,
       respuesta: agregarAyudaComandos(
-        `Perfecto, registré ${zonas.length} zona(s) productiva(s) (máximo ${maxZonasPorPlan} por tu plan). ✅`
+        `Perfecto, registré ${zonas.length} zona(s) productiva(s). ✅`
       ),
     };
   }
@@ -868,10 +888,42 @@ const gestionarCompletarPerfil = async (numeroWhatsapp, mensaje) => {
   return procesarCompletarPerfil(numeroWhatsapp, mensaje);
 };
 
-const gestionarOnboarding = async (numeroWhatsapp, mensaje) => {
-  const usuario = await buscarPorWhatsapp(numeroWhatsapp);
+/**
+ * true si el bot está esperando respuesta en onboarding (no completado)
+ * o en el flujo COMPLETAR PERFIL (perfil_extra activo).
+ * Usado para no encimar la invitación al resumen diario.
+ */
+const usuarioPendienteRespuestaOnboarding = async (usuario) => {
+  if (!usuario?.id) return false;
+  const seen = new Set();
+  const pendienteDesdeEstado = (estado) => {
+    if (!estado) return false;
+    if (!estado.completado) return true;
+    return Boolean(extraState(estado)?.activo);
+  };
+  const tryKey = async (raw) => {
+    const s = String(raw || "").trim();
+    if (!s) return false;
+    const dedupe = s.includes("@") ? s : normalizarWhatsapp(s) || s.replace(/\D/g, "");
+    if (!dedupe || seen.has(dedupe)) return false;
+    seen.add(dedupe);
+    const estado = await obtenerEstadoOnboarding(s);
+    return pendienteDesdeEstado(estado);
+  };
+  if (await tryKey(destinoWhatsappParaEnvio(usuario))) return true;
+  if (await tryKey(usuario.whatsapp_jid)) return true;
+  if (await tryKey(usuario.whatsapp_real)) return true;
+  if (await tryKey(usuario.whatsapp)) return true;
+  return false;
+};
+
+const gestionarOnboarding = async (numeroWhatsapp, mensaje, numeroReal) => {
+  const usuario = await buscarPorWhatsapp(numeroWhatsapp, numeroReal);
+  if (usuario && usuario.es_delegado) {
+    return { enOnboarding: false, respuesta: null };
+  }
   const estado = await obtenerEstadoOnboarding(numeroWhatsapp);
-  const perfil = usuario ? await obtenerPerfil(numeroWhatsapp) : null;
+  const perfil = usuario ? await obtenerPerfil(numeroWhatsapp, numeroReal) : null;
   const tieneCultivos =
     Array.isArray(perfil?.cultivos) && perfil.cultivos.length > 0;
   let perfilMinimoCompleto = Boolean(
@@ -932,4 +984,6 @@ module.exports = {
   gestionarOnboarding,
   obtenerEstadoOnboarding,
   gestionarCompletarPerfil,
+  usuarioPendienteRespuestaOnboarding,
+  geocodificarZona,
 };

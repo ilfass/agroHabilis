@@ -59,7 +59,9 @@ const parsearAlerta = (texto) => {
 };
 
 const configurarAlerta = async (whatsapp, texto) => {
-  const usuario = await buscarPorWhatsapp(whatsapp);
+  const usuario = typeof whatsapp === "object" && whatsapp !== null
+    ? whatsapp
+    : await buscarPorWhatsapp(whatsapp);
   if (!usuario) {
     return "Para crear alertas primero necesitás completar tu registro.";
   }
@@ -86,7 +88,9 @@ const configurarAlerta = async (whatsapp, texto) => {
 };
 
 const listarAlertas = async (whatsapp) => {
-  const usuario = await buscarPorWhatsapp(whatsapp);
+  const usuario = typeof whatsapp === "object" && whatsapp !== null
+    ? whatsapp
+    : await buscarPorWhatsapp(whatsapp);
   if (!usuario) return "No encontré tu usuario.";
   const result = await query(
     `
@@ -108,7 +112,9 @@ const listarAlertas = async (whatsapp) => {
 };
 
 const cancelarAlerta = async (whatsapp, idAlerta) => {
-  const usuario = await buscarPorWhatsapp(whatsapp);
+  const usuario = typeof whatsapp === "object" && whatsapp !== null
+    ? whatsapp
+    : await buscarPorWhatsapp(whatsapp);
   if (!usuario) return "No encontré tu usuario.";
   const id = Number(idAlerta);
   if (!Number.isInteger(id)) return "ID de alerta inválido.";

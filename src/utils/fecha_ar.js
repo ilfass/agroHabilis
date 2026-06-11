@@ -15,6 +15,16 @@ const fechaCivilArgentinaDesdeValor = (v) => {
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
   const d = v instanceof Date ? v : new Date(v);
   if (Number.isNaN(d.getTime())) return null;
+  // Si es un objeto Date puro a medianoche UTC (devuelto por pg para tipo DATE),
+  // evitamos el desplazamiento del huso horario local (UTC-3) que restaría un día.
+  if (
+    d.getUTCHours() === 0 &&
+    d.getUTCMinutes() === 0 &&
+    d.getUTCSeconds() === 0 &&
+    d.getUTCMilliseconds() === 0
+  ) {
+    return d.toISOString().slice(0, 10);
+  }
   return d.toLocaleDateString("en-CA", { timeZone: TZ_AR });
 };
 

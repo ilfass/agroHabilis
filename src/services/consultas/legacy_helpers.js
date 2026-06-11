@@ -252,12 +252,23 @@ const normalizarTextoComando = (texto = "") =>
     .trim()
     .toUpperCase();
 
-const normMin = (texto = "") =>
-  String(texto)
+const normMin = (texto = "") => {
+  let str = String(texto);
+  const idx = str.indexOf("\n\n---");
+  if (idx !== -1) {
+    str = str.slice(0, idx);
+  } else {
+    const idx2 = str.indexOf("\n---");
+    if (idx2 !== -1) {
+      str = str.slice(0, idx2);
+    }
+  }
+  return str
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .trim();
+};
 
 const { TZ_AR, fechaISOArgentina, formatearFechaRelativaArgentina, fechaCivilArgentinaDesdeValor } = require("../../utils/fecha_ar");
 const { formatearFuentesGroundingWhatsApp } = require("../../utils/urls_legibles");
@@ -285,7 +296,7 @@ const CULTIVOS_ALIAS = [
   { key: "girasol", patrones: ["girasol"] },
   { key: "sorgo", patrones: ["sorgo"] },
   { key: "cebada", patrones: ["cebada"] },
-  { key: "papa", patrones: ["papa", "patata"] },
+  { key: "papa", patrones: ["papa", "patata", "spunta", "kennebec", "innovator"] },
   /** Economías regionales: no inferir desde el único grano del perfil si la pregunta lo nombra. */
   { key: "yerba_mate", patrones: ["yerba mate", "yerbamate", "yerba"] },
 ];
@@ -459,17 +470,64 @@ const responderDolarActual = async () =>
     etiquetaTipoCambioFn: etiquetaTipoCambio,
   });
 
-const responderClimaPuntual = async ({ usuario, texto = "" }) => {
+const responderClimaPuntual = async ({ usuario, texto = "", periodo = null }) => {
   const zonaTexto = extraerZonaTexto(texto);
   const zonaLabel = zonaTexto || [usuario?.partido, usuario?.provincia].filter(Boolean).join(", ") || "tu zona";
   const clima = await obtenerClimaFresco({ usuario, texto });
   const ordenados = Array.isArray(clima)
     ? [...clima].sort((a, b) => String(a.fecha || "").localeCompare(String(b.fecha || "")))
     : [];
-  const t = normMin(texto);
+  if (!ordenados.length) return `No tengo clima actualizado para ${zonaLabel} en este momento.`;
+
+  let p = periodo;
+  if (!p) {
+    const t = normMin(texto);
+    if (/(fin\s*de\s*semana|finde)/.test(t)) {
+      p = "fin_de_semana";
+    } else if (/(semana|extendido|pronostico\s*extendido|7\s*dias)/.test(t)) {
+      p = "semana";
+    } else if (/(pasado\s*manana|pasado\s*ma)/.test(t)) {
+      p = "pasado_manana";
+    } else if (/\b(manana|mañana)\b/.test(t)) {
+      p = "manana";
+    } else {
+      p = "hoy";
+    }
+  }
+
+  if (p === "fin_de_semana") {
+    const finDeSemanaDays = ordenados.filter(item => {
+      const date = new Date(item.fecha + "T12:00:00");
+      const day = date.getDay();
+      return day === 0 || day === 6; // 0 = Domingo, 6 = Sábado
+    });
+    if (finDeSemanaDays.length > 0) {
+      const lineas = finDeSemanaDays.map(day => {
+        const fechaTxt = toISODateParam(day.fecha) || "s/d";
+        const heladaTxt = day.helada ? "sí hubo riesgo de helada" : "no se detecta riesgo de helada";
+        const dayName = new Date(day.fecha + "T12:00:00").toLocaleDateString("es-AR", { weekday: "long" });
+        const dayNameCapitalized = dayName.charAt(0).toUpperCase() + dayName.slice(1);
+        return `• ${dayNameCapitalized} (${fechaTxt}): ${day.descripcion || "Condiciones variables"} · ${day.temp_min}°/${day.temp_max}° · lluvia ${Number(day.precipitacion || 0).toFixed(1)} mm · Helada: ${heladaTxt}.`;
+      });
+      return [`🌤️ Clima en ${zonaLabel} (Fin de semana):`, ...lineas].join("\n");
+    }
+  }
+
+  if (p === "semana" || p === "todos") {
+    const lineas = ordenados.map(day => {
+      const fechaTxt = toISODateParam(day.fecha) || "s/d";
+      const heladaTxt = day.helada ? "sí hubo riesgo de helada" : "no se detecta riesgo de helada";
+      const dayName = new Date(day.fecha + "T12:00:00").toLocaleDateString("es-AR", { weekday: "long" });
+      const dayNameCapitalized = dayName.charAt(0).toUpperCase() + dayName.slice(1);
+      return `• ${dayNameCapitalized} (${fechaTxt}): ${day.descripcion || "Condiciones variables"} · ${day.temp_min}°/${day.temp_max}° · lluvia ${Number(day.precipitacion || 0).toFixed(1)} mm · Helada: ${heladaTxt}.`;
+    });
+    return [`🌤️ Pronóstico extendido en ${zonaLabel} (7 días):`, ...lineas].join("\n");
+  }
+
   let offset = 0;
-  if (/(pasado\s*manana|pasado\s*ma)/.test(t)) offset = 2;
-  else if (/\b(manana|mañana)\b/.test(t)) offset = 1;
+  if (p === "pasado_manana") offset = 2;
+  else if (p === "manana") offset = 1;
+
   const hoy = ordenados[offset] || ordenados[0] || null;
   if (!hoy) return `No tengo clima actualizado para ${zonaLabel} en este momento.`;
   const fechaTxt = toISODateParam(hoy.fecha) || "s/d";
@@ -1091,4 +1149,5 @@ module.exports = {
   evaluarRespuestaIASinContexto,
   extraerTemaDesdePregunta,
   logConsultaRoute,
+  construirRespuestaInteligenteGeneral,
 };

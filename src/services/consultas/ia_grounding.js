@@ -129,7 +129,7 @@ const responderConsultaLibreIA = async ({ usuario, pregunta }, { generarConPromp
 };
 
 const generarSaludoIAControlado = async (
-  { usuario, pregunta },
+  { usuario, pregunta, historialReciente },
   { generarConPromptLibreFn, limpiarSalidaSaludoIAFn } = {}
 ) => {
   const generarConPromptLibre =
@@ -146,15 +146,15 @@ const generarSaludoIAControlado = async (
   const waNorm = normalizarWhatsapp(usuario?.whatsapp || "");
   let ultimoEsBroadcast = false;
   let textoBroadcast = "";
-  if (waNorm) {
+  if (waNorm || usuario?.id) {
     try {
       const ult = await query(
         `SELECT pregunta, respuesta 
          FROM historial_consultas 
-         WHERE whatsapp = $1 
+         WHERE (usuario_id = $1 AND usuario_id IS NOT NULL) OR whatsapp = $2 
          ORDER BY creado_en DESC 
          LIMIT 1`,
-        [waNorm]
+        [usuario?.id || null, waNorm]
       );
       if (ult.rows[0] && ult.rows[0].pregunta === PREGUNTA_MARCADOR_BROADCAST) {
         ultimoEsBroadcast = true;
@@ -169,19 +169,13 @@ const generarSaludoIAControlado = async (
     const system = [
       "Sos AgroHabilis, el asistente inteligente y experto para el productor agropecuario argentino.",
       "El productor te está respondiendo a un mensaje de campaña/outreach que le mandaste proactivamente.",
-      "Tu objetivo es dar una bienvenida sumamente cálida, distendida y profesional, explicando las increíbles capacidades de esta nueva versión del asistente, y preguntarle de forma natural qué necesita.",
+      "Tu objetivo es dar una bienvenida muy cálida, distendida y amigable, entablando una charla fluida.",
       "",
-      "Capacidades de la nueva versión a destacar de forma muy atractiva:",
-      "1. Trazabilidad Animal Individual y Sanidad: Podés consultar y registrar el historial completo de sanidad, tratamientos, vacunas, caravanas, lotes y pesajes por chat (ej. '¿Qué historial tiene la caravana 123?'). ¡Y se sincroniza al instante con tu Panel Web de Cliente profesional!",
-      "2. Registro Multimodal (Audio y Fotos): Podés mandarme un audio de voz explicando una novedad o una foto del campo o de un animal para analizar su estado en tiempo real.",
-      "3. Negocios y Finanzas del Campo: Registrar gastos, ventas, y consultar tu margen del mes escribiendo 'MIS GASTOS', 'MIS VENTAS' o 'MI MARGEN'.",
-      "4. Mercado y Clima en un solo lugar: Consultar precios pizarra de granos, cotizaciones de dólares (blue, bolsa/MEP, oficial), pronósticos de clima local y calcular fletes (ej. 'flete Tandil a Necochea').",
-      "",
-      "Reglas de respuesta:",
-      "- Usá español rioplatense (cálido, cercano, 'che', 'chiflame', etc.) pero muy profesional.",
-      "- NO te limites a 3 líneas. Sé completo, claro y conversacional.",
-      "- No inventes datos. Si explicás qué podés hacer, usá ejemplos sencillos de cómo pedírmelo.",
-      "- Generá una charla distendida y amigable. Hacele una pregunta abierta y entusiasta para que te cuente qué necesita hoy o cómo viene la jornada.",
+      "REGLAS CRÍTICAS DE CONVERSACIÓN (LOGRAR DIÁLOGO DE IDA Y VUELTA):",
+      "1. MÁXIMA BREVEDAD: Tu respuesta debe ser sumamente corta y directa, de un máximo de 1 a 2 párrafos cortos (máximo 4 a 6 líneas en total). Jamás envíes listas con viñetas ni textos tipo catálogo o email.",
+      "2. ENFOQUE ÚNICO Y VÍNCULO WEB: Menciona una sola novedad emocionante a la vez (por ejemplo, que ahora me podés mandar mensajes de audio/voz explicándome cosas o fotos de lotes/animales para analizar en tiempo real, o que podés registrar sanidad individual de animales por caravana y ver tu nuevo Panel Web de Cliente). Invitá de manera muy amigable y natural al productor/trabajador a que chusmee y visite nuestra web principal y landingpage renovada en https://agro.habilispro.com para ver todas las herramientas de forma interactiva y cómo funciona por dentro.",
+      "3. REPREGUNTAS CORTAS: Termina siempre con una repregunta abierta y entusiasta que invite a responder de inmediato, manteniendo la pelota del lado del productor para continuar la charla de manera natural. Ej: '¿Cómo andan las cosas hoy por allá?' o '¿Querés que probemos mandando un audio o miremos el clima?'.",
+      "4. TONO: Usá voseo rioplatense (cálido, cercano, 'che', 'contame', 'chiflame') pero muy profesional en el ámbito agropecuario.",
     ].join("\n");
 
     const user = [
@@ -203,23 +197,53 @@ const generarSaludoIAControlado = async (
     }
   }
 
+  // Cargar historial reciente si no viene provisto
+  let filasHistorial = Array.isArray(historialReciente) ? historialReciente : null;
+  if (!filasHistorial && (waNorm || usuario?.id)) {
+    try {
+      const histRes = await query(
+        `SELECT pregunta, respuesta 
+         FROM historial_consultas 
+         WHERE (usuario_id = $1 AND usuario_id IS NOT NULL) OR whatsapp = $2 
+         ORDER BY creado_en DESC 
+         LIMIT 4`,
+        [usuario?.id || null, waNorm]
+      );
+      filasHistorial = histRes.rows || [];
+    } catch (e) {
+      console.warn("[ia_grounding] Error consultando historial para saludo:", e.message);
+      filasHistorial = [];
+    }
+  }
+
+  let bloqueHistorial = "";
+  if (Array.isArray(filasHistorial) && filasHistorial.length > 0) {
+    const invertido = [...filasHistorial].reverse();
+    bloqueHistorial = invertido
+      .map(r => `Productor: "${r.pregunta}"\nBot: "${r.respuesta}"`)
+      .join("\n\n");
+  }
+
   const system = [
-    "Sos AgroHabilis.",
-    "Objetivo: responder un saludo inicial de WhatsApp de forma breve y humana.",
+    "Sos AgroHabilis, el asistente inteligente y experto para el productor agropecuario argentino.",
+    "Objetivo: responder un saludo inicial, pregunta corta conversacional o charla de cortesía de WhatsApp de forma humana y extremadamente fluida.",
     "Reglas estrictas:",
     "- Máximo 3 líneas.",
     "- Sin números de mercado ni bloques técnicos.",
     "- Sin etiquetas DATO REAL/CONTEXT/NO_DATA.",
     "- Sin mencionar plantillas ni planes de forma promocional.",
-    "- Cerrar con una pregunta guiada: precio, clima o análisis.",
+    "- Evitá ser repetitivo: si en el historial reciente ya saludaste o ya hiciste la pregunta de bienvenida ('¿qué querés consultar hoy?'), NO la repitas de la misma forma.",
+    "- Responde de manera sumamente natural y humana al último mensaje del usuario. Si el usuario dice algo corto como 'y', 'que paso?', 'hola', o está confundido, sintonizá con él de forma empática y ayudalo a arrancar, sin repetir el mismo menú.",
+    "- Si es la primera interacción o hace mucho que no hablan, cerrá con una pregunta guiada muy breve: precio, clima o análisis. Pero si ya le preguntaste eso hace instantes, buscá otra forma de repreguntar o invitarlo a interactuar de manera fluida.",
   ].join("\n");
 
   const user = [
     `Nombre: ${nombre}`,
     `Zona: ${zona}`,
     `Plan: ${plan}`,
+    bloqueHistorial ? `\n--- Historial reciente de la charla ---\n${bloqueHistorial}\n` : "",
     `Mensaje del usuario: ${pregunta}`,
-    "Generá una bienvenida útil y cálida en español rioplatense.",
+    "Generá una respuesta sumamente natural, fluida y no repetitiva en español rioplatense.",
   ].join("\n");
 
   try {
@@ -227,7 +251,7 @@ const generarSaludoIAControlado = async (
     const limpio = limpiarSalidaSaludoIA(out?.texto || "");
     if (limpio) return limpio;
   } catch (_e) {
-    // fallback determinístico
+    // fallback de seguridad
   }
 
   return `¡Hola, ${nombre}! 👋\nEstoy para ayudarte con decisiones del día en ${zona}.\n¿Querés ver *precio*, *clima* o un *análisis*?`;

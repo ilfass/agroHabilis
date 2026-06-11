@@ -9,6 +9,7 @@ const CULTIVOS = [
   { key: "trigo", aliases: ["trigo"] },
   { key: "girasol", aliases: ["girasol"] },
   { key: "sorgo", aliases: ["sorgo"] },
+  { key: "cebada", aliases: ["cebada"] },
   { key: "papa", aliases: ["papas", "papa", "patata", "patatas"] },
 ];
 

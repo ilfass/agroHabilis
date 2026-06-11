@@ -469,6 +469,7 @@ const obtenerClimaFresco = async (lat, lng, maxHoras = 3) => {
       FROM clima
       WHERE ABS(lat - $1::numeric) < 0.15
         AND ABS(lng - $2::numeric) < 0.15
+        AND fecha >= CURRENT_DATE
       ORDER BY fecha ASC
       LIMIT 7
     `,
@@ -480,11 +481,12 @@ const obtenerClimaFresco = async (lat, lng, maxHoras = 3) => {
       FROM clima
       WHERE ABS(lat - $1::numeric) < 0.15
         AND ABS(lng - $2::numeric) < 0.15
+        AND fecha >= CURRENT_DATE
     `,
     [lat, lng]
   );
   const ultimo = fresh.rows[0]?.ultimo;
-  if (local.rows.length && ultimo && esFresco(ultimo, maxHoras)) {
+  if (local.rows.length >= 7 && ultimo && esFresco(ultimo, maxHoras)) {
     return { items: local.rows, fuente: "bd" };
   }
   const vivo = await obtenerClima(lat, lng);
@@ -559,40 +561,17 @@ const configPlan = (usuario = {}) => {
 };
 
 const aplicarReglasPlanMensaje = (mensaje = "", usuario = {}) => {
-  const plan = resolverPlan(usuario);
   let out = String(mensaje || "");
-  // Gratis/Básico no deben ver bloques PRO.
-  if (plan !== "pro") {
-    out = out
-      .replace(/\n?🧠 \*INSIGHTS PRO[\s\S]*?(?=\n(?:📌|\u{1F6D1}|$))/gu, "\n")
-      .replace(/\n?🧪 \*ESCENARIOS RÁPIDOS \(PRO\)[\s\S]*?(?=\n(?:📌|\u{1F6D1}|$))/gu, "\n")
-      .replace(/\n?⛽ \*TERMÓMETRO OPERATIVO \(PRO\)[\s\S]*?(?=\n(?:📌|\u{1F6D1}|$))/gu, "\n")
-      .replace(/\n?🔔 \*ALERTAS SUGERIDAS \(PRO\)[\s\S]*?(?=\n(?:📌|\u{1F6D1}|$))/gu, "\n");
-  }
   return out.replace(/\n{3,}/g, "\n\n").trim();
 };
 
 const quitarSeccion = (texto = "", titulo = "") => {
-  if (!titulo) return texto;
-  const safe = titulo.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const re = new RegExp(`\\n?${safe}[\\s\\S]*?(?=\\n(?:📊|💰|💵|🌤️|🔎|📌|🛑|━━━━━━━━|$))`, "gu");
-  return String(texto || "").replace(re, "\n");
+  return texto;
 };
 
 const aplicarLayoutPlanEstricto = (mensaje = "", usuario = {}) => {
-  const plan = resolverPlan(usuario);
   let out = aplicarReglasPlanMensaje(mensaje, usuario);
-  if (plan === "gratis") {
-    out = quitarSeccion(out, "💰 *TU CAMPAÑA*");
-    out = quitarSeccion(out, "🐄 *TU HACIENDA*");
-    out = quitarSeccion(out, "🎯 *OPORTUNIDAD DE VENTA (48/72h)*");
-    out = quitarSeccion(out, "⚠️ *RIESGOS OPERATIVOS (SEMANA)*");
-  }
-  if (plan === "basico") {
-    out = quitarSeccion(out, "💰 *TU CAMPAÑA*");
-    out = quitarSeccion(out, "🐄 *TU HACIENDA*");
-  }
-  return out.replace(/\n{3,}/g, "\n\n").trim();
+  return out;
 };
 
 /**

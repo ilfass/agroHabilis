@@ -4,7 +4,7 @@ const { generarConPromptLibre } = require("./gemini");
 const { actualizarUsuario, obtenerPerfil, normalizarWhatsapp } = require("../models/usuario");
 const { obtenerResumenFinanciero } = require("./gastos");
 const { calcularCostoPorHa } = require("./calculadora_costos");
-const { resolverPlanEfectivo } = require("./planes");
+const { resolverPlanEfectivo, PLAN_PRICES_CACHE } = require("./planes");
 const {
   obtenerTipoCambioDia,
   persistirTiposCambioDesdeScraper,
@@ -100,46 +100,59 @@ const asegurarGeolocalizacion = async (perfil) => {
 const obtenerPreciosCultivosUsuario = async (cultivos = []) => {
   if (!cultivos.length) return { fecha: null, items: [], variaciones: {} };
 
-  const fechaRows = await query(
-    `
-      SELECT DISTINCT fecha
-      FROM precios
-      ORDER BY fecha DESC
-      LIMIT 2
-    `
-  );
-  const fechas = fechaRows.rows.map((r) => r.fecha).filter(Boolean);
-  if (!fechas.length) return { fecha: null, items: [], variaciones: {} };
-
   const cultivosNorm = cultivos.map((c) => normalizar(c));
   const preciosRows = await query(
     `
-      SELECT cultivo, moneda, fecha, AVG(precio)::numeric(12,2) AS precio_promedio
-      FROM precios
-      WHERE fecha = ANY($1::date[])
-        AND LOWER(cultivo) = ANY($2::text[])
-      GROUP BY cultivo, moneda, fecha
-      ORDER BY cultivo, moneda, fecha DESC
+      WITH dist AS (
+        SELECT DISTINCT LOWER(TRIM(cultivo)) AS cn, fecha
+        FROM precios
+        WHERE LOWER(TRIM(cultivo)) = ANY($1::text[])
+      ),
+      fechas_cultivo AS (
+        SELECT cn, fecha,
+               ROW_NUMBER() OVER (PARTITION BY cn ORDER BY fecha DESC) AS rn
+        FROM dist
+      )
+      SELECT p.cultivo, p.moneda, p.fecha, fc.rn,
+             AVG(p.precio)::numeric(12,2) AS precio_promedio
+      FROM precios p
+      JOIN fechas_cultivo fc
+        ON LOWER(TRIM(p.cultivo)) = fc.cn
+       AND p.fecha = fc.fecha
+       AND fc.rn <= 2
+      WHERE LOWER(TRIM(p.cultivo)) = ANY($1::text[])
+      GROUP BY p.cultivo, p.moneda, p.fecha, fc.rn
+      ORDER BY p.cultivo, fc.rn, p.moneda
     `,
-    [fechas, cultivosNorm]
+    [cultivosNorm]
   );
 
-  const latest = fechas[0];
-  const prev = fechas[1] || null;
+  if (!preciosRows.rows.length) return { fecha: null, items: [], variaciones: {} };
+
   const byCultivo = {};
 
   for (const row of preciosRows.rows) {
     const cultivo = row.cultivo;
     const moneda = row.moneda;
     if (!byCultivo[cultivo]) byCultivo[cultivo] = { cultivo };
-    if (toISODate(row.fecha) === toISODate(latest)) {
+    if (Number(row.rn) === 1) {
+      byCultivo[cultivo].fecha = row.fecha;
       if (moneda === "ARS") byCultivo[cultivo].precio_ars = Number(row.precio_promedio);
       if (moneda === "USD") byCultivo[cultivo].precio_usd = Number(row.precio_promedio);
     }
-    if (prev && toISODate(row.fecha) === toISODate(prev) && moneda === "ARS") {
+    if (Number(row.rn) === 2 && moneda === "ARS") {
       byCultivo[cultivo].precio_ars_ayer = Number(row.precio_promedio);
     }
   }
+
+  let latestTs = 0;
+  for (const it of Object.values(byCultivo)) {
+    if (it.fecha) {
+      const t = new Date(it.fecha).getTime();
+      if (Number.isFinite(t) && t > latestTs) latestTs = t;
+    }
+  }
+  const latest = latestTs ? new Date(latestTs) : null;
 
   const items = Object.values(byCultivo).map((item) => {
     const hoy = Number(item.precio_ars);
@@ -311,6 +324,7 @@ const calcularMetricaCultivos = (cultivos, preciosHoy) => {
       precio_usd: Number.isFinite(Number(precio?.precio_usd))
         ? Number(precio.precio_usd)
         : null,
+      fecha_referencia: precio?.fecha || null,
       variacion_ars: Number.isFinite(Number(precio?.variacion_ars))
         ? Number(precio.variacion_ars)
         : null,
@@ -1422,14 +1436,10 @@ const generarResumen = async (usuarioOrId, opciones = {}) => {
     planActivoHasta: perfilGeo.plan_activo_hasta,
   });
   const esGratis = planEfectivo === "gratis";
-  const esBasico = planEfectivo === "basico";
-  const esPro = planEfectivo === "pro";
-  const noticiasMax = esPro
-    ? Math.max(1, Math.min(15, Number(perfilGeo.noticias_cantidad_pref) || 8))
-    : esBasico
-    ? 5
-    : 2;
-  const tieneBloquesPlus = esBasico || esPro;
+  const esBasico = true;
+  const esPro = true;
+  const noticiasMax = Math.max(1, Math.min(15, Number(perfilGeo.noticias_cantidad_pref) || 8));
+  const tieneBloquesPlus = true;
   const radarWeb = await obtenerRadarWeb({
     perfilTipo: perfilGeo.perfil_productivo,
     cultivos,
@@ -1501,7 +1511,10 @@ const generarResumen = async (usuarioOrId, opciones = {}) => {
     ia.texto = `${ia.texto}\n\n${construirMuestraTrialNoPro({ ...radarWeb, noticiasMax: 9 })}`;
   }
   if (esGratis) {
-    ia.texto = `${ia.texto}\n\n📌 *PLAN GRATIS* ($0/mes)\nRecibís este resumen 2 veces por semana: al día siguiente de tu registro y luego todos los lunes y jueves.\nSi querés resumen diario, escribí: QUIERO PLAN BASICO ($9.000/mes) o QUIERO PLAN PRO ($18.000/mes).`;
+    const pBasico = `$${Number(PLAN_PRICES_CACHE.basico || 22000).toLocaleString("es-AR")}`;
+    const pPro = `$${Number(PLAN_PRICES_CACHE.pro || 29000).toLocaleString("es-AR")}`;
+    const pProMax = `$${Number(PLAN_PRICES_CACHE.pro_max || 50000).toLocaleString("es-AR")}`;
+    ia.texto = `${ia.texto}\n\n📌 *PLAN GRATIS* ($0/mes)\nRecibís este resumen 2 veces por semana: al día siguiente de tu registro y luego todos los lunes y jueves.\nSi querés resumen diario, escribí:\n- QUIERO PLAN BASICO (${pBasico}/mes)\n- QUIERO PLAN PRO (${pPro}/mes)\n- QUIERO PLAN PRO MAX (${pProMax}/mes)`;
   }
   ia.texto = inyectarBloquePrecios(ia.texto, construirBloquePreciosDetallado({ metricas, detalleFuentes: detalleFuentesPrecios }));
   ia.texto = inyectarBloqueTipoCambio(ia.texto, construirBloqueTipoCambio({ tipoCambio }));
@@ -1529,7 +1542,46 @@ const generarResumen = async (usuarioOrId, opciones = {}) => {
   };
 };
 
+const prepararDatosResumenInteractivo = async (usuarioId) => {
+  const perfil = await obtenerPerfilPorId(usuarioId);
+  if (!perfil) return null;
+  const perfilGeo = await asegurarGeolocalizacion(perfil);
+  const cultivos = perfilGeo.cultivos || [];
+  const precios = await obtenerPreciosCultivosUsuario(cultivos.map((c) => c.cultivo));
+  const futuros = await obtenerFuturosPosicionesUsuario(cultivos.map((c) => c.cultivo));
+  let tipoCambio = await obtenerTipoCambioDia();
+  const oficial = (tipoCambio.items || []).find((t) => String(t.tipo || "").toLowerCase() === "oficial");
+  const oficialMs = oficial?.fecha ? new Date(oficial.fecha).getTime() : 0;
+  const hoyInicio = new Date();
+  hoyInicio.setHours(0, 0, 0, 0);
+  if (!oficialMs || oficialMs < hoyInicio.getTime()) {
+    try {
+      const vivo = await obtenerTipoCambio();
+      await persistirTiposCambioDesdeScraper(vivo, "dolarapi");
+      tipoCambio = await obtenerTipoCambioDia();
+    } catch (error) {
+      console.warn("[Resumen interactivo] No se pudo refrescar tipo de cambio:", error.message);
+    }
+  }
+  const clima = await obtenerClimaZona(perfilGeo);
+  const metricas = calcularMetricaCultivos(cultivos, precios.items);
+  const detalleFuentes = await obtenerDetallePreciosPorFuentes(cultivos.map((c) => c.cultivo));
+  return {
+    perfil: perfilGeo,
+    cultivos,
+    precios,
+    futuros,
+    tipoCambio,
+    clima,
+    metricas,
+    detalleFuentes,
+  };
+};
+
 module.exports = {
   generarResumen,
   marcarResumenEnviado,
+  guardarResumen,
+  prepararDatosResumenInteractivo,
+  obtenerRadarWeb,
 };

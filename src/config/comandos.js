@@ -10,7 +10,7 @@ module.exports = {
     { comando: "MI GANADO <cat1, cat2, ...>", descripcion: "Actualiza categorías ganaderas." },
     { comando: "MI PERFIL MIXTO", descripcion: "Configura perfil mixto (cultivos + ganadería)." },
     { comando: "VER MI PERFIL", descripcion: "Muestra tus datos actuales guardados." },
-    { comando: "MI RESUMEN", descripcion: "Genera y envía tu resumen manual." },
+    { comando: "MI RESUMEN", descripcion: "Inicia el resumen interactivo por pasos (mercado, dato clave, clima)." },
     { comando: "MIS ALERTAS", descripcion: "Lista tus alertas activas." },
     { comando: "ALERTA ... / AVISAME ...", descripcion: "Crea una alerta de precio." },
     { comando: "CANCELAR ALERTA <id>", descripcion: "Cancela una alerta puntual." },
@@ -33,7 +33,9 @@ module.exports = {
     { comando: "FUENTES", descripcion: "Resumen de estado de fuentes activas." },
   ],
   apiAdmin: [
-    { metodo: "GET", endpoint: "/api/dashboard/admin/resumen", descripcion: "Resumen global del dashboard." },
+    { metodo: "GET", endpoint: "/api/dashboard/admin/agent-runtime?dias=7", descripcion: "Flags/límites del agente + mix ia_provider (días 1–90)." },
+    { metodo: "GET", endpoint: "/api/dashboard/admin/agent-env", descripcion: "Definiciones y valores editables del agente (.env permitido, sin secretos)." },
+    { metodo: "POST", endpoint: "/api/dashboard/admin/agent-env", descripcion: "Actualiza claves permitidas en .env y reinicia PM2 si está disponible." },
     { metodo: "GET", endpoint: "/api/dashboard/admin/usuarios", descripcion: "Listado de usuarios admin." },
     { metodo: "GET", endpoint: "/api/dashboard/admin/usuario-detalle", descripcion: "Detalle completo por usuario." },
     { metodo: "GET", endpoint: "/api/dashboard/admin/pendientes", descripcion: "Pendientes de onboarding." },
@@ -44,6 +46,11 @@ module.exports = {
     { metodo: "GET", endpoint: "/api/dashboard/admin/envio-masivo/estado?jobId=", descripcion: "Estado del envío masivo (running|listo|error)." },
     { metodo: "GET", endpoint: "/api/dashboard/admin/whatsapp-qr.png", descripcion: "PNG del QR de vinculación WhatsApp (si existe)." },
     { metodo: "POST", endpoint: "/api/admin/recolectar", descripcion: "Ejecuta recolector manual." },
-    { metodo: "POST", endpoint: "/api/admin/enviar-resumen", descripcion: "Envía resumen manual por admin." },
+    {
+      metodo: "POST",
+      endpoint: "/api/admin/enviar-resumen",
+      descripcion:
+        "Invitación resumen interactivo (como el cron). Body: whatsapp | usuario_id | usuario_ids[].",
+    },
   ],
 };

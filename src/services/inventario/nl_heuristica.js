@@ -12,6 +12,9 @@ const norm = (s = "") =>
 
 const CULTIVOS = /\b(soja|ma[ií]z|trigo|girasol|sorgo|cebada|papa|patata|arroz|cebolla|pastura[s]?|alfa(?:lfa)?)\w*\b/i;
 
+const RE_EXCLUIR_DESCRIPCION =
+  /^(y|e|o|u|a|ante|bajo|cabe|con|contra|de|desde|durante|en|entre|hacia|hasta|mediante|para|por|segun|sin|so|sobre|tras|versus|via|el|la|los|las|un|una|unos|unas|mi|mis|tu|tus|su|sus|este|esta|ese|esa|aquel|aquella|lote|lotes|campo|campos|has|ha|hectarea|hectareas|tn|tonelada|toneladas|kilos|kg|litros|ltrs)$/i;
+
 /**
  * Vocabulario de animales (en singular y plural) reconocido como categoría ganadera.
  * Se usa para decidir si una palabra numérica («un», «una», «dos»…) está cuantificando ganado
@@ -294,18 +297,26 @@ function esPlanillaCatalogoLotesMultiples(texto = "") {
 function particionarPorLotes(texto = "") {
   const raw = String(texto || "");
   if (!raw.trim()) return [];
-  const reHito = /\b(?:lote|campo|parcela)\s+(\d{1,4}[a-z]?)\b/gi;
+  // Soporte para: "Lote 3", "Lote: 3", "Lote 8 a fina", "Lote 11L", "lote: 1L"
+  // El colon es opcional (planillas pipe-separated del OCR lo incluyen)
+  const reHito = /\b(?:lote|campo|parcela|corral|potrero)\s*:?\s*(\d{1,4}[a-zA-Z]?|[a-zA-Z0-9ñÑáéíóúÁÉÍÓÚ_-]{1,25})\b/gi;
   const hits = [];
   let m;
   while ((m = reHito.exec(raw)) !== null) {
-    hits.push({ idx: m.index, lote_nombre: String(m[1]).trim() });
+    const nombre = String(m[1]).trim();
+    // Filtrar nombres fantasma: solo letras de 1-2 chars que son artículos/conjunciones
+    // Ej: "Lote y" de "Campo y Lote", "Lote a" de títulos, etc.
+    // Son válidos: "3", "8a", "11L", "1L", "norte", "sur", "loma" (3+ chars)
+    const esNombreFantasma = /^[a-z]{1,2}$/i.test(nombre) && !/^\d/.test(nombre);
+    if (esNombreFantasma) continue;
+    hits.push({ idx: m.index, lote_nombre: nombre });
   }
   if (hits.length < 2) return [];
   const nombresDistintos = new Set(hits.map((h) => h.lote_nombre.toLowerCase()));
   if (nombresDistintos.size < 2) return [];
   const bloques = [];
   for (let i = 0; i < hits.length; i += 1) {
-    const desde = hits[i].idx;
+    const desde = i === 0 ? 0 : hits[i].idx;
     const hasta = i + 1 < hits.length ? hits[i + 1].idx : raw.length;
     const fragmento = raw.slice(desde, hasta).trim();
     if (!fragmento) continue;
@@ -332,7 +343,22 @@ function detectarCargaMultiLote(texto = "") {
   for (const b of bloques) {
     const cant = extraerCantidadUniversal(b.fragmento);
     if (cant && Number.isFinite(cant.valor) && cant.valor > 0) {
-      conDatos.push(b);
+      /**
+       * Fix campaña: Si el valor parece un año de campaña (>= 2000) y el fragmento
+       * contiene el patrón "Campaña: NNNN" o similar, y NO hay una cantidad con
+       * unidad explícita (ha, cab, tn, kg), descartar para evitar que 2627 -> 2.627 ha.
+       */
+      const esCantidadAnoCampana =
+        cant.valor >= 2000 &&
+        /(?:campa[nñ]a|c[aá]mpa|cupo)\s*:?\s*\d{4}/i.test(b.fragmento) &&
+        !/(\d+[.,]?\d*)\s*h[aá]s?\b/i.test(b.fragmento) &&
+        !/(\d+[.,]?\d*)\s*(?:cab|cabezas?|novillos?|vacas?|vaquillonas?|terneros?|toros?)\b/i.test(b.fragmento) &&
+        !/(\d+[.,]?\d*)\s*(?:tn|toneladas?|kg|litros?|lts?)\b/i.test(b.fragmento);
+      if (!esCantidadAnoCampana) {
+        conDatos.push(b);
+      } else {
+        sinDatos.push(b);
+      }
     } else {
       sinDatos.push(b);
     }
@@ -362,7 +388,7 @@ const parseIntentInventario = (texto = "") => {
 
   if (esPlanillaCatalogoLotesMultiples(texto)) return null;
   const consulta = detectarConsultaInventario(texto) || parecePedidoInformacion(texto);
-  const registro = detectarAltaInventario(texto) || detectarRegistroInsumo(texto);
+  const registro = detectarAltaInventario(texto) || detectarRegistroInsumo(texto) || !!parseRegistroGanadoMultipleHeuristic(texto);
   if (consulta && registro) return { clase: "ambiguo" };
   if (consulta) return { clase: "consulta" };
   if (registro) return { clase: "registro" };
@@ -611,6 +637,17 @@ function parseRegistroGanadoMultipleHeuristic(textoOriginal = "") {
   if (!/\b(vaca|novillo|ternero|toro|vaquillona|cabeza|cab|cabra|chivo|oveja|cordero|caballo|yegua|cerdo|chancho|lechon)\w*\b/i.test(s))
     return null;
 
+  /** Excluir consultas de PRECIO ("cuánto salen 10 novillos y 5 vacas en Liniers?")
+   *  y reportes de BAJA/PÉRDIDA ("perdí 3 vacas y 2 terneros") — no son registros de alta. */
+  const tNorm = norm(s);
+  const esPrecioGanado =
+    /\b(cuanto|cuantos|cuanto\s+salen|cuanto\s+valen|cuanto\s+cuesta|precio\s+de|valor\s+de|cotizacion|liniers|rosario|cac\b|remate|hacienda\s+en\s+pie)\b/.test(tNorm);
+  if (esPrecioGanado) return null;
+  const esBajaOPerdida =
+    /\b(perdi|murio|murieron|fallecio|fallecieron|se\s+murieron?|vendi|sali[oo]|salieron|egres[ao]|retir[eé]|retiraron)\b/.test(tNorm);
+  if (esBajaOPerdida) return null;
+
+
   const re = /(?:^|[\s,;]|y\s+)(\d+[.,]?\d*)\s+([a-záéíóúñ]+)(?:\s+([a-záéíóúñ]+))?/gi;
   let m;
   const items = [];
@@ -623,7 +660,10 @@ function parseRegistroGanadoMultipleHeuristic(textoOriginal = "") {
     const w2 = String(m[3] || "").toLowerCase();
     if (!w1) continue;
 
-    const esAnimal = /(vaca|novillo|ternero|toro|vaquillona|cabeza|cab)\w*/i.test(w1);
+    const esAnimal = /(vaca|novillo|ternero|toro|vaquillona|cabeza|cab|oveja|cordero|cabra|chivo|cerdo|chancho|lechon|caballo|yegua)\w*/i.test(w1);
+    if (!esAnimal && RE_EXCLUIR_DESCRIPCION.test(w1)) {
+      continue;
+    }
     let categoria = "";
     if (esAnimal) {
       ultimaBaseAnimal = w1;

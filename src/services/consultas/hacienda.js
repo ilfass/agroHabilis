@@ -39,12 +39,23 @@ const MARCO_REFERENCIA_HACIENDA = {
   ],
 };
 
-const normMinDefault = (texto = "") =>
-  String(texto || "")
+const normMinDefault = (texto = "") => {
+  let str = String(texto || "");
+  const idx = str.indexOf("\n\n---");
+  if (idx !== -1) {
+    str = str.slice(0, idx);
+  } else {
+    const idx2 = str.indexOf("\n---");
+    if (idx2 !== -1) {
+      str = str.slice(0, idx2);
+    }
+  }
+  return str
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .trim();
+};
 
 const esConsultaHaciendaVenta = (texto = "", { normMinFn } = {}) => {
   const norm = typeof normMinFn === "function" ? normMinFn : normMinDefault;

@@ -8,9 +8,8 @@ Esta información es para responder al usuario cuando pregunta sobre las capacid
 - **Ejemplo sugerido para el usuario:** "Mandame todo junto, por ejemplo: Lote Norte: 45 novillos, Lote Sur: 30 vacas. Y te registro todo."
 
 ## Seguimiento individual de animales (caravanas, sanidad específica)
-- **NO de forma nativa.** El registro actual en la base de datos es por *categoría* (ej: novillos, vacas, terneros) y por *lote/ubicación*, pero no a nivel individual (caravana, número de animal, chip).
-- **Workaround (solución alternativa):** Si el productor necesita registrar un animal con un estado particular (enfermo, vacunado, muerto), puede hacerlo creando una entrada separada con esa descripción en el lote.
-- **Ejemplo sugerido para el usuario:** "El registro es por categoría y lote, no por caravana individual. Pero si necesitás aislar a uno, podés decirme '1 novillo enfermo en lote norte' o '2 vacas vacunadas' y lo anoto por separado."
+- **SÍ, está soportado de forma nativa.** La base de datos cuenta con un registro para individualizar animales, asignándoles número de caravana, categoría (ej: novillo, vaca), estado sanitario (enfermo, vacunado, sano) y observaciones.
+- **Ejemplo sugerido para el usuario:** "¡Sí! Podés cargar los animales de a uno para llevar su historial. Por ejemplo, me podés decir 'Anotá un novillo enfermo en el lote Norte con caravana 123' o 'Tengo una vaca vacunada'."
 
 ## Capacidades de stock e inventario
 - AgroHabilis permite llevar stock de granos (toneladas en silo, acopio) y stock ganadero (cabezas por lote, pariciones, destetes, muertes).

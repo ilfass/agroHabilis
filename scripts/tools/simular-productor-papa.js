@@ -98,6 +98,7 @@ async function main() {
   const outPath = path.join(
     __dirname,
     "..",
+    "..",
     "docs",
     "operacion",
     `simulacion-productor-papa-${new Date().toISOString().slice(0, 10)}.json`,

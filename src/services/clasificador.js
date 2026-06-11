@@ -499,7 +499,22 @@ ${JSON.stringify({ intencion: clasificacion.intencion })}
   }
 };
 
+const truncarMensajeOcr = (msg) => {
+  const str = String(msg || "");
+  if (!str.includes("[Análisis de archivo:") && !str.includes("[analisis de archivo:")) {
+    return str;
+  }
+  const regexOcr = /(\[An[áa]lisis de archivo:)([\s\S]+?)(\])/gi;
+  return str.replace(regexOcr, (match, prefix, content, suffix) => {
+    if (content.length > 500) {
+      return `${prefix}${content.substring(0, 450)}... [truncado por longitud]${suffix}`;
+    }
+    return match;
+  });
+};
+
 const clasificarMensaje = async (mensaje, usuario, opciones = {}) => {
+  const mensajeTruncado = truncarMensajeOcr(mensaje);
   const listaEtiquetas = ETIQUETAS_INTENCION_PROMPT.map((e, i) => `${i + 1}. \`${e}\``).join("\n");
   const historialTxt = formatearHistorialParaClasificador(opciones?.historial || []);
   const bloqueHistorial = historialTxt
@@ -519,26 +534,29 @@ ${listaEtiquetas}
 ### Categorías posibles (qué significa cada \`intencion\`)
 Usá esta guía para mapear el mensaje a **una** etiqueta de la lista de arriba.
 
-- \`precio\`: quiere saber un **precio o cotización puntual hoy** (soja, maíz, otro grano, dólar/MEP/blue, insumo, novillo u otra hacienda en pie como referencia de mercado, “¿cuánto está…?”).
+- \`precio\`: quiere saber un **precio o cotización puntual hoy** (soja, maíz, otro grano, dólar/MEP/blue, insumo, novillo u otra hacienda en pie como referencia de mercado, “¿cuánto está…?”). **No** clasifiques como precio descripciones de archivos, imágenes, mapas o planos catastrales (ej. \`[Análisis de archivo: Plano catastral...]\` o \`[Análisis de archivo: Imagen de satélite...]\`), que deben ir a \`registrar\` o \`agro_general\`.
+- \`fletes\`: quiere calcular el costo de un flete (ej: "cuánto cuesta mandar 30 tn de maíz a Rosario", "flete de Junín a puerto") o quiere evaluar un arbitraje comercial/conveniencia de flete (ej: "me pagan $250.000 local, ¿me conviene el puerto?").
 - \`analisis_mercado\`: quiere **interpretar el mercado** o **decidir** (vender/esperar, tendencia, spread, MATBA, logística comercial, etc.) **sin** apoyarse en “mis costos”, “mis hectáreas” ni datos que solo él tiene cargados.
 - \`analisis_interno\`: quiere un análisis que **cruza mercado con sus propios datos del campo** (costos por ha, margen con sus gastos/ventas, “con mis números”, “me da con lo que tengo cargado”, etc.).
 - \`clima\`: pregunta sobre **tiempo, lluvia esperada, helada, temperatura, pronóstico** para planificar (futuro o “¿va a llover?”). **No** uses esta etiqueta si en realidad está **registrando** un hecho (ej. “llovió 35 mm”, “puse vacas en el campo el caimán”: eso suele ser \`registrar\`).
 - \`registrar\`: quiere **cargar o actualizar un dato nuevo** en el sistema: gasto, venta, animal o inventario, lluvia caída, labor/aplicación/siembra, stock, etc. (verbos tipo: gasté, compré, vendí, registrá, puse, agregué, cargué, nació, vacuné, llovió… con contenido concreto).
 - \`consulta_registros\`: quiere **consultar datos que él mismo cargó antes** (cuánto gasté, mis ventas, inventario, animales en total, qué hay en un lote, etc.). **NO** uses esta etiqueta si pregunta **si la app/herramienta permite** algo (p. ej. "¿puedo individualizar cada cabeza?", "¿se puede registrar por lote?", "¿después puedo identificar cada novillo?"): eso es **\`agro_general\`** (pregunta sobre el producto, no un listado de sus datos guardados).
-- \`agro_general\`: conocimiento agro **o** pregunta sobre **qué puede hacer AgroHabilis** (límites del registro, si admite trazabilidad animal, flujos, "¿puedo…?", "¿se puede…?"), **o** cuando el usuario **corrige** al asistente ("no me entendiste", "te pregunto otra cosa", "no es eso lo que pregunté"). **No** uses esta etiqueta si está **cargando datos concretos** (cantidades, animales, etc.): ahí suele ser \`registrar\`.
-- \`no_agro\`: pregunta que **no tiene que ver con el agro** operativo del productor (cultura general, deportes, etc.).
+- \`agro_general\`: conocimiento agro **o** pregunta sobre **qué puede hacer AgroHabilis** (límites del registro, si admite trazabilidad animal, flujos, "¿puedo…?", "¿se puede…?"), **o** preguntas **meta sobre el asistente** (si es/funciona como agente o bot, cómo opera el chat, «modo agente», comparación con un asistente clásico): eso sigue siendo **pregunta sobre el producto**, no análisis de mercado. **O** cuando el usuario **corrige** al asistente ("no me entendiste", "te pregunto otra cosa", "no es eso lo que pregunté"). **No** uses esta etiqueta si está **cargando datos concretos** (cantidades, animales, etc.): ahí suele ser \`registrar\`.
+- \`no_agro\`: pregunta que **no tiene que ver con el agro** operativo del productor (cultura general, deportes, entretenimiento, etc.). **No** uses \`no_agro\` si el mensaje menciona maquinaria, vehículos o equipos propios del campo (neumáticos de tractor/camión de cosecha, cubiertas, repuestos, combustible, análisis de cuota vs contado de un equipo agro): eso es \`agro_general\` porque hace a la operación del establecimiento.
 - \`saludo\`: **saludo, despedida o agradecimiento** sin un pedido concreto de datos o acción en el mismo mensaje (o el pedido es trivialmente social).
 - \`small_talk\`: **charla breve sin pedido operativo** (estados de ánimo: "tengo sueño", "qué frío"; confirmaciones cortas como "dale", "perfecto"; risas, etc.). Diferencia con \`saludo\`: no es saludo/despedida, pero tampoco trae un pedido concreto. Si hay números o tema agro operativo, **no** uses small_talk.
 - \`comando\`: pide ejecutar una **función explícita del bot** (MI RESUMEN, MIS ALERTAS, MI MARGEN, PLANES, VER COMANDOS, “avisame cuando la soja supere X”, etc.).
 
 ### Desempates (muy importante)
+- Si el mensaje es una descripción o análisis de un plano catastral, mapa, imagen de lote o croquis productivo (por ejemplo, con la etiqueta \`[Análisis de archivo: Plano catastral...]\`) → clasificalo como **\`agro_general\`** o **\`registrar\`** (según si el usuario quiere dar de alta los lotes o preguntar cómo hacerlo), y **nunca** como \`precio\` ni \`analisis_mercado\`.
+- Si el mensaje pregunta **si el asistente es/funciona como agente, bot o IA de AgroHabilis** (incluye redacciones coloquiales y con signos de pregunta) → **\`agro_general\`**; **no** uses \`analisis_mercado\`, \`precio\` ni \`no_agro\` salvo que además pida explícitamente cotización o tema ajeno al producto.
 - Si el mensaje pregunta **solo** «¿qué día es hoy?», «¿qué fecha es?», «¿qué hora es?» (calendario civil, sin mercado) → \`agro_general\` y en el JSON incluí \`"meta_consulta": "fecha"\` o \`"hora"\` según corresponda (además el pipeline fusiona \`meta_fecha\` / \`meta_hora\` del detector rápido).
 - Si el mensaje **carga o mueve datos** (cantidades, animales, insumos, lluvia ya caída en mm, “puse X vacas en el campo/lote Y”) → preferí **\`registrar\`** sobre \`clima\` o \`agro_general\`, aunque mencione un nombre que suene a localidad geográfica (puede ser nombre de lote).
 - Si pide **pronóstico o “va a llover”** sin estar anotando un hecho pasado → \`clima\`.
 - Si encajan dos etiquetas, elegí la **más específica** al acto principal (p. ej. registrar > agro_general).
 
 ## MENSAJE a clasificar
-"""${String(mensaje || "").replace(/"/g, '\\"')}"""
+"""${String(mensajeTruncado || "").replace(/"/g, '\\"')}"""
 
 ## Respuesta requerida
 Armá el objeto según el **MENSAJE a clasificar** (no copies literal el ejemplo si no aplica). En \`intencion\` poné **una sola** cadena **idéntica** a una de la lista numerada del principio.

@@ -107,6 +107,7 @@ const buscarCredencialesPorTelefono = async (telefonoRaw) => {
         u.id AS usuario_id,
         u.nombre,
         COALESCE(NULLIF(u.whatsapp_real, ''), u.whatsapp) AS whatsapp,
+        u.plan,
         c.telefono_norm,
         c.password_hash,
         c.password_temporal_expires_at,
@@ -131,6 +132,12 @@ const autenticarCliente = async ({ telefono, password, ip, userAgent }) => {
   if (!creds?.password_hash) return { ok: false };
   const validPassword = await bcrypt.compare(String(password || ""), creds.password_hash);
   if (!validPassword) return { ok: false };
+
+  const plan = String(creds.plan || "").toLowerCase();
+  if (plan === "gratis" || !plan) {
+    return { ok: false, reason: "plan_restricted" };
+  }
+
   if (creds.must_change_password && creds.password_temporal_expires_at) {
     const exp = new Date(creds.password_temporal_expires_at).getTime();
     if (Number.isFinite(exp) && exp < Date.now()) {
@@ -151,6 +158,7 @@ const autenticarCliente = async ({ telefono, password, ip, userAgent }) => {
       nombre: creds.nombre || null,
       whatsapp: creds.whatsapp || null,
       telefono: creds.telefono_norm || normalizarTelefono(telefono),
+      plan: creds.plan || "gratis",
     },
     mustChangePassword: Boolean(creds.must_change_password),
   };
@@ -167,6 +175,7 @@ const leerSesionCliente = async (req) => {
         s.expires_at,
         u.nombre,
         COALESCE(NULLIF(u.whatsapp_real, ''), u.whatsapp) AS whatsapp,
+        u.plan,
         c.must_change_password
       FROM cliente_auth_sessions s
       JOIN usuarios u ON u.id = s.usuario_id
@@ -188,6 +197,7 @@ const leerSesionCliente = async (req) => {
       id: row.usuario_id,
       nombre: row.nombre || null,
       whatsapp: row.whatsapp || null,
+      plan: row.plan || "gratis",
     },
     expiresAt: row.expires_at,
     mustChangePassword: Boolean(row.must_change_password),
@@ -358,6 +368,7 @@ module.exports = {
   CLIENT_SESSION_COOKIE,
   CLIENT_SESSION_TTL_MS,
   normalizarTelefono,
+  variantesTelefono,
   autenticarCliente,
   leerSesionCliente,
   invalidarSesionCliente,
@@ -368,4 +379,5 @@ module.exports = {
   persistirPasswordTemporalCliente,
   buildTextoCredencialCliente,
   ejecutarReenvioPasswordPanelCliente,
+  crearSesionCliente,
 };

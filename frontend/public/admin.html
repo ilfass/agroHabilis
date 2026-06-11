@@ -3,348 +3,506 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AgroHabilis Admin Dashboard</title>
+    <title>AgroHabilis — Panel de control</title>
     <style>
-      :root {
-        --bg: #f3f7ff;
-        --bg-soft: #eef4ff;
-        --panel: #ffffff;
-        --panel-soft: #f7faff;
-        --text: #17233a;
-        --muted: #5f7294;
-        --accent: #2f8bff;
-        --accent-soft: #1f66c9;
-        --danger: #e45858;
-        --line: #dbe7ff;
-        --shadow: 0 12px 30px rgba(39, 81, 161, 0.12);
+    :root {
+        --bg: #07090e;
+        --bg-elevated: #0d121f;
+        --panel: #111726;
+        --panel-soft: #192239;
+        --text: #f1f5f9;
+        --muted: #64748b;
+        --accent: #10b981;
+        --accent-soft: rgba(16, 185, 129, 0.12);
+        --danger: #ef4444;
+        --border: rgba(255, 255, 255, 0.06);
+        --shadow: 0 20px 40px rgba(0, 0, 0, 0.55);
       }
       * { box-sizing: border-box; }
       body {
-        font-family: Inter, Segoe UI, Arial, sans-serif;
-        font-size: 15px;
+        font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+        font-size: 14.5px;
         margin: 0;
-        background: linear-gradient(180deg, var(--bg-soft), var(--bg));
+        background: radial-gradient(1000px 500px at 15% 0%, rgba(16, 185, 129, 0.08), transparent 50%), var(--bg);
         color: var(--text);
-        padding: 24px 24px 24px 276px;
+        padding: 24px 24px 36px 268px;
+        line-height: 1.5;
+        overflow-x: hidden;
       }
-      h1, h2, h3 { margin-top: 0; letter-spacing: .2px; }
-      h1 { font-size: 30px; }
-      h3 { font-size: 19px; margin-bottom: 12px; }
+      h1, h2, h3 { margin-top: 0; letter-spacing: -0.01em; font-family: Outfit, Inter, sans-serif; }
+      h1 { font-size: 26px; font-weight: 800; color: var(--text); }
+      h3 { font-size: 17px; font-weight: 700; margin-bottom: 8px; color: var(--text); }
+      
+      .section-lead {
+        font-size: 13px;
+        color: var(--muted);
+        line-height: 1.6;
+        margin: 0 0 12px;
+        max-width: 80ch;
+      }
+      .section-kicker {
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.15em;
+        text-transform: uppercase;
+        color: var(--accent);
+        margin: 0 0 6px;
+      }
       .topbar {
         display: flex;
         flex-wrap: wrap;
         gap: 12px;
         align-items: center;
-        margin-bottom: 18px;
-      }
-      .card {
-        background: linear-gradient(180deg, var(--panel), var(--panel-soft));
-        border: 1px solid var(--line);
+        margin-bottom: 20px;
+        padding: 14px 18px;
+        background: var(--panel);
+        border: 1px solid var(--border);
         border-radius: 16px;
-        padding: 18px;
-        margin-bottom: 14px;
         box-shadow: var(--shadow);
       }
-      .nav { position: fixed; left: 18px; top: 18px; width: 230px; display:flex; flex-direction:column; gap:8px; padding:12px; border:1px solid var(--line); border-radius:16px; background:#fff; box-shadow: var(--shadow); }
-      .nav .brand { display:flex; align-items:center; gap:10px; padding:8px 10px 12px; border-bottom:1px solid #e7efff; margin-bottom:4px; font-weight:800; color:#1e3b6e; }
-      .brand-dot { width:10px; height:10px; border-radius:999px; background:#2f8bff; box-shadow:0 0 0 4px rgba(47,139,255,.12); }
-      .nav a { text-decoration:none; padding:10px 13px; border-radius:10px; border:1px solid #d5e3ff; color:#38507b; background:#fff; font-size:13px; font-weight:600; width:100%; }
-      .nav a.active { background: linear-gradient(180deg, var(--accent), var(--accent-soft)); border:none; color:#fff; font-weight:700; }
-      .page-head { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:14px; }
-      .crumb { color:var(--muted); font-size:13px; }
-      .quick { display:flex; gap:8px; flex-wrap:wrap; }
-      .quick a { text-decoration:none; padding:8px 10px; border:1px solid #d7e6ff; border-radius:10px; color:#2f4f80; background:#fff; font-weight:600; font-size:12px; }
+      .card {
+        background: linear-gradient(170deg, var(--panel) 0%, rgba(17, 23, 38, 0.8) 100%);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 22px;
+        margin-bottom: 16px;
+        box-shadow: var(--shadow);
+      }
+      .nav {
+        position: fixed;
+        left: 16px;
+        top: 16px;
+        width: 236px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        padding: 16px;
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        background: var(--bg-elevated);
+        box-shadow: var(--shadow);
+      }
+      .nav .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 10px 16px;
+        border-bottom: 1px solid var(--border);
+        margin-bottom: 8px;
+        font-weight: 800;
+        color: var(--text);
+        font-size: 14.5px;
+        letter-spacing: 0.5px;
+      }
+      .brand-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--accent);
+        box-shadow: 0 0 10px var(--accent);
+      }
+      .nav a {
+        text-decoration: none;
+        padding: 9px 12px;
+        border-radius: 10px;
+        border: 1px solid transparent;
+        color: var(--muted);
+        background: transparent;
+        font-size: 13px;
+        font-weight: 600;
+        width: 100%;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .nav a:hover {
+        color: var(--text);
+        background: var(--panel-soft);
+        transform: translateX(4px);
+      }
+      .nav a.active {
+        background: var(--accent-soft);
+        border-color: rgba(16, 185, 129, 0.25);
+        color: var(--accent);
+        font-weight: 700;
+      }
+      .page-head { display:flex; justify-content:space-between; align-items:flex-start; gap:14px; margin-bottom:18px; }
+      .crumb { color:var(--muted); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+      
       .grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-        gap: 10px;
-      }
-      .kpi {
-        background: #fff;
-        border: 1px solid #d8e5ff;
-        border-radius: 12px;
-        padding: 14px;
-      }
-      .kpi.clickable { cursor: pointer; transition: transform .12s ease, border-color .12s ease; }
-      .kpi.clickable:hover { transform: translateY(-1px); border-color: #4a67a3; }
-      .kpi .v { font-size: 28px; font-weight: 800; margin-top: 6px; }
-      .kpi .l { color: var(--muted); font-size: 13px; }
-      #kpis .kpi:nth-child(1) { background: linear-gradient(180deg, #e9f2ff, #f8fbff); }
-      #kpis .kpi:nth-child(2) { background: linear-gradient(180deg, #ecfff4, #f9fffc); }
-      #kpis .kpi:nth-child(3) { background: linear-gradient(180deg, #fff4e8, #fffaf5); }
-      #kpis .kpi:nth-child(4) { background: linear-gradient(180deg, #efeaff, #faf7ff); }
-      input, button, select {
-        padding: 11px 13px;
-        border-radius: 10px;
-        border: 1px solid #cfddfa;
-        background: #fff;
-        color: #24395f;
-      }
-      button {
-        cursor: pointer;
-        background: linear-gradient(180deg, var(--accent), var(--accent-soft));
-        border: none;
-        color: #fff;
-        font-weight: 700;
-      }
-      table { width: 100%; border-collapse: collapse; }
-      th, td {
-        border-bottom: 1px solid #2a3d66;
-        padding: 10px 8px;
-        text-align: left;
-        font-size: 14px;
-      }
-      th { color: var(--muted); font-weight: 700; background: #f7faff; }
-      .muted { color: var(--muted); font-size: 13px; }
-      .ok { color: var(--accent); font-weight: 700; }
-      .bad { color: var(--danger); font-weight: 700; }
-      .chip { display:inline-block; padding:3px 8px; border-radius:999px; font-size:11px; border:1px solid #2f446f; color:var(--muted); background:rgba(255,255,255,.04); }
-      .chip.clickable { cursor:pointer; }
-      .chip.clickable:hover { border-color:#4a67a3; color:#d7e2f7; }
-      .helper { color: var(--muted); font-size: 12px; margin-bottom: 8px; }
-      .coverage-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:8px; margin:10px 0; }
-      .coverage-item { border:1px solid #2f446f; border-radius:10px; padding:8px; background:rgba(255,255,255,.02); }
-      .coverage-item .title { font-size:12px; color:var(--muted); margin-bottom:4px; }
-      .coverage-item .state { font-weight:700; font-size:12px; }
-      .quality-chip { display:inline-block; margin-top:6px; padding:2px 7px; border-radius:999px; font-size:11px; border:1px solid #2f446f; }
-      .quality-directa { color:#3ad37c; border-color:#2f6c4a; background:rgba(58,211,124,.1); }
-      .quality-proxy { color:#ffd27d; border-color:#8a6d2f; background:rgba(255,210,125,.1); }
-      .quality-ultimo_valido { color:#9ec5ff; border-color:#3b5f8d; background:rgba(110,168,255,.12); }
-      .quality-sin_datos { color:#ff9a9a; border-color:#7e3d3d; background:rgba(255,125,125,.1); }
-      .state-ok { color: var(--accent); }
-      .state-warn { color: #ffd27d; }
-      .state-empty { color: var(--danger); }
-      .coverage-top { display:flex; align-items:center; gap:12px; margin-bottom:10px; }
-      .coverage-light { width:14px; height:14px; border-radius:50%; box-shadow:0 0 10px rgba(0,0,0,.35); }
-      .coverage-light.ok { background:#3ad37c; box-shadow:0 0 12px rgba(58,211,124,.5); }
-      .coverage-light.warn { background:#ffd27d; box-shadow:0 0 12px rgba(255,210,125,.5); }
-      .coverage-light.bad { background:#ff7d7d; box-shadow:0 0 12px rgba(255,125,125,.5); }
-      .coverage-bars { display:grid; gap:6px; margin:8px 0 12px; }
-      .coverage-bar-row { display:grid; grid-template-columns:100px 1fr auto; gap:8px; align-items:center; font-size:12px; }
-      .coverage-bar-track { height:8px; border-radius:999px; background:#1c2d4f; border:1px solid #2f446f; overflow:hidden; }
-      .coverage-bar-fill { height:100%; border-radius:999px; }
-      .coverage-bar-fill.ok { background:linear-gradient(90deg,#35c56f,#3ad37c); }
-      .coverage-bar-fill.warn { background:linear-gradient(90deg,#e2b656,#ffd27d); }
-      .coverage-bar-fill.bad { background:linear-gradient(90deg,#dd6060,#ff7d7d); }
-      .empty { color: var(--muted); text-align:center; padding:10px 0; font-size:12px; }
-      .chart-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:10px; }
-      .chart-card { border:1px solid #2f446f; border-radius:10px; padding:10px; background:rgba(255,255,255,.02); }
-      .chart-title { font-size:12px; color:var(--muted); margin-bottom:6px; }
-      .legend { font-size:12px; color:var(--muted); margin-top:6px; }
-      .split {
-        display: grid;
-        grid-template-columns: 1.3fr 1fr;
         gap: 12px;
       }
-      .actions { display:flex; gap:8px; flex-wrap:wrap; margin:8px 0 12px; }
-      .row-actions { display:flex; gap:6px; flex-wrap:wrap; }
-      .plan-actions { display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-top:8px; }
-      .btn-mini { padding:6px 8px; border-radius:6px; font-size:12px; }
-      .btn-danger { background: linear-gradient(180deg, #ff8f8f, #d84d4d); color:#2a0000; }
-      .btn-secondary { background: linear-gradient(180deg, #8fb7ff, #4a6ed8); color:#071435; }
-      .plan-card.clickable { cursor:pointer; }
-      .plan-card.clickable:hover { border-color:#4a67a3; transform:translateY(-1px); transition:.12s ease; }
-      .modal-backdrop {
-        position: fixed; inset: 0; background: rgba(4, 10, 20, .72);
-        display: none; align-items: center; justify-content: center; z-index: 9999; padding: 18px;
+      .kpi {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 14px 16px;
+        transition: all 0.25s ease;
       }
-      .modal {
-        width: min(760px, 96vw); max-height: 86vh; overflow: auto;
-        background: linear-gradient(180deg, var(--panel), var(--panel-soft));
-        border: 1px solid #2a3d66; border-radius: 12px; padding: 14px;
+      .kpi.clickable { cursor: pointer; }
+      .kpi.clickable:hover { transform: translateY(-2px); border-color: var(--accent); box-shadow: 0 8px 24px rgba(16, 185, 129, 0.15); }
+      .kpi .v { font-size: 22px; font-weight: 800; margin-top: 6px; color: var(--text); font-family: Outfit, Inter, sans-serif; }
+      .kpi .l { color: var(--muted); font-size: 12px; font-weight: 600; text-transform: uppercase; }
+      
+      input, button, select {
+        padding: 10px 14px;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        background: var(--bg-elevated);
+        color: var(--text);
+        font-size: 13.5px;
+        transition: all 0.2s ease;
       }
-      .modal-header { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:8px; }
-      .modal-close {
-        border:1px solid #3d5689; background:#0f1930; color:var(--text); font-weight:700;
+      input:focus, select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+      
+      button {
+        cursor: pointer;
+        background: linear-gradient(180deg, var(--accent), #059669);
+        border: none;
+        color: #06090e;
+        font-weight: 700;
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
       }
-      .block-list { display:grid; gap:8px; }
-      .block-item { border:1px solid #2f446f; border-radius:10px; padding:8px; background:rgba(255,255,255,.02); }
-      .block-item b { font-size:13px; }
+      button:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(16, 185, 129, 0.35); }
+      button:disabled { opacity: 0.45; cursor: not-allowed; transform: none; box-shadow: none; }
+      
+      .btn-secondary {
+        background: var(--panel-soft);
+        color: var(--text);
+        border: 1px solid var(--border);
+        box-shadow: none;
+      }
+      .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+      
+      .btn-mini { padding:6px 10px; border-radius:8px; font-size:11.5px; }
+      
+      table { width: 100%; border-collapse: collapse; }
+      th, td {
+        border-bottom: 1px solid var(--border);
+        padding: 12px 10px;
+        text-align: left;
+        font-size: 13px;
+      }
+      th { color: var(--muted); font-weight: 700; background: rgba(15, 21, 36, 0.9); font-size: 12px; text-transform: uppercase; }
+      .muted { color: var(--muted); font-size: 13px; }
+      
+      .badge {
+        display: inline-block;
+        padding: 3px 8px;
+        border-radius: 6px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+      }
+      .badge.success { background: rgba(16, 185, 129, 0.15); color: var(--accent); border: 1px solid rgba(16, 185, 129, 0.25); }
+      .badge.danger { background: rgba(239, 68, 68, 0.15); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.25); }
+      .badge.warning { background: rgba(245, 158, 11, 0.15); color: #ffd27d; border: 1px solid rgba(245, 158, 11, 0.25); }
+      .badge.info { background: rgba(59, 130, 246, 0.15); color: #6ea8ff; border: 1px solid rgba(59, 130, 246, 0.25); }
+
+      .mono-inline { font-family: ui-monospace, SFMono-Regular, monospace; font-size: 11.5px; color: var(--accent); background: rgba(16, 185, 129, 0.08); padding: 2px 6px; border-radius: 6px; border: 1px solid rgba(16, 185, 129, 0.15); }
+      
+      .env-edit-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+      .env-edit-table th,
+      .env-edit-table td { border-bottom: 1px solid var(--border); padding: 12px 10px; vertical-align: middle; }
+      .env-key { font-family: ui-monospace, SFMono-Regular, monospace; font-size: 11.5px; color: #6ea8ff; white-space: nowrap; }
+      .env-input { width: 100%; max-width: 320px; }
+      
+      pre {
+        background: var(--bg);
+        color: var(--text);
+        padding: 14px;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        overflow: auto;
+      }
+      .flag-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; margin: 12px 0; }
+      .flag-item {
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 12px;
+        background: var(--bg-elevated);
+      }
+      .flag-item .k { font-size: 11.5px; color: var(--muted); font-weight: 600; }
+      .flag-item .v { font-weight: 800; font-size: 14.5px; margin-top: 4px; }
+      
+      .summary-link { cursor: pointer; font-weight: 700; color: var(--accent); list-style: none; display: flex; align-items: center; gap: 4px; }
+      .summary-link::-webkit-details-marker { display: none; }
+      
+      .state-ok { color: var(--accent); font-weight: 700; }
+      
       @media (max-width: 1100px) {
-        body { padding: 16px; }
-        .nav { position: static; width: auto; flex-direction: row; flex-wrap: wrap; }
-        .split { grid-template-columns: 1fr; }
+        body { padding: 16px 16px 28px 16px; }
+        .nav { position: static; width: auto; flex-direction: row; flex-wrap: wrap; margin-bottom: 16px; }
       }
-      @media (max-width: 760px) {
-        body { padding: 12px; font-size: 14px; }
-        .card { padding: 12px; border-radius: 12px; }
+      @media (max-width: 720px) {
+        body { padding: 12px 12px 12px 12px; font-size: 13.5px; }
+        .card { padding: 14px; border-radius: 12px; }
+        .topbar { padding: 10px; border-radius: 12px; }
         .topbar > * { width: 100%; }
-        .page-head { align-items: flex-start; }
-        .quick { width: 100%; }
-        .quick a { flex: 1 1 100%; text-align: center; }
         .nav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; padding: 10px; border-radius: 12px; }
         .nav .brand { grid-column: 1 / -1; }
         .nav a { width: 100%; text-align: center; padding: 8px 10px; font-size: 12px; }
-        table { display: block; overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; }
-        .coverage-bar-row { grid-template-columns: 78px 1fr auto; }
       }
     </style>
   </head>
   <body>
     <div class="topbar">
-      <h1 style="margin:0;">AgroHabilis - Control Center</h1>
-      <input id="adminKey" type="password" placeholder="ADMIN_KEY (opcional, fallback API)" />
-      <button id="btnLoad">Actualizar dashboard</button>
-      <button id="btnCerrarSesion">Cerrar sesión</button>
-      <button id="btnComandos">Comandos</button>
-      <button id="btnTemplates">Templates</button>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <span class="brand-dot"></span>
+        <h1 style="margin:0; font-size:20px; font-weight:800;">Panel de Control</h1>
+      </div>
+      <div style="margin-left:auto; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+        <input id="adminKey" type="password" placeholder="ADMIN_KEY (opcional)" style="width:160px; padding:8px 10px;" />
+        <button id="btnReload" class="btn primary btn-mini" style="height:35px;">🔄 Actualizar Dashboard</button>
+        <button id="btnCerrarSesion" class="btn-secondary btn-mini" style="height:35px;">Cerrar Sesión</button>
+      </div>
     </div>
+    
     <div class="nav">
       <div class="brand"><span class="brand-dot"></span><span>AgroHabilis Admin</span></div>
       <a href="/dashboard/admin" class="active">🏠 Dashboard</a>
       <a href="/dashboard/metricas">📊 Métricas</a>
       <a href="/dashboard/precios">💹 Precios</a>
       <a href="/dashboard/usuarios">👥 Usuarios</a>
+      <a href="/dashboard/campanas">🚀 Campañas</a>
+      <a href="/dashboard/planes">🤖 Planes</a>
+      <a href="/dashboard/ia">🧠 IA & Gemini</a>
       <a href="/dashboard/comandos">⌨️ Comandos</a>
       <a href="/dashboard/templates">🧩 Templates</a>
+      <a href="/dashboard/admin#agentRuntimeCard">⚙️ Runtime agente</a>
+      <a href="/dashboard/admin#agentPlanCard">🤖 Plan agente</a>
       <a href="/dashboard/cliente">🙍 Cliente</a>
     </div>
+
     <div class="page-head">
       <div>
-        <div class="crumb">Inicio / Control Center</div>
-        <h3 style="margin:2px 0 0;">Vista ejecutiva del sistema</h3>
-      </div>
-      <div class="quick">
-        <a href="/dashboard/metricas">Ver salud IA</a>
-        <a href="/dashboard/usuarios">Gestionar usuarios</a>
-        <a href="/dashboard/templates">Editar templates</a>
+        <div class="crumb">Inicio / Panel de Control</div>
+        <h3 style="margin:2px 0 0; font-size:20px; font-weight:800;">Centro de Mandos Ejecutivo</h3>
+        <p class="section-lead" style="margin-top:8px">
+          Bienvenido al centro de operaciones técnicas de <strong>AgroHabilis</strong>. Esta consola unifica la telemetría en tiempo real del motor conversacional, el estado del servidor y la configuración de variables críticas de tu agente autónomo.
+        </p>
       </div>
     </div>
-    <div class="helper">Acceso con login activo. El campo ADMIN_KEY queda opcional como fallback técnico para API.</div>
-    <div class="card">
-      <h3>Matriz de bloques por plan</h3>
-      <div class="grid">
-        <div class="kpi plan-card clickable" data-plan-view="gratis" title="Click para ver detalle">
-          <div class="l">GRATIS</div>
-          <div class="v" style="font-size:18px;">Base</div>
-          <div class="muted">7 bloques</div>
-        </div>
-        <div class="kpi plan-card clickable" data-plan-view="basico" title="Click para ver detalle">
-          <div class="l">BÁSICO</div>
-          <div class="v" style="font-size:18px;">Base + Básico</div>
-          <div class="muted">9 bloques (7 + 2)</div>
-        </div>
-        <div class="kpi plan-card clickable" data-plan-view="pro" title="Click para ver detalle">
-          <div class="l">PRO</div>
-          <div class="v" style="font-size:18px;">Base + Básico + Pro</div>
-          <div class="muted">13 bloques (7 + 2 + 4)</div>
+
+    <!-- Health Check & Live Status Panel -->
+    <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; margin-bottom:14px;">
+      <div class="card" style="margin-bottom:0;">
+        <p class="section-kicker">Diagnóstico de Telemetría</p>
+        <h3>Salud y Estado del Servidor</h3>
+        <p class="section-lead">Verificación del gateway de comunicación y la base de datos central de producción.</p>
+        
+        <div style="display:flex; flex-direction:column; gap:10px; margin-top:14px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; background:var(--bg-elevated); border:1px solid var(--border); border-radius:10px;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span class="brand-dot" style="background:#10b981; box-shadow:0 0 10px #10b981;"></span>
+              <span style="font-weight:600; font-size:13px;">WhatsApp Gateway</span>
+            </div>
+            <span id="waStatusBadge" class="badge success">CONECTADO</span>
+          </div>
+          
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; background:var(--bg-elevated); border:1px solid var(--border); border-radius:10px;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span class="brand-dot" style="background:#10b981; box-shadow:0 0 10px #10b981;"></span>
+              <span style="font-weight:600; font-size:13px;">Base de Datos PostgreSQL</span>
+            </div>
+            <span id="dbStatusBadge" class="badge success">OPERATIVA</span>
+          </div>
+
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; background:var(--bg-elevated); border:1px solid var(--border); border-radius:10px;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span class="brand-dot" style="background:#10b981; box-shadow:0 0 10px #10b981;"></span>
+              <span style="font-weight:600; font-size:13px;">Planificador (Cron Jobs)</span>
+            </div>
+            <span id="cronStatusBadge" class="badge success">ACTIVO</span>
+          </div>
         </div>
       </div>
-    </div>
-    <div class="card">
-      <div class="grid" id="kpis"></div>
-    </div>
-    <div class="card">
-      <h3>Templates y layouts (editable)</h3>
-      <div class="helper">Panel nuevo para editar templates en vivo desde Admin.</div>
-      <div id="templatesInsight" class="muted">Cargando...</div>
-    </div>
-    <div class="card">
-      <h3>Gráficos de control</h3>
-      <div class="chart-grid">
-        <div class="chart-card">
-          <div class="chart-title">Distribución de planes</div>
-          <canvas id="chartPlanes" height="130"></canvas>
-          <div class="legend" id="legendPlanes"></div>
+
+      <div class="card" style="margin-bottom:0; display:flex; flex-direction:column; justify-content:space-between;">
+        <div>
+          <p class="section-kicker">Consistencia de Datos</p>
+          <h3>Frescura de Fuentes</h3>
+          <p class="section-lead">Último corte y verificación de coberturas de temas clave en el servidor.</p>
         </div>
-        <div class="chart-card">
-          <div class="chart-title">Alertas (activas vs disparadas)</div>
-          <canvas id="chartAlertas" height="130"></canvas>
-          <div class="legend" id="legendAlertas"></div>
-        </div>
-        <div class="chart-card">
-          <div class="chart-title">Consultas hoy (IA vs fallback)</div>
-          <canvas id="chartIA" height="130"></canvas>
-          <div class="legend" id="legendIA"></div>
+        <div style="display:flex; flex-direction:column; gap:8px; font-size:13px; margin-top:12px;">
+          <div style="display:flex; justify-content:space-between; border-bottom:1px dashed var(--border); padding-bottom:6px;">
+            <span class="muted">Precios de Granos (BCR)</span>
+            <strong id="frescuraPrecios">—</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; border-bottom:1px dashed var(--border); padding-bottom:6px;">
+            <span class="muted">Tipo de Cambio MEP</span>
+            <strong id="frescuraMEP">—</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; padding-bottom:4px;">
+            <span class="muted">Clima Agro Zona</span>
+            <strong id="frescuraClima">—</strong>
+          </div>
         </div>
       </div>
     </div>
 
-    <div class="split">
-      <div>
-        <div class="card">
-          <h3>Estado IA y consumo</h3>
-          <div id="iaBox" class="muted">Sin datos</div>
-        </div>
-        <div class="card">
-          <h3>Frescura y fuentes de datos</h3>
-          <div id="fuentesBox" class="muted">Sin datos</div>
-        </div>
-        <div class="card">
-          <h3>Interacciones por usuario</h3>
-          <table>
-            <thead><tr><th>Usuario</th><th>WhatsApp</th><th>Consultas</th><th>Hoy</th><th>Última</th></tr></thead>
-            <tbody id="interaccionesBody"></tbody>
-          </table>
-        </div>
-        <div class="card">
-          <h3>Alertas por usuario</h3>
-          <div class="topbar" style="margin-bottom:8px;">
-            <input id="alertaUsuarioSearch" placeholder="Buscar usuario o whatsapp" />
-            <select id="alertaUsuarioEstado">
-              <option value="todas">Todas</option>
-              <option value="con_activas">Con activas</option>
-              <option value="con_disparadas">Con disparadas</option>
-            </select>
-          </div>
-          <table>
-            <thead><tr><th>Usuario</th><th>WhatsApp</th><th>Activas</th><th>Disparadas</th><th>Total</th></tr></thead>
-            <tbody id="alertasUsuariosBody"></tbody>
-          </table>
-        </div>
-        <div class="card">
-          <h3>Pendientes de registro</h3>
-          <div class="helper">Números que interactuaron, pero todavía no aparecen como usuario registrado.</div>
-          <table>
-            <thead><tr><th>WhatsApp</th><th>Paso</th><th>Bot</th><th>Última actividad</th><th>Acciones</th></tr></thead>
-            <tbody id="pendientesBody"></tbody>
-          </table>
-        </div>
+    <!-- Executive KPI Bar -->
+    <div class="card" style="padding:15px; margin-bottom:14px;">
+      <div class="grid" id="kpis">
+        <div class="kpi"><div class="l">Cargando métricas principales...</div></div>
       </div>
-      <div>
-        <div class="card">
-          <h3>Usuarios (vista admin)</h3>
-          <div class="topbar" style="margin-bottom:8px;">
-            <input id="usuariosSearch" placeholder="Buscar por id, nombre o whatsapp" />
-            <select id="usuariosEstado">
-              <option value="todos">Todos</option>
-              <option value="activos">Activos</option>
-              <option value="inactivos">Inactivos</option>
-            </select>
-            <select id="usuariosPlan">
-              <option value="todos">Todos los planes</option>
-              <option value="gratis">Gratis</option>
-              <option value="basico">Básico</option>
-              <option value="pro">Pro</option>
-            </select>
+    </div>
+
+    <!-- Administrative Action Matrix (Drill-Down Cards) -->
+    <div class="card" style="margin-bottom:14px;">
+      <p class="section-kicker">Operaciones Técnicas</p>
+      <h3>Módulos Administrativos y de Gestión</h3>
+      <p class="section-lead">La plataforma AgroHabilis se organiza en vistas enfocadas para evitar sobrecarga. Seleccioná una sección para operar:</p>
+      
+      <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-top:12px;">
+        <div class="kpi clickable" onclick="window.location.href='/dashboard/usuarios'" style="background:rgba(88,166,255,0.02); border-radius:12px; display:flex; flex-direction:column; justify-content:space-between; min-height:160px;">
+          <div>
+            <strong style="color:var(--text); font-size:14.5px; display:flex; align-items:center; gap:8px;">👥 Productores y Usuarios</strong>
+            <p class="muted" style="margin:6px 0 0 0; font-size:12px; line-height:1.5;">Administrá el listado de productores, perfiles de onboarding, cultivos declarados, suscripciones de MercadoPago e historial de alertas.</p>
           </div>
-          <table>
-            <thead><tr><th>ID</th><th>Nombre</th><th>WhatsApp</th><th>Plan</th><th>Bloques habilitados</th><th>Activo</th><th>Consultas</th><th>Tokens</th><th>Acciones</th></tr></thead>
-            <tbody id="usuariosBody"></tbody>
-          </table>
+          <a href="/dashboard/usuarios" style="color:var(--accent); text-decoration:none; font-size:12px; font-weight:700; align-self:flex-end; margin-top:8px;">Gestionar Usuarios ➔</a>
         </div>
-        <div class="card">
-          <h3>Detalle por usuario</h3>
-          <div class="topbar" style="margin-bottom:8px;">
-            <input id="userIdInput" placeholder="usuarioId (ej: 4)" />
-            <button id="btnUser">Ver detalle</button>
+
+        <div class="kpi clickable" onclick="window.location.href='/dashboard/ia'" style="background:rgba(16,185,129,0.02); border-radius:12px; display:flex; flex-direction:column; justify-content:space-between; min-height:160px;">
+          <div>
+            <strong style="color:var(--text); font-size:14.5px; display:flex; align-items:center; gap:8px;">🧠 Consola de IA & Gemini</strong>
+            <p class="muted" style="margin:6px 0 0 0; font-size:12px; line-height:1.5;">Monitoreá las API keys de Gemini, Groq, OpenRouter y Ollama, eventos de cuota excedida, el extractor de visión y consumo de tokens.</p>
           </div>
-          <div class="actions">
-            <button id="btnActivar" class="btn-secondary">Activar usuario</button>
-            <button id="btnPausar" class="btn-secondary">Pausar usuario</button>
-            <button id="btnEliminar" class="btn-danger">Eliminar (soft)</button>
+          <a href="/dashboard/ia" style="color:var(--accent); text-decoration:none; font-size:12px; font-weight:700; align-self:flex-end; margin-top:8px;">Ver Consola IA ➔</a>
+        </div>
+
+        <div class="kpi clickable" onclick="window.location.href='/dashboard/campanas'" style="background:rgba(163,113,247,0.02); border-radius:12px; display:flex; flex-direction:column; justify-content:space-between; min-height:160px;">
+          <div>
+            <strong style="color:var(--text); font-size:14.5px; display:flex; align-items:center; gap:8px;">🚀 Campañas Masivas</strong>
+            <p class="muted" style="margin:6px 0 0 0; font-size:12px; line-height:1.5;">Programá broadcasts, recordatorios de bienvenida, boletines automáticos del mercado de granos y envíos masivos directos a los productores.</p>
           </div>
-          <div id="userDetail" class="muted">Elegí un usuario para ver actividad, tokens, cultivos, consultas y envíos.</div>
+          <a href="/dashboard/campanas" style="color:var(--accent); text-decoration:none; font-size:12px; font-weight:700; align-self:flex-end; margin-top:8px;">Ver Campañas ➔</a>
+        </div>
+
+        <div class="kpi clickable" onclick="window.location.href='/dashboard/planes'" style="background:rgba(245,158,11,0.02); border-radius:12px; display:flex; flex-direction:column; justify-content:space-between; min-height:160px;">
+          <div>
+            <strong style="color:var(--text); font-size:14.5px; display:flex; align-items:center; gap:8px;">🤖 Planes y Bloques</strong>
+            <p class="muted" style="margin:6px 0 0 0; font-size:12px; line-height:1.5;">Configurá los bloques dinámicos del boletín (clima, hacienda, pizarras) e insights según la matriz de planes (Gratis/Básico/Pro).</p>
+          </div>
+          <a href="/dashboard/planes" style="color:var(--accent); text-decoration:none; font-size:12px; font-weight:700; align-self:flex-end; margin-top:8px;">Matriz de Planes ➔</a>
+        </div>
+
+        <div class="kpi clickable" onclick="window.location.href='/dashboard/precios'" style="background:rgba(88,166,255,0.02); border-radius:12px; display:flex; flex-direction:column; justify-content:space-between; min-height:160px;">
+          <div>
+            <strong style="color:var(--text); font-size:14.5px; display:flex; align-items:center; gap:8px;">💹 Precios & Futuros</strong>
+            <p class="muted" style="margin:6px 0 0 0; font-size:12px; line-height:1.5;">Verificá y gestioná las cotizaciones de futuros MATBA, pizarras locales, dólares MEP/oficial y fletes terrestres.</p>
+          </div>
+          <a href="/dashboard/precios" style="color:var(--accent); text-decoration:none; font-size:12px; font-weight:700; align-self:flex-end; margin-top:8px;">Ver Precios ➔</a>
+        </div>
+
+        <div class="kpi clickable" onclick="window.location.href='/dashboard/templates'" style="background:rgba(16,185,129,0.02); border-radius:12px; display:flex; flex-direction:column; justify-content:space-between; min-height:160px;">
+          <div>
+            <strong style="color:var(--text); font-size:14.5px; display:flex; align-items:center; gap:8px;">🧩 Templates Mensajes</strong>
+            <p class="muted" style="margin:6px 0 0 0; font-size:12px; line-height:1.5;">Edita los layouts de WhatsApp, la estructura del boletín y el formato rústico del bot para respuestas automatizadas directas.</p>
+          </div>
+          <a href="/dashboard/templates" style="color:var(--accent); text-decoration:none; font-size:12px; font-weight:700; align-self:flex-end; margin-top:8px;">Maquetar Respuestas ➔</a>
+        </div>
+
+        <div class="kpi clickable" onclick="window.location.href='/dashboard/metricas'" style="background:rgba(163,113,247,0.02); border-radius:12px; display:flex; flex-direction:column; justify-content:space-between; min-height:160px;">
+          <div>
+            <strong style="color:var(--text); font-size:14.5px; display:flex; align-items:center; gap:8px;">📊 Gráficos & Métricas</strong>
+            <p class="muted" style="margin:6px 0 0 0; font-size:12px; line-height:1.5;">Analizá de forma avanzada la tasa de fallback de IA, la distribución de planes, calidad de origen de datos y anomalías de servidor.</p>
+          </div>
+          <a href="/dashboard/metricas" style="color:var(--accent); text-decoration:none; font-size:12px; font-weight:700; align-self:flex-end; margin-top:8px;">Ver Métricas ➔</a>
+        </div>
+
+        <div class="kpi clickable" onclick="window.location.href='/dashboard/comandos'" style="background:rgba(245,158,11,0.02); border-radius:12px; display:flex; flex-direction:column; justify-content:space-between; min-height:160px;">
+          <div>
+            <strong style="color:var(--text); font-size:14.5px; display:flex; align-items:center; gap:8px;">⌨️ Triggers & Comandos</strong>
+            <p class="muted" style="margin:6px 0 0 0; font-size:12px; line-height:1.5;">Consultá las palabras clave reservadas, triggers y comandos directos de administración del bot mediante WhatsApp.</p>
+          </div>
+          <a href="/dashboard/comandos" style="color:var(--accent); text-decoration:none; font-size:12px; font-weight:700; align-self:flex-end; margin-top:8px;">Ver Comandos ➔</a>
         </div>
       </div>
     </div>
-    <div id="planModalBackdrop" class="modal-backdrop">
-      <div class="modal">
-        <div class="modal-header">
-          <h3 id="planModalTitle" style="margin:0;">Detalle de bloques</h3>
-          <button id="planModalClose" class="modal-close">Cerrar</button>
+    
+    <!-- Runtime and Config Section -->
+    <div class="grid" style="grid-template-columns: 1fr; gap: 14px; margin-top: 14px;">
+      <!-- Runtime del Agente -->
+      <div class="card" id="agentRuntimeCard">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
+          <div>
+            <p class="section-kicker">Telemetría de la Inteligencia Artificial</p>
+            <h3 style="margin:0;">⚙️ Runtime y Configuración del Agente</h3>
+            <p class="section-lead" style="margin-bottom:0;">Estado de flags en tiempo real y uso de proveedores de modelos LLM.</p>
+          </div>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <select id="agentRuntimeDias" style="padding:6px 10px; font-size:12px; height:32px;">
+              <option value="7">Últimos 7 días</option>
+              <option value="15">Últimos 15 días</option>
+              <option value="30">Últimos 30 días</option>
+            </select>
+            <button id="btnAgentRuntimeRefresh" class="btn-secondary btn-mini" style="height:32px;">🔄 Recargar</button>
+          </div>
         </div>
-        <div id="planModalBody" class="block-list"></div>
+        <div id="agentRuntimeBody" style="margin-top:10px;">
+          <p class="muted">Cargando estado del runtime...</p>
+        </div>
+      </div>
+
+      <!-- Variables .env Hot Reload -->
+      <div class="card" id="agentEnvCard">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
+          <div>
+            <p class="section-kicker">Variables de Entorno</p>
+            <h3 style="margin:0;">🛠️ Editor de Configuración (.env)</h3>
+            <p class="section-lead" style="margin-bottom:0;">Ruta de archivo: <span id="agentEnvPath" class="mono-inline" style="color:var(--text);">—</span></p>
+          </div>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <button id="btnAgentEnvReload" class="btn-secondary btn-mini" style="height:32px;">🔄 Recargar .env</button>
+            <button id="btnAgentEnvSave" class="btn primary btn-mini" style="height:32px;">💾 Guardar Cambios</button>
+          </div>
+        </div>
+        <div id="agentEnvStatus" style="font-size:13px; color:var(--accent); font-weight:600; margin-bottom:8px;"></div>
+        <div id="agentEnvFormBody" style="margin-top:10px; overflow-x:auto;">
+          <p class="muted">Cargando variables de entorno...</p>
+        </div>
+      </div>
+
+      <!-- Cola de Consultas Asíncronas y Herramientas -->
+      <div class="card" id="agentPlanCard">
+        <p class="section-kicker">Orquestación de Tareas</p>
+        <h3>🤖 Plan de Ejecución de Tareas Asíncronas</h3>
+        <p class="section-lead">Visualización del flujo activo del agente, herramientas cargadas en memoria y cola de WhatsApp pendientes.</p>
+        
+        <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:14px; margin-top:14px;">
+          <div style="background:var(--bg-elevated); border:1px solid var(--border); border-radius:12px; padding:16px;">
+            <div id="agentColaBox">
+              <span class="muted">Cargando cola de consultas...</span>
+            </div>
+          </div>
+          
+          <div style="background:var(--bg-elevated); border:1px solid var(--border); border-radius:12px; padding:16px;">
+            <h4 style="margin:0 0 10px; font-size:14px; font-weight:700;">Herramientas Activas en AGY SDK</h4>
+            <pre id="agentToolsBox" style="margin:0; font-size:11.5px; max-height:240px; overflow-y:auto; background:var(--bg); border-color:var(--border); white-space:pre-wrap; word-break:break-all;">—</pre>
+          </div>
+        </div>
+
+        <div style="margin-top:14px; background:var(--bg-elevated); border:1px solid var(--border); border-radius:12px; padding:16px;">
+          <h4 style="margin:0 0 10px; font-size:14px; font-weight:700;">Planes Recientes de IA</h4>
+          <div id="agentPlanBox" style="overflow-x:auto;">
+            <span class="muted">Cargando planes del agente...</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="planModalBackdrop" class="modal-backdrop" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); align-items:center; justify-content:center; z-index:9999;">
+      <div class="modal" style="background:var(--panel); border:1px solid var(--border); border-radius:16px; padding:24px; max-width:500px; width:90%; box-shadow:var(--shadow);">
+        <div class="modal-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+          <h3 id="planModalTitle" style="margin:0;">Detalle de bloques</h3>
+          <button id="planModalClose" class="btn-secondary btn-mini">Cerrar</button>
+        </div>
+        <div id="planModalBody" class="block-list" style="max-height:350px; overflow-y:auto; display:flex; flex-direction:column; gap:10px;"></div>
       </div>
     </div>
 
@@ -357,30 +515,10 @@
         return Number.isNaN(d.getTime()) ? String(v) : d.toLocaleString("es-AR");
       };
 
-      const badge = (ok, textOk, textBad) => `<span class="${ok ? "ok" : "bad"}">${ok ? textOk : textBad}</span>`;
       const num = (v) => Number(v || 0).toLocaleString("es-AR");
       const esc = (v) => String(v ?? "").replace(/"/g, "&quot;");
       const sessionAdminKey = "agrohabilis_admin_key";
       let lastResumen = null;
-      const BLOQUES_BASE = [
-        ["Saludo + fecha", "Contexto diario y personalización del mensaje."],
-        ["Precios del día / Mercados", "Valores relevantes para su perfil productivo."],
-        ["Tipo de cambio", "Oficial, Blue y MEP para decisión comercial."],
-        ["Clima zona", "Pronóstico local con foco operativo."],
-        ["Situación", "Lectura breve de contexto del productor."],
-        ["Consejo del día", "Sugerencia puntual y accionable."],
-        ["Señal del día", "Indicador rápido de oportunidad/riesgo."],
-      ];
-      const BLOQUES_BASICO = [
-        ["Oportunidad de venta (48/72h)", "Detecta ventana de fijación parcial por spread/tendencia."],
-        ["Riesgos operativos (semana)", "Semáforo climático para ordenar labores."],
-      ];
-      const BLOQUES_PRO = [
-        ["Insights Pro (producto + zona)", "Lectura avanzada combinando mercado y clima local."],
-        ["Escenarios rápidos", "Impacto de variaciones +/-5% en precio objetivo."],
-        ["Termómetro operativo", "Resumen de condiciones de corto plazo y efecto práctico."],
-        ["Alertas sugeridas", "Automatizaciones recomendadas por perfil y contexto."],
-      ];
 
       function adminHeaders() {
         const key = $("adminKey").value.trim();
@@ -398,196 +536,320 @@
         return true;
       }
 
-      function bloquesPorPlan(planRaw) {
-        const plan = String(planRaw || "gratis").toLowerCase();
-        if (plan === "pro") return { etiqueta: "Base + Básico + Pro", detalle: "Base(7) + Básico(2) + Pro(4)" };
-        if (plan === "basico") return { etiqueta: "Base + Básico", detalle: "Base(7) + Básico(2)" };
-        return { etiqueta: "Base", detalle: "Base(7)" };
-      }
-
-      function detallesPorPlan(planRaw) {
-        const plan = String(planRaw || "gratis").toLowerCase();
-        if (plan === "pro") return [...BLOQUES_BASE, ...BLOQUES_BASICO, ...BLOQUES_PRO];
-        if (plan === "basico") return [...BLOQUES_BASE, ...BLOQUES_BASICO];
-        return [...BLOQUES_BASE];
-      }
-
-      function abrirModalPlan(planRaw) {
-        const plan = String(planRaw || "gratis").toLowerCase();
-        const titulo = plan === "pro" ? "Plan Pro" : plan === "basico" ? "Plan Básico" : "Plan Gratis";
-        const items = detallesPorPlan(plan);
-        $("planModalTitle").textContent = `Bloques habilitados - ${titulo}`;
-        $("planModalBody").innerHTML = items
-          .map((it, idx) => `<div class="block-item"><b>${idx + 1}. ${it[0]}</b><div class="muted">${it[1]}</div></div>`)
-          .join("");
-        $("planModalBackdrop").style.display = "flex";
-      }
-
-      function cerrarModalPlan() {
-        $("planModalBackdrop").style.display = "none";
-      }
-
-      function renderRows(targetId, rows, emptyText = "Sin datos") {
-        const body = $(targetId);
-        body.innerHTML = rows.join("") || `<tr><td class="empty" colspan="99">${emptyText}</td></tr>`;
-      }
-
-      function filtrarAlertasPorUsuario() {
-        const q = ($("alertaUsuarioSearch")?.value || "").trim().toLowerCase();
-        const estado = ($("alertaUsuarioEstado")?.value || "todas").toLowerCase();
-        const rows = $("alertasUsuariosBody").querySelectorAll("tr[data-alerta-usuario-row='1']");
-        rows.forEach((row) => {
-          const usuarioTxt = row.getAttribute("data-usuario-texto") || "";
-          const activas = Number(row.getAttribute("data-activas") || 0);
-          const disparadas = Number(row.getAttribute("data-disparadas") || 0);
-          const okTexto = !q || usuarioTxt.includes(q);
-          const okEstado =
-            estado === "todas" ||
-            (estado === "con_activas" && activas > 0) ||
-            (estado === "con_disparadas" && disparadas > 0);
-          row.style.display = okTexto && okEstado ? "" : "none";
-        });
-      }
-
-      function filtrarUsuarios() {
-        const q = ($("usuariosSearch")?.value || "").trim().toLowerCase();
-        const estado = ($("usuariosEstado")?.value || "todos").toLowerCase();
-        const plan = ($("usuariosPlan")?.value || "todos").toLowerCase();
-        const rows = $("usuariosBody").querySelectorAll("tr[data-user-row='1']");
-        rows.forEach((row) => {
-          const txt = row.getAttribute("data-user-texto") || "";
-          const activo = row.getAttribute("data-user-activo") || "no";
-          const rowPlan = row.getAttribute("data-user-plan") || "gratis";
-          const okText = !q || txt.includes(q);
-          const okEstado =
-            estado === "todos" ||
-            (estado === "activos" && activo === "si") ||
-            (estado === "inactivos" && activo === "no");
-          const okPlan = plan === "todos" || rowPlan === plan;
-          row.style.display = okText && okEstado && okPlan ? "" : "none";
-        });
-      }
-
-      function drawBarChart(canvasId, labels, values, color = "#3ad37c") {
-        const canvas = $(canvasId);
-        if (!canvas) return;
-        const ctx = canvas.getContext("2d");
-        const w = canvas.width = canvas.clientWidth || 320;
-        const h = canvas.height;
-        ctx.clearRect(0, 0, w, h);
-        const max = Math.max(...values, 1);
-        const top = 12;
-        const bottom = h - 26;
-        const chartH = bottom - top;
-        const colW = Math.max(Math.floor((w - 20) / Math.max(values.length, 1)), 1);
-        values.forEach((v, i) => {
-          const bh = Math.round((v / max) * chartH);
-          const x = 10 + i * colW + Math.floor(colW * 0.15);
-          const y = bottom - bh;
-          const bw = Math.floor(colW * 0.7);
-          ctx.fillStyle = color;
-          ctx.fillRect(x, y, bw, bh);
-          ctx.fillStyle = "#9db0d1";
-          ctx.font = "11px Inter, Arial";
-          ctx.fillText(labels[i] || "", x, h - 8);
-          ctx.fillText(String(v ?? 0), x, y - 4);
-        });
-      }
-
-      function drawDonutLike(canvasId, values, colors) {
-        const canvas = $(canvasId);
-        if (!canvas) return;
-        const ctx = canvas.getContext("2d");
-        const w = canvas.width = canvas.clientWidth || 320;
-        const h = canvas.height;
-        ctx.clearRect(0, 0, w, h);
-        const total = values.reduce((a, b) => a + Number(b || 0), 0) || 1;
-        const cx = Math.floor(w / 2), cy = Math.floor(h / 2), r = Math.min(w, h) * 0.34;
-        let start = -Math.PI / 2;
-        values.forEach((v, i) => {
-          const ang = (Number(v || 0) / total) * Math.PI * 2;
-          ctx.beginPath();
-          ctx.moveTo(cx, cy);
-          ctx.fillStyle = colors[i % colors.length];
-          ctx.arc(cx, cy, r, start, start + ang);
-          ctx.closePath();
-          ctx.fill();
-          start += ang;
-        });
-        ctx.beginPath();
-        ctx.fillStyle = "#101a2f";
-        ctx.arc(cx, cy, r * 0.55, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      function renderCharts(x) {
-        const planes = x?.usuarios?.porPlan || [];
-        drawBarChart(
-          "chartPlanes",
-          planes.map((p) => String(p.plan || "-").toUpperCase()),
-          planes.map((p) => Number(p.total || 0)),
-          "#6ea8ff"
-        );
-        $("legendPlanes").textContent = planes
-          .map((p) => `${String(p.plan || "-").toUpperCase()}: ${num(p.total)}`)
-          .join(" | ") || "Sin datos";
-
-        const activas = Number(x?.alertas?.activas || 0);
-        const disparadas = Number(x?.alertas?.disparadas || 0);
-        drawDonutLike("chartAlertas", [activas, disparadas], ["#3ad37c", "#ffb54c"]);
-        $("legendAlertas").textContent = `Activas: ${num(activas)} | Disparadas: ${num(disparadas)}`;
-
-        const ia = Number(x?.ia?.metricas?.consultasConIAHoy || 0);
-        const fb = Number(x?.ia?.metricas?.consultasFallbackHoy || 0);
-        drawDonutLike("chartIA", [ia, fb], ["#7be495", "#ff7d7d"]);
-        $("legendIA").textContent = `IA: ${num(ia)} | Fallback: ${num(fb)}`;
-      }
-
       function onKpiClick(tipo) {
         if (!lastResumen) return;
         if (tipo === "alertas_activas") {
-          $("alertaUsuarioEstado").value = "con_activas";
-          filtrarAlertasPorUsuario();
-          $("alertasUsuariosBody").scrollIntoView({ behavior: "smooth", block: "start" });
+          window.location.href = "/dashboard/usuarios?estado=activos";
         } else if (tipo === "alertas_disparadas") {
-          $("alertaUsuarioEstado").value = "con_disparadas";
-          filtrarAlertasPorUsuario();
-          $("alertasUsuariosBody").scrollIntoView({ behavior: "smooth", block: "start" });
+          window.location.href = "/dashboard/usuarios?alerta=disparadas";
         } else if (tipo === "consultas_hoy") {
-          $("interaccionesBody").scrollIntoView({ behavior: "smooth", block: "start" });
+          window.location.href = "/dashboard/usuarios?consultas=con";
         }
       }
 
-      function aplicarFiltroAlertasDetalle() {
-        const estado = ($("detalleAlertaEstado")?.value || "todas").toLowerCase();
-        const cultivo = ($("detalleAlertaCultivo")?.value || "todos").toLowerCase();
-        const rows = $("userDetail").querySelectorAll("tr[data-alerta-row='1']");
-        rows.forEach((row) => {
-          const rowEstado = row.getAttribute("data-estado") || "todas";
-          const rowCultivo = row.getAttribute("data-cultivo") || "";
-          const okEstado = estado === "todas" ? true : rowEstado === estado;
-          const okCultivo = cultivo === "todos" ? true : rowCultivo === cultivo;
-          row.style.display = okEstado && okCultivo ? "" : "none";
+      function renderAgentPlan(d4, d5, d6) {
+        const colaBox = $("agentColaBox");
+        if (colaBox) {
+          if (!d6 || !d6.ok) {
+            colaBox.innerHTML = `<span class="muted">${d6?.error ? escapeHtml(d6.error) : "Cola: sin datos o migración pendiente"}</span>`;
+          } else {
+            const be = d6.byEstado || {};
+            const chips = ["pending", "processing", "done", "error"]
+              .map((k) => `<span class="badge ${k === 'error' ? 'danger' : k === 'processing' ? 'warning' : k === 'done' ? 'success' : 'info'}" style="margin-right:4px;">${k}: <strong>${be[k] ?? 0}</strong></span>`)
+              .join(" ");
+            const rows = d6.rows || [];
+            const tabla =
+              rows.length === 0
+                ? "<p class=\"muted\" style=\"margin:12px 0 0\">Sin filas en la cola de tareas <code>agent_tarea_fila</code>.</p>"
+                : `<div style="overflow-x:auto; margin-top:12px;"><table style="font-size:12px;"><thead><tr><th>ID</th><th>Estado</th><th>Creado</th><th>WhatsApp</th><th>Consulta</th></tr></thead><tbody>${rows
+                    .map(
+                      (r) =>
+                        `<tr><td>${r.id}</td><td><span class="badge ${r.estado === 'error' ? 'danger' : r.estado === 'processing' ? 'warning' : r.estado === 'done' ? 'success' : 'info'}">${escapeHtml(String(r.estado || ""))}</span></td><td>${fmt(r.creado_en)}</td><td>${escapeHtml(String(r.jid_preview || ""))}</td><td style="max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(String(r.consulta_preview || ""))}">${escapeHtml(String(r.consulta_preview || ""))}</td></tr>`
+                    )
+                    .join("")}</tbody></table></div>`;
+            colaBox.innerHTML = `<div><h4 style="margin:0 0 10px 0; font-size:14px; font-weight:700;">Cola de Consultas Asíncronas</h4><div style="display:flex; flex-wrap:wrap; gap:4px; margin-bottom:8px;">${chips}</div></div>${tabla}`;
+          }
+        }
+        
+        const box = $("agentPlanBox");
+        const toolsBox = $("agentToolsBox");
+        
+        if (box) {
+          if (!d4.ok) {
+            box.innerHTML = `<span class="badge danger">${d4.error || "Error al cargar planes del agente"}</span>`;
+          } else {
+            const rows = d4.rows || [];
+            if (!rows.length) {
+              box.innerHTML = '<span class="muted">Sin turnos con plan aún (ninguna consulta guardó en la tabla <code>agent_plan</code>).</span>';
+            } else {
+              box.innerHTML = `
+                <table style="font-size:12px;">
+                  <thead><tr><th>ID</th><th>Fecha</th><th>WA</th><th>Proveedor</th><th>Pasos de Planificación</th></tr></thead>
+                  <tbody>
+                    ${rows
+                      .map((row) => {
+                        const pasos = (row.pasos || [])
+                          .map(
+                            (p) =>
+                              `<li><code>${escapeHtml(String(p.step || ""))}</code>${p.detail ? ` — <span class="muted">${escapeHtml(JSON.stringify(p.detail))}</span>` : ""}</li>`
+                          )
+                          .join("");
+                        return `<tr>
+                          <td>${row.id}</td>
+                          <td>${fmt(row.creado_en)}</td>
+                          <td>${escapeHtml(String(row.whatsapp || ""))}</td>
+                          <td><span class="badge info">${escapeHtml(String(row.ia_provider || "-"))}</span></td>
+                          <td><ul style="margin:0; padding-left:14px; line-height:1.45;">${pasos}</ul></td>
+                        </tr>`;
+                      })
+                      .join("")}
+                  </tbody>
+                </table>`;
+            }
+          }
+        }
+        if (toolsBox) {
+          if (d5 && d5.ok) {
+            toolsBox.textContent = JSON.stringify(d5.tools || [], null, 2);
+          } else {
+            toolsBox.textContent = d5?.error || "Sin herramientas cargadas.";
+          }
+        }
+      }
+
+      function escapeHtml(s) {
+        return String(s)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
+      }
+
+      function renderAgentEnvForm(data) {
+        const body = $("agentEnvFormBody");
+        if (!body) return;
+        const eff = data.effectiveValues || {};
+        const file = data.fileValues || {};
+        const defs = data.defs || [];
+        const rows = defs
+          .map((d) => {
+            const key = d.key;
+            const fromFile = file[key];
+            const disp =
+              fromFile !== undefined && fromFile !== ""
+                ? String(fromFile)
+                : eff[key] != null && eff[key] !== ""
+                  ? String(eff[key])
+                  : d.kind === "bool"
+                    ? "1"
+                    : "";
+            if (d.kind === "bool") {
+              const v = ["1", "true", "yes", "on"].includes(String(disp).toLowerCase()) ? "1" : "0";
+              const proc = ["1", "true", "yes", "on"].includes(String(eff[key] ?? "0").toLowerCase()) ? "sí" : "no";
+              return `<tr><td class="env-key">${escapeHtml(key)}</td><td><div style="font-weight:600; color:var(--text);">${escapeHtml(d.label)}</div><div class="muted" style="font-size:12px;line-height:1.4">${escapeHtml(d.description)}</div><div class="muted" style="font-size:11px;margin-top:4px">Activo (antes de reiniciar): <strong>${proc}</strong></div></td><td><select class="env-input" data-env-key="${escapeHtml(key)}" style="width:100%; max-width:240px; padding:6px 10px;"><option value="1" ${v === "1" ? "selected" : ""}>Sí (1)</option><option value="0" ${v === "0" ? "selected" : ""}>No (0)</option></select></td></tr>`;
+            }
+            if (d.kind === "int") {
+              const n = disp !== "" ? String(disp) : String(eff[key] ?? "");
+              return `<tr><td class="env-key">${escapeHtml(key)}</td><td><div style="font-weight:600; color:var(--text);">${escapeHtml(d.label)}</div><div class="muted" style="font-size:12px;line-height:1.4">${escapeHtml(d.description)}</div><div class="muted" style="font-size:11px;margin-top:4px">Rango ${d.min}–${d.max}</div></td><td><input type="number" class="env-input" data-env-key="${escapeHtml(key)}" min="${d.min}" max="${d.max}" value="${escapeHtml(n)}" style="width:100%; max-width:240px; padding:6px 10px;" /></td></tr>`;
+            }
+            const s = disp !== "" ? String(disp) : String(eff[key] ?? "");
+            return `<tr><td class="env-key">${escapeHtml(key)}</td><td><div style="font-weight:600; color:var(--text);">${escapeHtml(d.label)}</div><div class="muted" style="font-size:12px;line-height:1.4">${escapeHtml(d.description)}</div></td><td><input type="text" class="env-input" data-env-key="${escapeHtml(key)}" value="${escapeHtml(s)}" style="width:100%; max-width:240px; padding:6px 10px;" /></td></tr>`;
+          })
+          .join("");
+        body.innerHTML = `<table class="env-edit-table"><thead><tr><th>Variable</th><th>Detalle</th><th>Valor Actual</th></tr></thead><tbody>${rows}</tbody></table>`;
+      }
+
+      async function loadAgentEnvPanel() {
+        const body = $("agentEnvFormBody");
+        const pathEl = $("agentEnvPath");
+        const st = $("agentEnvStatus");
+        try {
+          const r = await fetch("/api/dashboard/admin/agent-env", { headers: adminHeaders() });
+          const j = await r.json();
+          if (!j.ok) {
+            if (body) body.innerHTML = `<span class="badge danger">${escapeHtml(j.error || "Error al cargar .env")}</span>`;
+            return;
+          }
+          if (pathEl) pathEl.textContent = j.data.envPath || "—";
+          if (st) {
+            if (j.data.effectiveError) {
+              st.innerHTML = `<span class="badge danger">${escapeHtml(j.data.effectiveError)}</span>`;
+            } else if (!j.data.dotenvExists) {
+              st.textContent = "Aviso: no hay archivo .env; al guardar se creará uno nuevo.";
+            } else {
+              st.textContent = "";
+            }
+          }
+          renderAgentEnvForm(j.data);
+        } catch (e) {
+          if (body) body.innerHTML = `<span class="badge danger">${escapeHtml(e.message)}</span>`;
+        }
+      }
+
+      async function saveAgentEnvPanel() {
+        const patch = {};
+        document.querySelectorAll("[data-env-key]").forEach((el) => {
+          const k = el.getAttribute("data-env-key");
+          if (k) patch[k] = el.value;
         });
+        const btn = $("btnAgentEnvSave");
+        if (btn) btn.disabled = true;
+        try {
+          const r = await fetch("/api/dashboard/admin/agent-env", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", ...adminHeaders() },
+            body: JSON.stringify(patch),
+          });
+          const j = await r.json();
+          if (!j.ok) {
+            alert(j.error || "No se pudo guardar");
+            return;
+          }
+          const pm2 = j.pm2;
+          let msg = "Cambios guardados en archivo .env.";
+          if (pm2 && pm2.restarted) msg += ` PM2 reinició el proceso (${pm2.app}).`;
+          else if (pm2 && pm2.warn) msg += ` Reinicio no ejecutado: ${pm2.warn}`;
+          const st = $("agentEnvStatus");
+          if (st) st.textContent = msg;
+          await cargar();
+        } finally {
+          if (btn) btn.disabled = false;
+        }
+      }
+
+      function renderAgentRuntime(ar, mixProveedor, diasVentana = 7) {
+        const box = $("agentRuntimeBody");
+        if (!box) return;
+        if (!ar || ar.error) {
+          box.innerHTML = `<span class="badge danger">No se pudo leer el runtime: ${escapeHtml(ar?.error || "sin datos")}</span>`;
+          return;
+        }
+        const chip = (on) => (on ? '<span class="badge success">Sí</span>' : '<span class="badge warning" style="opacity:0.65;">No</span>');
+        const lim = ar.limits || {};
+        const keys = ar.apiKeysPresent || {};
+        const models = ar.models || {};
+        const dWin = Number(diasVentana) || 7;
+        box.innerHTML = `
+          <div class="flag-grid">
+            <div class="flag-item"><div class="k">Modo agente (<code>AGENT_CURSOR_MODE</code>)</div><div class="v">${chip(ar.cursorMode)}</div></div>
+            <div class="flag-item"><div class="k">IA total pipeline (<code>AGENT_IA_TOTAL</code>)</div><div class="v">${chip(ar.agentIaTotal)}</div></div>
+            <div class="flag-item"><div class="k">Bucle unificado (<code>AGENT_UNIFIED_TURN_LOOP</code>)</div><div class="v">${chip(ar.unifiedTurnLoop)}</div></div>
+            <div class="flag-item"><div class="k">Clasificador en bucle</div><div class="v">${chip(ar.clasificadorEnBucleUnificado)}</div></div>
+            <div class="flag-item"><div class="k">Scout tool-loop</div><div class="v">${chip(ar.scoutLoop)}</div></div>
+            <div class="flag-item"><div class="k">Inventario solo LLM</div><div class="v">${chip(ar.inventarioSoloLlm)}</div></div>
+          </div>
+          
+          <div style="margin-top:14px; padding:12px; background:var(--bg-elevated); border:1px solid var(--border); border-radius:10px;">
+            <p style="margin:0 0 6px 0;"><b>API Keys del Servidor:</b> OpenRouter ${chip(keys.OPENROUTER)} · Groq ${chip(keys.GROQ)} · Gemini ${chip(keys.GEMINI)}</p>
+            <p class="muted" style="margin:0; font-size:12.5px;">Modelos por env: OpenRouter <code>${escapeHtml(models.OPENROUTER_MODEL || "—")}</code> · Gemini <code>${escapeHtml(models.GEMINI_MODEL || "—")}</code></p>
+          </div>
+
+          <h4 style="margin:16px 0 8px 0; font-size:14px; font-weight:700;">Límites de Ejecución</h4>
+          <table style="font-size:12px;">
+            <thead><tr><th>Límite de Runtime</th><th>Valor</th></tr></thead>
+            <tbody>
+              <tr><td>Historial clasificador (turnos)</td><td><strong>${lim.historialClasificador ?? "—"}</strong></td></tr>
+              <tr><td>Historial hilo IA (turnos en prompt)</td><td><strong>${lim.historialHiloIaTurnos ?? "—"}</strong></td></tr>
+              <tr><td>Historial gate dominio</td><td><strong>${lim.historialDominio ?? "—"}</strong></td></tr>
+              <tr><td>Scout / unificado — max turns</td><td><strong>${lim.scoutMaxTurns ?? "—"}</strong></td></tr>
+              <tr><td>Scout / unificado — max tool calls</td><td><strong>${lim.scoutMaxToolCalls ?? "—"}</strong></td></tr>
+            </tbody>
+          </table>
+
+          <h4 style="margin:16px 0 8px 0; font-size:14px; font-weight:700;"><code>ia_provider</code> en consultas (últimos ${dWin} días)</h4>
+          <table>
+            <thead><tr><th>Proveedor Utilizado</th><th>Cantidad de Consultas</th></tr></thead>
+            <tbody>
+              ${mixProveedor && mixProveedor.length
+                ? mixProveedor.map((r) => `<tr><td><code>${escapeHtml(String(r.proveedor || ""))}</code></td><td><strong>${num(r.n)}</strong></td></tr>`).join("")
+                : '<tr><td colspan="2" class="muted">Sin consultas registradas en este período.</td></tr>'}
+            </tbody>
+          </table>
+        `;
+      }
+
+      async function refreshAgentRuntimeSolo() {
+        const sel = $("agentRuntimeDias");
+        const btn = $("btnAgentRuntimeRefresh");
+        const diasRaw = sel ? Number(sel.value) : 7;
+        const dias = Math.min(90, Math.max(1, diasRaw || 7));
+        const headers = adminHeaders();
+        if (btn) btn.disabled = true;
+        try {
+          const r = await fetch(`/api/dashboard/admin/agent-runtime?dias=${dias}`, { headers });
+          const j = await r.json();
+          if (!j.ok) {
+            alert(j.error || "Error al cargar runtime del agente");
+            return;
+          }
+          const { dias: dClamped, runtime, proveedorMix } = j.data || {};
+          if (sel && dClamped != null) sel.value = String(dClamped);
+          renderAgentRuntime(runtime, proveedorMix, dClamped ?? dias);
+        } finally {
+          if (btn) btn.disabled = false;
+        }
       }
 
       async function cargar() {
         const headers = adminHeaders();
-        const [r1, r2, r3] = await Promise.all([
+        const [r1, r4, r5, r6] = await Promise.all([
           fetch("/api/dashboard/admin/resumen", { headers }),
-          fetch("/api/dashboard/admin/usuarios?limit=20", { headers }),
-          fetch("/api/dashboard/admin/pendientes?limit=120", { headers }),
+          fetch("/api/dashboard/admin/agent-plan?limit=15", { headers }),
+          fetch("/api/dashboard/admin/agent-tools", { headers }),
+          fetch("/api/dashboard/admin/agent-cola", { headers }),
         ]);
         const d1 = await r1.json();
-        const d2 = await r2.json();
-        const d3 = await r3.json();
-        if (!d1.ok) return alert(d1.error || "Error resumen");
-        if (!d2.ok) return alert(d2.error || "Error usuarios");
-        if (!d3.ok) return alert(d3.error || "Error pendientes");
-        await cargarTemplatesInsight(headers);
+        const d4 = await r4.json();
+        const d5 = await r5.json();
+        const d6 = await r6.json();
+        
+        if (!d1.ok) return alert(d1.error || "Error al cargar resumen");
+        renderAgentPlan(d4, d5, d6);
 
         const x = d1.data;
         lastResumen = x;
+        
+        const rtSel = $("agentRuntimeDias");
+        if (rtSel) rtSel.value = "7";
+        renderAgentRuntime(x.agentRuntime, x.ia?.metricas?.proveedorMix7d, 7);
+
+        // Update live health badges
+        const waBadge = $("waStatusBadge");
+        if (waBadge) {
+          const code = x.estado?.whatsappDetalle?.codigo || x.estado?.whatsapp;
+          if (code === "listo" || code === "CONECTADO") {
+            waBadge.className = "badge success";
+            waBadge.textContent = "CONECTADO";
+          } else {
+            waBadge.className = "badge danger";
+            waBadge.textContent = String(code || "DESCONECTADO").toUpperCase();
+          }
+        }
+        
+        const dbBadge = $("dbStatusBadge");
+        if (dbBadge) {
+          const code = String(x.estado?.db || "desconocido").toLowerCase();
+          if (code === "ok" || code === "operativa") {
+            dbBadge.className = "badge success";
+            dbBadge.textContent = "OPERATIVA";
+          } else {
+            dbBadge.className = "badge danger";
+            dbBadge.textContent = "DESCONECTADA";
+          }
+        }
+
+        const cronBadge = $("cronStatusBadge");
+        if (cronBadge) {
+          cronBadge.className = "badge success";
+          cronBadge.textContent = "ACTIVO";
+        }
+
+        // Update freshness timestamps
+        if ($("frescuraPrecios")) $("frescuraPrecios").textContent = fmt(x.actualizacion?.ultimaRecoleccion);
+        if ($("frescuraMEP")) $("frescuraMEP").textContent = fmt(x.actualizacion?.ultimaCotizacion);
+        if ($("frescuraClima")) $("frescuraClima").textContent = fmt(x.actualizacion?.ultimaConsulta);
+
+        // Render executive KPIs
         const textoWhatsappKpi = () => {
           const d = x.estado?.whatsappDetalle;
           if (!d) return x.estado?.whatsapp || "—";
@@ -595,22 +857,20 @@
           if (d.codigo === "listo") return base;
           return d.ultimoMotivo ? `${base} · ${d.ultimoMotivo}` : base;
         };
+
         const kpis = [
           { l: "WhatsApp", v: textoWhatsappKpi() },
-          { l: "DB", v: x.estado.db.toUpperCase() },
+          { l: "PostgreSQL DB", v: String(x.estado.db).toUpperCase() },
           { l: "Usuarios registrados", v: num(x.usuarios.registrados) },
           { l: "Usuarios activos", v: num(x.usuarios.activos) },
           { l: "Consultas hoy", v: num(x.interacciones.consultasHoy), click: "consultas_hoy" },
           { l: "Consultas 7 días", v: num(x.interacciones.consultas7d) },
-          { l: "Resúmenes hoy enviados", v: num(x.resumenesHoy.enviados) },
-          {
-            l: `Gratis hoy: ${num(x.resumenesHoy?.gratis?.postRegistro)} post-reg | ${num(x.resumenesHoy?.gratis?.lunesJueves)} L/J`,
-            v: num(x.resumenesHoy?.gratis?.total || 0),
-          },
+          { l: "Resúmenes hoy", v: num(x.resumenesHoy.enviados) },
           { l: "Onboarding en curso", v: num(x.usuarios.onboardingEnCurso) },
           { l: "Alertas activas", v: num(x.alertas?.activas), click: "alertas_activas" },
           { l: "Alertas disparadas", v: num(x.alertas?.disparadas), click: "alertas_disparadas" },
         ];
+
         $("kpis").innerHTML = kpis
           .map(
             (k) =>
@@ -619,436 +879,46 @@
               </div>`
           )
           .join("");
+
         $("kpis").querySelectorAll("[data-kpi-click]").forEach((el) => {
           el.addEventListener("click", () => onKpiClick(el.getAttribute("data-kpi-click")));
         });
-        renderCharts(x);
 
-        $("iaBox").innerHTML = `
-          <p><b>Estado IA:</b> ${badge(x.ia.estado === "operativa", "OPERATIVA", "SIN PROVEEDORES")}</p>
-          <p><b>Orden fallback:</b> ${(x.ia.ordenFallback || []).join(" -> ") || "sin proveedores configurados"}</p>
-          <p><b>Consultas IA hoy:</b> ${num(x.ia.metricas.consultasConIAHoy)} | <b>Fallback hoy:</b> ${num(x.ia.metricas.consultasFallbackHoy)}</p>
-          <p><b>Tasa IA hoy:</b> ${x.ia.metricas.porcentajeIAHoy ?? "s/d"}% | <b>Tasa fallback:</b> ${x.ia.metricas.porcentajeFallbackHoy ?? "s/d"}%</p>
-          <p><b>Auditoría IA (sin contexto):</b> hoy ${num(x.ia.metricas.respuestasIASinContextoHoy)} | 7d ${num(x.ia.metricas.respuestasIASinContexto7d)}</p>
-          <p><b>Tokens consultas hoy:</b> ${num(x.ia.tokens.consultasHoy)} | <b>Tokens consultas total:</b> ${num(x.ia.tokens.consultasTotal)}</p>
-          <h4>Tokens por usuario</h4>
-          <table>
-            <thead><tr><th>Usuario</th><th>WhatsApp</th><th>Tokens</th></tr></thead>
-            <tbody>
-              ${(x.ia.tokens.porUsuario || []).map(t => `<tr><td>${t.nombre || "-"}</td><td>${t.whatsapp || "-"}</td><td>${num(t.tokens_totales)}</td></tr>`).join("")}
-            </tbody>
-          </table>
-        `;
-
-        const cobertura = x.datos?.cobertura || { porcentaje: 0, temas: [] };
-        const estadoClase = (e) => e === "ok" ? "state-ok" : e === "desactualizado" ? "state-warn" : "state-empty";
-        const estadoBarClass = (e) => e === "ok" ? "ok" : e === "desactualizado" ? "warn" : "bad";
-        const qualityLabel = (q) => {
-          if (q === "directa") return "directa";
-          if (q === "proxy") return "proxy/fallback";
-          if (q === "ultimo_valido") return "último válido";
-          return "sin datos";
-        };
-        const qualityIcon = (q) => {
-          if (q === "directa") return "🟢";
-          if (q === "proxy") return "🟡";
-          if (q === "ultimo_valido") return "🔵";
-          return "⚪";
-        };
-        const semaforo = cobertura.porcentaje >= 80 ? "ok" : cobertura.porcentaje >= 50 ? "warn" : "bad";
-        const estadoTxt = semaforo === "ok" ? "Cobertura saludable" : semaforo === "warn" ? "Cobertura parcial" : "Cobertura crítica";
-        const temaById = Object.fromEntries((cobertura.temas || []).map((t) => [t.id, t]));
-        $("fuentesBox").innerHTML = `
-          <div class="coverage-top">
-            <div class="coverage-light ${semaforo}"></div>
-            <p><b>Cobertura de datos:</b> ${num(cobertura.porcentaje)}% · ${estadoTxt}</p>
-          </div>
-          <div class="coverage-bars">
-            ${(cobertura.temas || []).map(t => {
-              const pctTema = t.estado === "ok" ? 100 : t.estado === "desactualizado" ? 55 : 15;
-              return `
-                <div class="coverage-bar-row">
-                  <div>${t.nombre}</div>
-                  <div class="coverage-bar-track">
-                    <div class="coverage-bar-fill ${estadoBarClass(t.estado)}" style="width:${pctTema}%"></div>
-                  </div>
-                  <div>${t.label}</div>
-                </div>
-              `;
-            }).join("")}
-          </div>
-          <div class="coverage-grid">
-            ${(cobertura.temas || []).map(t => `
-              <div class="coverage-item">
-                <div class="title">${t.nombre}</div>
-                <div class="state ${estadoClase(t.estado)}">${t.label}</div>
-                <div class="muted">Registros: ${num(t.total || 0)}</div>
-                <div class="muted">Última: ${fmt(t.ultimaActualizacion)}</div>
-                ${(t.id === "insumos" || t.id === "hacienda") ? `<div class="quality-chip quality-${t.calidad || "sin_datos"}">Origen: ${qualityLabel(t.calidad)}</div>` : ""}
-                ${(t.id === "insumos" || t.id === "hacienda") ? `<div class="muted">${t.calidadDetalle || "-"}</div>` : ""}
-              </div>
-            `).join("")}
-          </div>
-          <p><b>Última recolección precios:</b> ${fmt(x.actualizacion.ultimaRecoleccion)}</p>
-          <p><b>Último tipo cambio:</b> ${fmt(x.actualizacion.ultimaCotizacion)}</p>
-          <p><b>Última consulta:</b> ${fmt(x.actualizacion.ultimaConsulta)}</p>
-          <h4>APIs y scrapers en uso</h4>
-          <table>
-            <thead><tr><th>Fuente</th><th>Categoría</th><th>Estado</th><th>Región</th><th>Productos</th><th>Endpoint</th><th>Última verificación</th><th>Min atrás</th></tr></thead>
-            <tbody>
-              ${(x.datos.fuentes || []).map(f => `<tr><td>${f.nombre || f.codigo}</td><td>${f.categoria}/${f.grupo}</td><td>${f.estado || "-"}</td><td>${f.region || "-"}</td><td>${(f.productos || []).join(", ") || "-"}</td><td style="max-width:280px;word-break:break-all;">${f.endpoint}</td><td>${fmt(f.ultimaActualizacion)}</td><td>${f.minutosDesdeUltAct ?? "s/d"}</td></tr>`).join("")}
-            </tbody>
-          </table>
-          <h4>Estado de fuentes (agrupado)</h4>
-          ${(Object.entries(x.datos.fuentesEstado || {})).map(([cat, items]) => `
-            <p><b>${cat.toUpperCase()}</b></p>
-            <ul>
-              ${(items || []).map(f => {
-                const icon = f.status === "ok" ? "🟢" : f.status === "lento" ? "🟡" : f.status === "error" ? "🔴" : "⚪";
-                const isInsumo = String(cat).toLowerCase() === "insumos";
-                const isHacienda = String(f.nombre || "").toLowerCase().includes("liniers") || String(f.nombre || "").toLowerCase().includes("agroganadero");
-                const calidadTema = isInsumo ? temaById.insumos : isHacienda ? temaById.hacienda : null;
-                const origenTxt = calidadTema ? `${qualityIcon(calidadTema.calidad)} ${qualityLabel(calidadTema.calidad)}` : null;
-                return `<li>${icon} ${f.nombre} · ${f.region || "-"} · ${fmt(f.verificadoEn)} · ${(f.productos || []).join(", ") || "-"}${origenTxt ? ` · Origen ${origenTxt}` : ""}</li>`;
-              }).join("")}
-            </ul>
-          `).join("")}
-        `;
-
-        const fmtWhatsappAdmin = (u) => {
-          const real = u.whatsapp_real || "";
-          const jid = u.whatsapp_jid || "";
-          const base = u.whatsapp || real || "-";
-          if (real) return base;
-          if (jid && String(jid).includes("@lid")) return `${base} (LID, sin nro real)`;
-          return base;
-        };
-
-        $("interaccionesBody").innerHTML = (x.interacciones.porUsuario || [])
-          .map((u) => `<tr><td>${u.nombre || "-"}</td><td>${fmtWhatsappAdmin(u)}</td><td>${num(u.consultas_total)}</td><td>${num(u.consultas_hoy)}</td><td>${fmt(u.ultima_consulta)}</td></tr>`)
-          .join("");
-
-        $("alertasUsuariosBody").innerHTML = (x.alertas?.porUsuario || [])
-          .map((u) => `<tr data-alerta-usuario-row="1" data-usuario-texto="${esc(`${u.nombre || ""} ${u.whatsapp || ""}`.toLowerCase())}" data-activas="${Number(u.activas || 0)}" data-disparadas="${Number(u.disparadas || 0)}"><td>${u.nombre || "-"}</td><td>${fmtWhatsappAdmin(u)}</td><td>${num(u.activas)}</td><td>${num(u.disparadas)}</td><td>${num(u.total)}</td></tr>`)
-          .join("");
-        filtrarAlertasPorUsuario();
-
-        renderRows(
-          "usuariosBody",
-          (d2.usuarios || []).map((u) => {
-            const bloques = bloquesPorPlan(u.plan);
-            return `
-            <tr data-user-row="1" data-user-activo="${u.activo ? "si" : "no"}" data-user-plan="${esc(String(u.plan || "gratis").toLowerCase())}" data-user-texto="${esc(`${u.id} ${u.nombre || ""} ${u.whatsapp || ""}`.toLowerCase())}">
-              <td>${u.id}</td>
-              <td>${u.nombre || "-"}</td>
-              <td>${fmtWhatsappAdmin(u)}</td>
-              <td>${u.plan || "-"}</td>
-              <td><span class="chip clickable" title="${bloques.detalle}" data-plan-chip="${esc(String(u.plan || "gratis").toLowerCase())}">${bloques.etiqueta}</span></td>
-              <td>${u.activo ? "si" : "no"}</td>
-              <td>${num(u.consultas_total)}</td>
-              <td>${num(u.tokens_consultas)}</td>
-              <td>
-                <div class="row-actions">
-                  <button class="btn-mini btn-secondary" data-action="activar" data-user-id="${u.id}" data-user-name="${esc(u.nombre || u.whatsapp)}">Activar</button>
-                  <button class="btn-mini btn-secondary" data-action="pausar" data-user-id="${u.id}" data-user-name="${esc(u.nombre || u.whatsapp)}">Pausar</button>
-                  <button class="btn-mini btn-danger" data-action="eliminar" data-user-id="${u.id}" data-user-name="${esc(u.nombre || u.whatsapp)}">Eliminar</button>
-                </div>
-                <div class="plan-actions">
-                  <select data-plan-target="${u.id}">
-                    <option value="gratis" ${String(u.plan || "").toLowerCase() === "gratis" ? "selected" : ""}>Gratis</option>
-                    <option value="basico" ${String(u.plan || "").toLowerCase() === "basico" ? "selected" : ""}>Básico</option>
-                    <option value="pro" ${String(u.plan || "").toLowerCase() === "pro" ? "selected" : ""}>Pro</option>
-                  </select>
-                  <button class="btn-mini btn-secondary" data-action="cambiar_plan" data-user-id="${u.id}" data-user-name="${esc(u.nombre || u.whatsapp)}">Cambiar plan</button>
-                </div>
-              </td>
-            </tr>
-          `}),
-          "No hay usuarios para mostrar"
-        );
-        filtrarUsuarios();
-
-        $("usuariosBody").querySelectorAll("button[data-action]").forEach((btn) => {
-          btn.addEventListener("click", async () => {
-            const action = btn.getAttribute("data-action");
-            const userId = btn.getAttribute("data-user-id");
-            const userName = btn.getAttribute("data-user-name");
-            await ejecutarAccionUsuario(action, userId, userName);
-          });
-        });
-        $("usuariosBody").querySelectorAll("[data-plan-chip]").forEach((el) => {
-          el.addEventListener("click", () => abrirModalPlan(el.getAttribute("data-plan-chip")));
-        });
-
-        renderRows(
-          "pendientesBody",
-          (d3.items || []).map((p) => `
-            <tr>
-              <td>${p.whatsapp || "-"}</td>
-              <td>${p.paso_actual ?? "-"}</td>
-              <td>${p.bot_activo ? "activo" : "pausado"}</td>
-              <td>${fmt(p.ultima_interaccion || p.actualizado_en)}</td>
-              <td>
-                <div class="row-actions">
-                  <button class="btn-mini btn-secondary" data-pendiente-action="recordar" data-pendiente-wp="${p.whatsapp}">Recordar</button>
-                  <button class="btn-mini btn-secondary" data-pendiente-action="mensaje" data-pendiente-wp="${p.whatsapp}">Mensaje</button>
-                  <button class="btn-mini btn-danger" data-pendiente-action="eliminar" data-pendiente-wp="${p.whatsapp}">Eliminar</button>
-                </div>
-              </td>
-            </tr>
-          `),
-          "Sin pendientes de registro"
-        );
-        $("pendientesBody").querySelectorAll("button[data-pendiente-action]").forEach((btn) => {
-          btn.addEventListener("click", async () => {
-            const accion = btn.getAttribute("data-pendiente-action");
-            const whatsapp = btn.getAttribute("data-pendiente-wp");
-            await ejecutarAccionPendiente(accion, whatsapp);
-          });
-        });
+        await loadAgentEnvPanel();
       }
 
-      async function cargarTemplatesInsight(headers = {}) {
-        try {
-          const r = await fetch("/api/dashboard/admin/templates", { headers });
-          const d = await r.json();
-          if (!d.ok) throw new Error(d.error || "No disponible");
-          const files = d.files || [];
-          const ultimos = files
-            .slice()
-            .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
-            .slice(0, 5);
-          $("templatesInsight").innerHTML = `
-            <div class="coverage-grid">
-              <div class="coverage-item"><div class="title">Archivos editables</div><div class="state state-ok">${files.length}</div></div>
-              <div class="coverage-item"><div class="title">Layouts por plan</div><div class="state">${files.filter((f) => f.path.includes("layouts/")).length}</div></div>
-              <div class="coverage-item"><div class="title">Templates base</div><div class="state">${files.filter((f) => !f.path.includes("layouts/")).length}</div></div>
-            </div>
-            <div class="muted">Últimos actualizados</div>
-            <ul>
-              ${ultimos.map((f) => `<li>${f.path} · ${new Date(f.updatedAt).toLocaleString("es-AR")}</li>`).join("") || "<li>Sin archivos</li>"}
-            </ul>
-            <div class="actions"><button class="btn-secondary btn-mini" onclick="window.location.href='/dashboard/templates'">Abrir editor de templates</button></div>
-          `;
-        } catch (e) {
-          $("templatesInsight").textContent = `No se pudo cargar estado de templates: ${e.message}`;
-        }
-      }
-
-      async function ejecutarAccionPendiente(accion, whatsapp) {
-        const key = $("adminKey").value.trim();
-        if (!whatsapp) return alert("Falta whatsapp");
-        let mensaje = "";
-        if (accion === "mensaje") {
-          mensaje = prompt("Escribí el mensaje para enviar por WhatsApp:", "Hola 👋 Te contacto desde AgroHabilis para ayudarte a completar tu registro.");
-          if (mensaje === null) return;
-          mensaje = String(mensaje).trim();
-          if (!mensaje) return alert("El mensaje no puede estar vacío");
-        }
-        const msg =
-          accion === "recordar"
-            ? `Enviar recordatorio para completar registro a ${whatsapp}?`
-            : accion === "mensaje"
-              ? `Enviar mensaje personalizado a ${whatsapp}?`
-            : `Eliminar pendiente de registro para ${whatsapp}?`;
-        if (!confirm(msg)) return;
-        const r = await fetch("/api/dashboard/admin/pendiente-accion", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(key ? { "x-admin-key": key } : {}),
-          },
-          body: JSON.stringify({ accion, whatsapp, mensaje }),
-        });
-        const d = await r.json();
-        if (!d.ok) return alert(d.error || "No se pudo ejecutar la acción");
-        const textoOk =
-          accion === "recordar"
-            ? `Recordatorio enviado a ${whatsapp}`
-            : accion === "mensaje"
-              ? `Mensaje enviado a ${whatsapp}`
-              : `Pendiente eliminado: ${whatsapp}`;
-        alert(textoOk);
-        await cargar();
-      }
-
-      async function cargarDetalleUsuario() {
-        const userId = $("userIdInput").value.trim();
-        if (!userId) return alert("Ingresá usuarioId");
-        const r = await fetch(`/api/dashboard/admin/usuario-detalle?usuarioId=${encodeURIComponent(userId)}`, {
-          headers: adminHeaders(),
-        });
-        const d = await r.json();
-        if (!d.ok) return alert(d.error || "No se pudo cargar detalle");
-        const x = d.detalle;
-        const bloques = bloquesPorPlan(x.usuario.plan);
-        const lotesDeclarados = x.onboarding?.datos_temporales?.lotes_declarados || [];
-        const stockTotal = (x.stockGanadero || []).reduce((acc, s) => acc + Number(s.cantidad || 0), 0);
-        $("userDetail").innerHTML = `
-          <p><b>${x.usuario.nombre || "-"}</b> (${x.usuario.whatsapp})</p>
-          <p>Plan: ${x.usuario.plan || "-"} | Activo: ${x.usuario.activo ? "si" : "no"} | Zona: ${x.usuario.partido || "-"}, ${x.usuario.provincia || "-"}</p>
-          <p>Bloques habilitados: <span class="chip clickable" title="${bloques.detalle}" data-user-detail-plan="${String(x.usuario.plan || "gratis").toLowerCase()}">${bloques.etiqueta}</span></p>
-          <p>Comercialización: ${x.usuario.tipo_comercializacion || "-"} | Perfil productivo: ${x.perfilProductivo?.tipo || "s/d"} | Onboarding: ${x.onboarding?.completado ? "completo" : "en curso"}</p>
-          <p>Consultas total: ${num(x.actividad.consultas_total)} | Hoy: ${num(x.actividad.consultas_hoy)} | Tokens total: ${num(x.actividad.tokens_consultas_total)} | Tokens hoy: ${num(x.actividad.tokens_consultas_hoy)}</p>
-          <p>Última consulta: ${fmt(x.actividad.ultima_consulta)}</p>
-          <p>Stock ganadero total: ${num(stockTotal)} cabezas</p>
-          <h4>Lotes declarados (onboarding/progresivo)</h4>
-          <table><thead><tr><th>Lote</th></tr></thead><tbody>
-            ${lotesDeclarados.length ? lotesDeclarados.map((l) => `<tr><td>${l}</td></tr>`).join("") : '<tr><td>-</td></tr>'}
-          </tbody></table>
-          <h4>Stock ganadero por categoría</h4>
-          <table><thead><tr><th>Categoría</th><th>Cantidad</th><th>Fecha</th></tr></thead><tbody>
-            ${(x.stockGanadero || []).length ? (x.stockGanadero || []).map(s => `<tr><td>${s.categoria || "-"}</td><td>${num(s.cantidad)}</td><td>${fmt(s.fecha)}</td></tr>`).join("") : '<tr><td>-</td><td>-</td><td>-</td></tr>'}
-          </tbody></table>
-          <h4>Cultivos</h4>
-          <table><thead><tr><th>Cultivo</th><th>Ha</th><th>Costo/ha</th><th>Activo</th></tr></thead><tbody>
-            ${(x.cultivos || []).map(c => `<tr><td>${c.cultivo}</td><td>${c.hectareas ?? "-"}</td><td>${c.costo_por_ha ?? "-"}</td><td>${c.activo ? "si" : "no"}</td></tr>`).join("")}
-          </tbody></table>
-          <h4>Últimos envíos WhatsApp</h4>
-          <table><thead><tr><th>Estado</th><th>Error</th><th>Fecha</th></tr></thead><tbody>
-            ${(x.enviosWhatsapp || []).map(e => `<tr><td>${e.estado || "-"}</td><td>${e.error_msg || "-"}</td><td>${fmt(e.creado_en)}</td></tr>`).join("")}
-          </tbody></table>
-          <h4>Alertas del usuario</h4>
-          <div class="topbar" style="margin-bottom:8px;">
-            <select id="detalleAlertaEstado">
-              <option value="todas">Todas</option>
-              <option value="activas">Activas</option>
-              <option value="disparadas">Disparadas</option>
-              <option value="inactivas">Inactivas</option>
-            </select>
-            <select id="detalleAlertaCultivo">
-              <option value="todos">Todos los cultivos</option>
-            </select>
-          </div>
-          <table><thead><tr><th>ID</th><th>Cultivo</th><th>Tipo</th><th>Objetivo</th><th>Activa</th><th>Disparada</th><th>Acciones</th></tr></thead><tbody>
-            ${(x.alertas || []).map(a => `<tr data-alerta-row="1" data-estado="${a.activa ? (a.disparada ? "disparadas" : "activas") : "inactivas"}" data-cultivo="${String(a.cultivo || "").toLowerCase()}">
-              <td>${a.id}</td>
-              <td>${a.cultivo || "-"}</td>
-              <td>${a.tipo || "-"}</td>
-              <td>${a.valor_objetivo ?? "-"}</td>
-              <td>${a.activa ? "si" : "no"}</td>
-              <td>${a.disparada ? "si" : "no"}</td>
-              <td>
-                <div class="row-actions">
-                  <button class="btn-mini btn-secondary" data-alerta-action="reactivar" data-alerta-id="${a.id}">Reactivar</button>
-                  <button class="btn-mini btn-danger" data-alerta-action="cancelar" data-alerta-id="${a.id}">Cancelar</button>
-                </div>
-              </td>
-            </tr>`).join("")}
-          </tbody></table>
-        `;
-
-        const cultivoSelect = $("detalleAlertaCultivo");
-        const cultivosUnicos = Array.from(
-          new Set((x.alertas || []).map((a) => String(a.cultivo || "").toLowerCase()).filter(Boolean))
-        ).sort();
-        cultivoSelect.innerHTML = `<option value="todos">Todos los cultivos</option>${cultivosUnicos
-          .map((c) => `<option value="${c}">${c}</option>`)
-          .join("")}`;
-        $("detalleAlertaEstado").addEventListener("change", aplicarFiltroAlertasDetalle);
-        $("detalleAlertaCultivo").addEventListener("change", aplicarFiltroAlertasDetalle);
-        const planDetailChip = $("userDetail").querySelector("[data-user-detail-plan]");
-        if (planDetailChip) {
-          planDetailChip.addEventListener("click", () => abrirModalPlan(planDetailChip.getAttribute("data-user-detail-plan")));
-        }
-        aplicarFiltroAlertasDetalle();
-
-        $("userDetail").querySelectorAll("button[data-alerta-action]").forEach((btn) => {
-          btn.addEventListener("click", async () => {
-            const accion = btn.getAttribute("data-alerta-action");
-            const alertaId = btn.getAttribute("data-alerta-id");
-            await ejecutarAccionAlerta(accion, alertaId);
-          });
-        });
-      }
-
-      async function ejecutarAccionAlerta(accion, alertaId) {
-        const key = $("adminKey").value.trim();
-        const userId = $("userIdInput").value.trim();
-        if (!alertaId) return alert("Falta alertaId");
-        if (!confirm(`Confirmar acción "${accion}" para alerta #${alertaId}?`)) return;
-        const r = await fetch("/api/dashboard/admin/alerta-accion", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(key ? { "x-admin-key": key } : {}),
-          },
-          body: JSON.stringify({ alertaId: Number(alertaId), accion }),
-        });
-        const d = await r.json();
-        if (!d.ok) return alert(d.error || "No se pudo ejecutar la acción de alerta");
-        alert(`Acción ${accion} aplicada a alerta #${d.alerta.id}`);
-        await cargar();
-        if (userId) await cargarDetalleUsuario();
-      }
-
-      async function ejecutarAccionUsuario(accion, userIdParam = null, userName = null) {
-        const key = $("adminKey").value.trim();
-        const userId = String(userIdParam || $("userIdInput").value.trim());
-        if (!userId) return alert("Ingresá usuarioId");
-        const etiqueta = userName ? `${userName} (id ${userId})` : `usuario ${userId}`;
-        let planObjetivo = null;
-        if (accion === "cambiar_plan") {
-          const sel = document.querySelector(`select[data-plan-target="${userId}"]`);
-          planObjetivo = String(sel?.value || "").toLowerCase();
-          if (!["gratis", "basico", "pro"].includes(planObjetivo)) {
-            return alert("Seleccioná un plan válido");
-          }
-        }
-        if (!confirm(`Confirmar acción "${accion}" para ${etiqueta}?`)) return;
-
-        const r = await fetch("/api/dashboard/admin/usuario-accion", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(key ? { "x-admin-key": key } : {}),
-          },
-          body: JSON.stringify({ usuarioId: Number(userId), accion, planObjetivo }),
-        });
-        const d = await r.json();
-        if (!d.ok) return alert(d.error || "No se pudo ejecutar la acción");
-        $("userIdInput").value = userId;
-        alert(`Acción ${accion} aplicada a ${d.usuario.nombre || d.usuario.whatsapp}`);
-        await cargar();
-        await cargarDetalleUsuario();
-      }
-
-      $("btnLoad").addEventListener("click", cargar);
-      $("btnComandos").addEventListener("click", () => {
-        window.open("/dashboard/comandos", "_blank");
-      });
-      $("btnTemplates").addEventListener("click", () => {
-        window.open("/dashboard/templates", "_blank");
-      });
+      $("btnReload").addEventListener("click", cargar);
+      $("btnAgentRuntimeRefresh")?.addEventListener("click", refreshAgentRuntimeSolo);
+      $("agentRuntimeDias")?.addEventListener("change", refreshAgentRuntimeSolo);
+      $("btnAgentEnvReload")?.addEventListener("click", loadAgentEnvPanel);
+      $("btnAgentEnvSave")?.addEventListener("click", saveAgentEnvPanel);
+      
       $("btnCerrarSesion").addEventListener("click", async () => {
         await fetch("/api/auth/admin/logout", { method: "POST" });
         localStorage.removeItem(sessionAdminKey);
         $("adminKey").value = "";
         window.location.href = "/login?next=/dashboard/admin";
       });
-      $("btnUser").addEventListener("click", cargarDetalleUsuario);
-      $("btnActivar").addEventListener("click", () => ejecutarAccionUsuario("activar"));
-      $("btnPausar").addEventListener("click", () => ejecutarAccionUsuario("pausar"));
-      $("btnEliminar").addEventListener("click", () => ejecutarAccionUsuario("eliminar"));
-      $("alertaUsuarioSearch").addEventListener("input", filtrarAlertasPorUsuario);
-      $("alertaUsuarioEstado").addEventListener("change", filtrarAlertasPorUsuario);
-      $("usuariosSearch").addEventListener("input", filtrarUsuarios);
-      $("usuariosEstado").addEventListener("change", filtrarUsuarios);
-      $("usuariosPlan").addEventListener("change", filtrarUsuarios);
+
       $("adminKey").addEventListener("change", () => {
         const k = $("adminKey").value.trim();
         if (k) localStorage.setItem(sessionAdminKey, k);
         else localStorage.removeItem(sessionAdminKey);
       });
-      const persistedKey = localStorage.getItem(sessionAdminKey) || "";
-      if (persistedKey) $("adminKey").value = persistedKey;
-      document.querySelectorAll("[data-plan-view]").forEach((el) => {
-        el.addEventListener("click", () => abrirModalPlan(el.getAttribute("data-plan-view")));
-      });
-      $("planModalClose").addEventListener("click", cerrarModalPlan);
-      $("planModalBackdrop").addEventListener("click", (e) => {
+
+      function cerrarModalPlan() {
+        const modal = $("planModalBackdrop");
+        if (modal) modal.style.display = "none";
+      }
+
+      $("planModalClose")?.addEventListener("click", cerrarModalPlan);
+      $("planModalBackdrop")?.addEventListener("click", (e) => {
         if (e.target === $("planModalBackdrop")) cerrarModalPlan();
       });
+
+      const persistedKey = localStorage.getItem(sessionAdminKey) || "";
+      if (persistedKey) $("adminKey").value = persistedKey;
+
       asegurarSesionAdmin().then((ok) => {
         if (ok) cargar();
       });

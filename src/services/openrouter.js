@@ -9,7 +9,7 @@ const getModel = () =>
  * Chat compatible con OpenAI v1 (OpenRouter).
  * @returns {{ texto: string, tokensUsados: number|null, model: string }}
  */
-const generarChatOpenRouter = async ({ system, user }) => {
+const generarChatOpenRouter = async ({ system, user, maxTokens = null, temperature = undefined, responseMimeType = undefined }) => {
   const apiKey = process.env.OPENROUTER_API_KEY?.trim();
   if (!apiKey) {
     throw new Error("OPENROUTER_API_KEY no configurada");
@@ -19,16 +19,27 @@ const generarChatOpenRouter = async ({ system, user }) => {
   const referer =
     process.env.OPENROUTER_HTTP_REFERER?.trim() || "https://agrohabilis.local";
 
+  const body = {
+    model,
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: user },
+    ],
+  };
+  if (Number.isFinite(Number(maxTokens)) && Number(maxTokens) > 0) {
+    body.max_tokens = Math.floor(Number(maxTokens));
+  }
+  if (Number.isFinite(Number(temperature))) {
+    body.temperature = Number(temperature);
+  }
+  if (typeof responseMimeType === "string" && responseMimeType.includes("json")) {
+    body.response_format = { type: "json_object" };
+  }
+
   try {
     const { data } = await axios.post(
       OPENROUTER_URL,
-      {
-        model,
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: user },
-        ],
-      },
+      body,
       {
         headers: {
           Authorization: `Bearer ${apiKey}`,

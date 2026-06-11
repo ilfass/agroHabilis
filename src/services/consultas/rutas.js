@@ -23,7 +23,7 @@ const CULTIVOS_ALIAS = [
   { key: "girasol", patrones: ["girasol"] },
   { key: "sorgo", patrones: ["sorgo"] },
   { key: "cebada", patrones: ["cebada"] },
-  { key: "papa", patrones: ["papa", "patata"] },
+  { key: "papa", patrones: ["papa", "patata", "spunta", "kennebec", "innovator"] },
   { key: "yerba_mate", patrones: ["yerba mate", "yerbamate", "yerba"] },
 ];
 
@@ -135,7 +135,7 @@ const esPedidoEstadoCieloConversacional = (texto = "") => {
 };
 
 const esConsultaClima = (texto = "") =>
-  /clima|helada|lluvia|temperatura|viento|pron[oó]stico|\bel tiempo\b|humedad|fri[oó]|frialdad|fumigar|pulveriz/i.test(
+  /clima|helada|lluvia|llover|llueve|lloviendo|llovizn|tormenta|graniz|temporal|temperatura|viento|pron[oó]stico|\bel tiempo\b|humedad|fri[oó]|frialdad|fumigar|pulveriz/i.test(
     String(texto || "")
   );
 

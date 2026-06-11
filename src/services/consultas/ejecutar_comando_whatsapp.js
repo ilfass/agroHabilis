@@ -1,5 +1,8 @@
 "use strict";
 
+const { textoInvitacionResumen } = require("../resumen_interactivo");
+const { PLAN_PRICES_CACHE } = require("../planes");
+
 const ejecutarComandoYHumanizar = async (
   { comando, parametros = {}, usuario, numeroWhatsapp, textoOriginal = "" } = {},
   deps = {}
@@ -33,9 +36,11 @@ const ejecutarComandoYHumanizar = async (
     return "Para eso primero necesito tu perfil activo. Decime tu nombre y zona y lo habilitamos enseguida.";
   }
   if (cmd === "MI_RESUMEN") {
-    const generado = await renderTemplate("mi_resumen", usuario);
+    // No marcar invitación ni estado acá: solo WhatsApp/iniciarResumen debe hacerlo tras envío real;
+    // si no, el cron omite al usuario sin haberle mandado el mensaje.
     return (
-      String(generado?.mensaje || "").trim() || "No pude generar tu resumen en este momento."
+      String(textoInvitacionResumen(usuario?.nombre) || "").trim() ||
+      "No pude iniciar tu resumen en este momento."
     );
   }
   if (cmd === "MIS_ALERTAS") {
@@ -78,7 +83,7 @@ const ejecutarComandoYHumanizar = async (
     });
   }
   if (cmd === "REGISTRAR_GASTO") {
-    const base = await registrarGasto(whatsapp, textoOriginal);
+    const base = await registrarGasto(usuario, textoOriginal);
     return humanizarComandoConIA({
       usuario,
       comando: "REGISTRAR_GASTO",
@@ -86,7 +91,7 @@ const ejecutarComandoYHumanizar = async (
     });
   }
   if (cmd === "REGISTRAR_VENTA") {
-    const base = await registrarVenta(whatsapp, textoOriginal);
+    const base = await registrarVenta(usuario, textoOriginal);
     return humanizarComandoConIA({
       usuario,
       comando: "REGISTRAR_VENTA",
@@ -94,10 +99,6 @@ const ejecutarComandoYHumanizar = async (
     });
   }
   if (cmd === "CREAR_ALERTA") {
-    const planCtx = await obtenerContextoPlanPorWhatsapp(whatsapp);
-    if (!puedeUsarAlertas(planCtx.planEfectivo)) {
-      return "Las alertas de precio están disponibles en Plan Básico o Pro. Si querés activarlas, escribí: QUIERO PLAN BASICO.";
-    }
     const cultivo = String(parametros?.cultivo || "").trim();
     const valor = Number(parametros?.valor);
     const payload = cultivo && Number.isFinite(valor) ? `avisame cuando ${cultivo} supere ${valor}` : textoOriginal;
@@ -113,7 +114,10 @@ const ejecutarComandoYHumanizar = async (
     return humanizarComandoConIA({ usuario, comando: "ANALIZAR_CULTIVO", datosTexto: analisisTpl?.mensaje || "" });
   }
   if (cmd === "PLANES") {
-    return "Planes disponibles: GRATIS $0/mes, BASICO $9.000/mes y PRO $18.000/mes. ¿Querés que te recomiende uno según tu uso?";
+    const pBasico = `$${Number(PLAN_PRICES_CACHE.basico || 22000).toLocaleString("es-AR")}`;
+    const pPro = `$${Number(PLAN_PRICES_CACHE.pro || 29000).toLocaleString("es-AR")}`;
+    const pProMax = `$${Number(PLAN_PRICES_CACHE.pro_max || 50000).toLocaleString("es-AR")}`;
+    return `Planes disponibles: GRATIS $0/mes, BASICO ${pBasico}/mes, PRO ${pPro}/mes y PRO MAX ${pProMax}/mes. ¿Querés que te recomiende uno según tu uso?`;
   }
   return null;
 };

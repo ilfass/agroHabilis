@@ -2,6 +2,12 @@
 
 const { invokeTool, listTools } = require("../tools");
 const { postOpenRouterChat, parseToolArgs, toOpenAiToolDefinitions } = require("./openrouter_chat");
+const {
+  scoutMaxTurns,
+  scoutMaxToolCalls,
+  scoutAllowlistExtra,
+  cursorMode,
+} = require("../cursor_mode");
 
 const envTruthy = (v) => !["0", "false", "off", "no", ""].includes(String(v ?? "").trim().toLowerCase());
 
@@ -54,14 +60,19 @@ const ejecutarScoutToolLoop = async ({ clasificacion, usuario, numeroWhatsapp, m
   }
 
   const allow = new Set(allowlistPredeterminada());
-  const all = listTools().filter((t) => allow.has(t.name));
+  for (const n of scoutAllowlistExtra()) allow.add(n);
+  let all = listTools().filter((t) => allow.has(t.name));
+  if (cursorMode()) {
+    const agentTools = listTools().filter((t) => String(t.name || "").startsWith("agent."));
+    all = agentTools.length ? agentTools : all;
+  }
   if (!all.length) {
     return { resumen: null, toolTrace: trace };
   }
 
   const tools = toOpenAiToolDefinitions(all);
-  const maxTurns = Math.min(8, Math.max(1, Number.parseInt(String(process.env.AGENT_TOOL_LOOP_MAX_TURNS || "5"), 10) || 5));
-  const maxToolCalls = Math.min(12, Math.max(1, Number.parseInt(String(process.env.AGENT_TOOL_LOOP_MAX_TOOL_CALLS || "6"), 10) || 6));
+  const maxTurns = scoutMaxTurns();
+  const maxToolCalls = scoutMaxToolCalls();
 
   const toolCtx = { clasificacion, usuario, numeroWhatsapp };
 

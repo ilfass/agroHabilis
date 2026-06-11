@@ -2,6 +2,8 @@
 
 Archivos fuera del flujo estándar de la app: código o scripts conservados solo como referencia. **No** están referenciados por `npm run` ni por imports activos del backend.
 
+Otra carpeta relacionada (metadatos de limpieza reciente, no código histórico grande): `src/services/obsoletos/` (MANIFEST + archivos archivados puntuales). Auditoría global: `docs/operacion/auditoria-repo-desde-raiz-2026-05-11.txt`.
+
 ## Contenido
 
 | Ruta | Qué era |

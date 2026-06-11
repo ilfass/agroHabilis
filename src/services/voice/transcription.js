@@ -60,7 +60,11 @@ const transcribirAudioGemini = async (audioBuffer, mimeType) => {
   try {
     const result = await model.generateContent(parts);
     const response = await result.response;
-    return response.text().trim();
+    try {
+      return response.text().trim();
+    } catch (textErr) {
+      throw new Error("Error al obtener la transcripción del audio de Gemini: " + textErr.message);
+    }
   } catch (error) {
     console.error("[Voice] Error en Gemini Voice:", error.message);
     throw new Error("No pude transcribir el audio.");

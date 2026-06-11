@@ -1,0 +1,784 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AgroHabilis - IA & Gemini Admin</title>
+    <style>
+      :root {
+        --bg: #07090e;
+        --bg-soft: #0d121f;
+        --panel: #111726;
+        --panel-soft: #192239;
+        --text: #f1f5f9;
+        --muted: #64748b;
+        --accent: #10b981;
+        --accent-soft: rgba(16, 185, 129, 0.12);
+        --line: rgba(255, 255, 255, 0.06);
+        --shadow: 0 20px 40px rgba(0, 0, 0, 0.55);
+        --success: #10b981;
+        --success-bg: rgba(16, 185, 129, 0.12);
+        --success-border: rgba(16, 185, 129, 0.25);
+        --warning: #f59e0b;
+        --warning-bg: rgba(245, 158, 11, 0.12);
+        --warning-border: rgba(245, 158, 11, 0.25);
+        --danger: #ef4444;
+        --danger-bg: rgba(239, 68, 68, 0.12);
+        --danger-border: rgba(239, 68, 68, 0.25);
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: Inter, Segoe UI, Arial, sans-serif;
+        font-size: 15px;
+        background: radial-gradient(1000px 500px at 15% 0%, rgba(16, 185, 129, 0.08), transparent 50%), var(--bg);
+        color: var(--text);
+        padding: 24px 24px 24px 276px;
+      }
+      .topbar {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        margin-bottom: 16px;
+        flex-wrap: wrap;
+      }
+      .nav {
+        position: fixed;
+        left: 18px;
+        top: 18px;
+        width: 230px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 16px;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background: var(--bg-soft);
+        box-shadow: var(--shadow);
+        margin-bottom: 14px;
+      }
+      .nav .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 10px 16px;
+        border-bottom: 1px solid var(--line);
+        margin-bottom: 8px;
+        font-weight: 800;
+        color: var(--text);
+      }
+      .brand-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        background: var(--accent);
+        box-shadow: 0 0 10px var(--accent);
+      }
+      .nav a {
+        text-decoration: none;
+        padding: 9px 12px;
+        border-radius: 10px;
+        border: 1px solid transparent;
+        color: var(--muted);
+        background: transparent;
+        font-size: 13px;
+        font-weight: 600;
+        width: 100%;
+        transition: all 0.2s ease;
+      }
+      .nav a.active {
+        background: var(--accent-soft);
+        border-color: rgba(16, 185, 129, 0.25);
+        color: var(--accent);
+        font-weight: 700;
+      }
+      .nav a:hover:not(.active) {
+        background: var(--panel-soft);
+        color: var(--text);
+        transform: translateX(3px);
+      }
+      .card {
+        background: linear-gradient(170deg, var(--panel) 0%, rgba(17, 23, 38, 0.8) 100%);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 20px;
+        margin-bottom: 16px;
+        box-shadow: var(--shadow);
+        position: relative;
+      }
+      .card-title {
+        color: var(--text);
+        margin-top: 0;
+        margin-bottom: 10px;
+        font-size: 18px;
+        font-weight: 800;
+      }
+      .glow-box {
+        border-radius: 14px;
+        padding: 20px;
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        transition: all 0.3s ease;
+      }
+      .glow-box.success {
+        background: var(--success-bg);
+        border: 2px solid var(--success-border);
+        box-shadow: 0 0 20px rgba(16, 185, 129, 0.12);
+      }
+      .glow-box.warning {
+        background: var(--warning-bg);
+        border: 2px solid var(--warning-border);
+        box-shadow: 0 0 20px rgba(245, 158, 11, 0.12);
+      }
+      .glow-badge {
+        font-size: 12px;
+        font-weight: 800;
+        text-transform: uppercase;
+        padding: 6px 12px;
+        border-radius: 99px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .glow-badge.success {
+        background: var(--success);
+        color: #fff;
+      }
+      .glow-badge.warning {
+        background: var(--warning);
+        color: #fff;
+      }
+      .badge {
+        display: inline-block;
+        padding: 3px 8px;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 700;
+      }
+      .badge.success { background: var(--success-bg); color: var(--success); border: 1px solid var(--success-border); }
+      .badge.warning { background: var(--warning-bg); color: var(--warning); border: 1px solid var(--warning-border); }
+      .badge.danger { background: var(--danger-bg); color: var(--danger); border: 1px solid var(--danger-border); }
+      .badge.info { background: var(--panel-soft); color: var(--accent); border: 1px solid var(--line); }
+
+      .grid-2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+        margin-bottom: 16px;
+      }
+      @media (max-width: 900px) {
+        .grid-2 { grid-template-columns: 1fr; }
+      }
+
+      .btn {
+        text-decoration: none;
+        padding: 10px 18px;
+        border-radius: 10px;
+        font-weight: 700;
+        border: none;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        font-size: 13px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .btn.primary {
+        background: linear-gradient(180deg, var(--accent), #059669);
+        color: #06090e;
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
+      }
+      .btn.primary:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 16px rgba(16, 185, 129, 0.35);
+      }
+      
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 8px;
+      }
+      th, td {
+        border-bottom: 1px solid var(--line);
+        padding: 12px 10px;
+        text-align: left;
+        font-size: 14px;
+      }
+      th {
+        color: var(--muted);
+        font-weight: 700;
+        background: rgba(15, 21, 36, 0.9);
+      }
+      
+      .metric-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 10px 0;
+        border-bottom: 1px dashed var(--line);
+      }
+      .metric-row:last-child {
+        border-bottom: none;
+      }
+      .metric-label {
+        font-weight: 600;
+        color: var(--text);
+      }
+      .metric-value {
+        font-weight: 700;
+        color: var(--accent);
+      }
+
+      .step-container {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        margin-top: 14px;
+      }
+      .step-item {
+        display: flex;
+        gap: 14px;
+        background: var(--panel-soft);
+        padding: 14px;
+        border-radius: 12px;
+        border: 1px solid var(--line);
+      }
+      .step-number {
+        background: var(--accent-soft);
+        color: var(--accent);
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 800;
+        flex-shrink: 0;
+      }
+      .step-body h4 {
+        margin: 0 0 4px 0;
+        color: var(--text);
+      }
+      .step-body p {
+        margin: 0;
+        font-size: 13px;
+        color: var(--muted);
+        line-height: 1.45;
+      }
+      
+      .progress-bar-container {
+        background: var(--bg-soft);
+        border-radius: 99px;
+        height: 10px;
+        width: 100%;
+        overflow: hidden;
+        margin-top: 6px;
+        border: 1px solid var(--line);
+      }
+      .progress-bar-fill {
+        height: 100%;
+        background: linear-gradient(90deg, var(--accent), #10b981);
+        border-radius: 99px;
+        transition: width 0.5s ease;
+      }
+
+      .crumb { color: var(--muted); font-size: 13px; }
+      .page-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 14px;
+      }
+
+      @media (max-width: 1100px) {
+        body { padding: 16px; }
+        .nav { position: static; width: auto; flex-direction: row; flex-wrap: wrap; }
+      }
+      @media (max-width: 760px) {
+        body { padding: 12px; font-size: 14px; }
+        .card { padding: 12px; border-radius: 12px; }
+        .topbar > * { width: 100%; }
+        .nav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; padding: 10px; border-radius: 12px; }
+        .nav .brand { grid-column: 1 / -1; }
+        .nav a { width: 100%; text-align: center; padding: 8px 10px; font-size: 12px; }
+        table { display: block; overflow-x: auto; white-space: nowrap; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="topbar">
+      <h1 style="margin:0;">Consola de Inteligencia Artificial</h1>
+      <button id="btnReload" class="btn primary">🔄 Actualizar Diagnóstico</button>
+    </div>
+    
+    <div class="nav">
+      <div class="brand"><span class="brand-dot"></span><span>AgroHabilis Admin</span></div>
+      <a href="/dashboard/admin">🏠 Dashboard</a>
+      <a href="/dashboard/metricas">📊 Métricas</a>
+      <a href="/dashboard/precios">💹 Precios</a>
+      <a href="/dashboard/usuarios">👥 Usuarios</a>
+      <a href="/dashboard/campanas">🚀 Campañas</a>
+      <a href="/dashboard/planes">🤖 Planes</a>
+      <a href="/dashboard/ia" class="active">🧠 IA & Gemini</a>
+      <a href="/dashboard/comandos">⌨️ Comandos</a>
+      <a href="/dashboard/templates">🧩 Templates</a>
+      <a href="/dashboard/cliente">🙍 Cliente</a>
+    </div>
+
+    <div class="page-head">
+      <div>
+        <div class="crumb">Administración / Inteligencia Artificial</div>
+        <h3 style="margin:2px 0 0;">Estado, Conmutación y Consumo de Modelos IA</h3>
+      </div>
+    </div>
+
+    <!-- Dynamic Gemini Key Status Widget -->
+    <div id="geminiGlowCard" class="glow-box success">
+      <div style="flex-grow: 1;">
+        <h3 style="margin: 0 0 6px 0; font-family: 'Outfit', sans-serif; font-weight: 800;" id="geminiGlowTitle">Llave Gemini Vision: Gratuita (Activa)</h3>
+        <p style="margin: 0; font-size: 14px; line-height: 1.5;" id="geminiGlowDesc">
+          El sistema está operando con la clave primaria de Gemini de uso gratuito (límite de 15 RPM). Esta clave no genera costos para AgroHabilis, manteniendo el servicio 100% independiente y autosuficiente.
+        </p>
+      </div>
+      <div id="geminiGlowBadge" class="glow-badge success">🟢 Gratuita</div>
+    </div>
+
+    <!-- Quota Alert Banner -->
+    <div id="quotaAlertBanner" style="display: none; background: var(--danger-bg); border: 2px solid var(--danger-border); box-shadow: 0 0 20px rgba(239, 68, 68, 0.12); border-radius: 14px; padding: 20px; margin-bottom: 20px; align-items: center; gap: 16px; transition: all 0.3s ease;">
+      <div style="flex-grow: 1;">
+        <h3 style="margin: 0 0 6px 0; font-family: 'Outfit', sans-serif; font-weight: 800; color: var(--danger);" id="quotaAlertTitle">🚨 ALERTA DE LÍMITE DE CUOTA ALCANZADO</h3>
+        <p style="margin: 0; font-size: 14px; line-height: 1.5; color: #4b1a1a;" id="quotaAlertDesc">
+          Uno o más motores de Inteligencia Artificial han superado su límite de cuota o arrojaron errores 429 de saturación de peticiones hoy. Se han activado los mecanismos de conmutación transparente en caliente.
+        </p>
+      </div>
+      <div class="glow-badge" style="background: var(--danger); color: #fff; font-size: 12px; font-weight: 800; text-transform: uppercase; padding: 6px 12px; border-radius: 99px;">⚠️ ALERTA ACTIVA</div>
+    </div>
+
+    <div class="grid-2">
+      <!-- Left side: System and Data Source Monitor -->
+      <div class="card">
+        <h3 class="card-title">🛰️ Monitor de Servicios y Fuentes</h3>
+        <p style="font-size: 13.5px; color: var(--muted); line-height: 1.55; margin-top: 0; margin-bottom: 12px;">
+          Estado en tiempo real de los servicios core del backend y los scrapers que proveen contexto a la IA.
+        </p>
+        
+        <h4 style="margin: 10px 0 6px 0; color: #1e3b6e; font-size: 14px;">Servicios Core</h4>
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px;">
+          <div style="background: var(--panel-soft); border: 1px solid var(--line); border-radius: 10px; padding: 10px; text-align: center;">
+            <div style="font-size: 11px; color: var(--muted); text-transform: uppercase; font-weight: 700; margin-bottom: 4px;">WhatsApp</div>
+            <span id="srvWhatsapp" class="badge warning">Cargando...</span>
+          </div>
+          <div style="background: var(--panel-soft); border: 1px solid var(--line); border-radius: 10px; padding: 10px; text-align: center;">
+            <div style="font-size: 11px; color: var(--muted); text-transform: uppercase; font-weight: 700; margin-bottom: 4px;">Base Datos</div>
+            <span id="srvDb" class="badge warning">Cargando...</span>
+          </div>
+          <div style="background: var(--panel-soft); border: 1px solid var(--line); border-radius: 10px; padding: 10px; text-align: center;">
+            <div style="font-size: 11px; color: var(--muted); text-transform: uppercase; font-weight: 700; margin-bottom: 4px;">Crons</div>
+            <span id="srvCrons" class="badge warning">Cargando...</span>
+          </div>
+        </div>
+
+        <h4 style="margin: 10px 0 6px 0; color: #1e3b6e; font-size: 14px;">Fuentes de Información</h4>
+        <div style="max-height: 200px; overflow-y: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--bg-soft);">
+          <table style="margin-top: 0; width: 100%; border-collapse: collapse;">
+            <thead>
+              <tr style="position: sticky; top: 0; z-index: 1;">
+                <th style="font-size: 11px; padding: 6px 8px; background: rgba(15, 21, 36, 0.95); border-bottom: 1px solid var(--line);">Origen</th>
+                <th style="font-size: 11px; padding: 6px 8px; text-align: center; background: rgba(15, 21, 36, 0.95); border-bottom: 1px solid var(--line);">Latencia</th>
+                <th style="font-size: 11px; padding: 6px 8px; text-align: right; background: rgba(15, 21, 36, 0.95); border-bottom: 1px solid var(--line);">Estado</th>
+              </tr>
+            </thead>
+            <tbody id="fuentesTableBody">
+              <tr>
+                <td colspan="3" class="muted" style="padding: 12px; text-align: center; font-size: 13px;">Cargando estado de fuentes...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Right side: AI Metrics and Fallbacks -->
+      <div class="card">
+        <h3 class="card-title">📊 Rendimiento y Fallbacks Hoy</h3>
+        <p style="font-size: 13.5px; color: var(--muted); line-height: 1.55; margin-top: 0; margin-bottom: 14px;">
+          Resumen de solicitudes completadas por los proveedores de IA vs el fallback local (procesado directamente por el servidor sin LLM externo).
+        </p>
+
+        <div class="metric-row">
+          <span class="metric-label">Estado General de IA</span>
+          <span id="iaEstadoGeneral" class="badge success">OPERATIVA</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-label">Autodiagnóstico (Salud)</span>
+          <span id="iaHealthStatus" class="badge success">Cargando...</span>
+        </div>
+        <div class="metric-row" id="iaHealthErrorRow" style="display: none; flex-direction: column; align-items: flex-start; gap: 4px; border-top: 1px dashed var(--border); padding-top: 8px; margin-top: 8px; width: 100%;">
+          <span class="metric-label" style="color: var(--danger); font-weight: 600; font-size: 12px;">Detalle del fallo de diagnóstico:</span>
+          <span id="iaHealthErrorMsg" style="font-size: 12px; color: var(--muted); line-height: 1.4; word-break: break-all;">-</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-label">Consultas Procesadas hoy</span>
+          <span id="iaConsultasHoy" class="metric-value">0</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-label">Fallback Local hoy</span>
+          <span id="iaFallbackHoy" class="metric-value">0</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-label">Tasa de Éxito de IA</span>
+          <span id="iaTasaExitPct" class="metric-value">0%</span>
+        </div>
+        
+        <div style="margin-top: 14px;">
+          <span class="metric-label" style="font-size: 13px;">Proporción IA Principal vs Fallback</span>
+          <div class="progress-bar-container">
+            <div id="iaProgressFill" class="progress-bar-fill" style="width: 0%;"></div>
+          </div>
+        </div>
+
+        <h4 style="margin: 20px 0 8px 0; color: #1e3b6e; font-size: 14px;">Orden de Fallback Configurado</h4>
+        <p id="iaOrdenFallback" style="font-size: 13px; color: var(--muted); margin: 0; font-family: monospace; background: var(--bg-soft); padding: 8px 12px; border-radius: 8px; border: 1px solid var(--line);">
+          cargando...
+        </p>
+      </div>
+    </div>
+
+    <!-- AI Providers and Rate Limits -->
+    <div class="grid-2">
+      <div class="card">
+        <h3 class="card-title">🧠 Estado y Consumo por Motor de IA</h3>
+        <p class="muted" style="margin-top: 0; margin-bottom: 14px;">
+          Detalle del uso diario y estado de cuota para cada uno de los 7 motores de Inteligencia Artificial configurados.
+        </p>
+        
+        <table style="margin-top: 10px;">
+          <thead>
+            <tr>
+              <th>Motor de IA</th>
+              <th style="text-align: center;">Consultas Hoy</th>
+              <th style="text-align: center;">Límite Cuota</th>
+              <th style="text-align: right;">Estado</th>
+            </tr>
+          </thead>
+          <tbody id="iaBreakdownTableBody">
+            <tr>
+              <td colspan="4" class="muted">Cargando desglose de motores...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <h3 class="card-title">🔑 Variables de Configuración</h3>
+        <p class="muted" style="margin-top: 0; margin-bottom: 14px;">
+          Estas variables definen el comportamiento y los tokens en el servidor. Editables desde el panel de control (.env).
+        </p>
+
+        <div class="metric-row">
+          <span class="metric-label">Modelo Gemini Principal</span>
+          <span style="font-family: monospace;" class="metric-value">gemini-1.5-flash</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-label">Reintentos en Fallback</span>
+          <span class="metric-value">Sí (Transparentes)</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-label">Conmutación en memoria</span>
+          <span class="metric-value">Activo</span>
+        </div>
+        <p style="font-size: 12px; color: var(--muted); line-height: 1.5; margin: 12px 0 0 0; background: #fffdf5; padding: 10px; border-radius: 8px; border: 1px solid #fde68a;">
+          💡 <strong>Nota de Seguridad:</strong> Si el badge superior indica <strong>Paga (Fallback Activo)</strong>, significa que el servidor está consumiendo de <code>GEMINI_API_KEY_FALLBACK</code>. Podés reestablecer la gratuita reiniciando el servidor o esperando que se limpie la cuota en la API.
+        </p>
+      </div>
+    </div>
+
+    <!-- Token footprint per user -->
+    <div class="card">
+      <h3 class="card-title">👤 Footprint de Tokens por Usuario</h3>
+      <p class="muted" style="margin-top: 0; margin-bottom: 14px;">
+        Lista de usuarios ordenados por consumo acumulado de tokens de IA en consultas y resúmenes.
+      </p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Productor</th>
+            <th>WhatsApp</th>
+            <th>Consultas Totales</th>
+            <th>Tokens Acumulados</th>
+            <th>Nivel de Consumo</th>
+          </tr>
+        </thead>
+        <tbody id="tokensTableBody">
+          <tr>
+            <td colspan="5" class="muted">Cargando footprint...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+      const num = (v) => Number(v || 0).toLocaleString("es-AR");
+
+      async function fetchStatus() {
+        try {
+          const btn = $("btnReload");
+          if (btn) btn.disabled = true;
+
+          const r = await fetch("/api/dashboard/admin/resumen", { credentials: "same-origin" });
+          const j = await r.json();
+          
+          if (btn) btn.disabled = false;
+          if (!j.ok) throw new Error(j.error || "Fallo consulta");
+
+          render(j.data);
+        } catch (err) {
+          alert("Error cargando variables de IA: " + err.message);
+        }
+      }
+
+      function render(data) {
+        const iaStatus = data.iaStatus || { label: "Gratuita (Activa)", activeKeyType: "gratuita" };
+        const ia = data.ia || {};
+        const metricas = ia.metricas || {};
+
+        // 1. Update Gemini Glow Card
+        const glowCard = $("geminiGlowCard");
+        const glowTitle = $("geminiGlowTitle");
+        const glowDesc = $("geminiGlowDesc");
+        const glowBadge = $("geminiGlowBadge");
+
+        glowTitle.textContent = `Llave Gemini Vision: ${iaStatus.label}`;
+        
+        if (iaStatus.activeKeyType === 'paga') {
+          glowCard.className = "glow-box warning";
+          glowBadge.className = "glow-badge warning";
+          glowBadge.textContent = "🟡 Fallback Paga";
+          glowDesc.innerHTML = `
+            ⚠️ <strong>Se detectó un agotamiento de cuota (429 Too Many Requests)</strong> o límites en la clave gratuita primaria.
+            El backend AgroHabilis conmutó de forma inmediata y transparente en caliente a la <strong>clave de Fallback Paga</strong>.
+            Tus productores en WhatsApp no percibirán interrupciones, pero se generarán cargos mínimos en esta ventana.
+          `;
+        } else {
+          glowCard.className = "glow-box success";
+          glowBadge.className = "glow-badge success";
+          glowBadge.textContent = "🟢 Gratuita";
+          glowDesc.innerHTML = `
+            El sistema está operando con la clave primaria de Gemini de <strong>uso gratuito</strong> (límite de 15 RPM).
+            Esta clave no genera costos para AgroHabilis, manteniendo el servicio 100% independiente y autosuficiente.
+            Los reintentos están configurados a la de fallback en caso de picos de carga.
+          `;
+        }
+
+        // 2. Update IA Metrics Card
+        $("iaEstadoGeneral").className = ia.estado === "operativa" ? "badge success" : "badge danger";
+        $("iaEstadoGeneral").textContent = ia.estado === "operativa" ? "OPERATIVA" : "SIN PROVEEDORES";
+
+        // Autodiagnóstico (Health Check)
+        const health = ia.healthCheck || { status: "sin_datos", verificadoEn: null, errorMsg: null };
+        const healthBadge = $("iaHealthStatus");
+        const healthErrorRow = $("iaHealthErrorRow");
+        const healthErrorMsg = $("iaHealthErrorMsg");
+
+        if (healthBadge) {
+          if (health.status === "ok") {
+            healthBadge.className = "badge success";
+            healthBadge.textContent = "SANO ✅";
+            if (healthErrorRow) healthErrorRow.style.display = "none";
+          } else if (health.status === "error") {
+            healthBadge.className = "badge danger";
+            healthBadge.textContent = "FALLANDO ❌";
+            if (healthErrorRow) {
+              healthErrorRow.style.display = "flex";
+              if (healthErrorMsg) healthErrorMsg.textContent = health.errorMsg || "Error desconocido";
+            }
+          } else {
+            healthBadge.className = "badge warning";
+            healthBadge.textContent = "SIN DATOS ⚪";
+            if (healthErrorRow) healthErrorRow.style.display = "none";
+          }
+        }
+
+        // Update Core Services and Data Sources Status
+        const estado = data.estado || {};
+        
+        const srvWhatsapp = $("srvWhatsapp");
+        if (srvWhatsapp) {
+          const waStatus = estado.whatsapp || "desconocido";
+          if (waStatus === "listo") {
+            srvWhatsapp.className = "badge success";
+            srvWhatsapp.textContent = "CONECTADO";
+          } else {
+            srvWhatsapp.className = "badge danger";
+            srvWhatsapp.textContent = waStatus.toUpperCase();
+          }
+        }
+
+        const srvDb = $("srvDb");
+        if (srvDb) {
+          const dbStatus = estado.db || "error";
+          if (dbStatus === "ok") {
+            srvDb.className = "badge success";
+            srvDb.textContent = "ONLINE";
+          } else {
+            srvDb.className = "badge danger";
+            srvDb.textContent = "OFFLINE";
+          }
+        }
+
+        const srvCrons = $("srvCrons");
+        if (srvCrons) {
+          const cronRec = estado.cronRecolector || "inactivo";
+          const cronEnv = estado.cronEnviador || "inactivo";
+          if (cronRec === "activo" && cronEnv === "activo") {
+            srvCrons.className = "badge success";
+            srvCrons.textContent = "ACTIVOS";
+          } else if (cronRec === "activo" || cronEnv === "activo") {
+            srvCrons.className = "badge warning";
+            srvCrons.textContent = "PARCIAL";
+          } else {
+            srvCrons.className = "badge danger";
+            srvCrons.textContent = "INACTIVOS";
+          }
+        }
+
+        const fuentesTableBody = $("fuentesTableBody");
+        if (fuentesTableBody) {
+          const fuentes = data.datos?.fuentes || [];
+          if (fuentes.length === 0) {
+            fuentesTableBody.innerHTML = `<tr><td colspan="3" class="muted" style="padding: 12px; text-align: center;">No hay fuentes registradas.</td></tr>`;
+          } else {
+            const formatMins = (m) => {
+              if (m === null || m === undefined) return "nunca";
+              if (m < 1) return "hace instantes";
+              if (m < 60) return `hace ${m}m`;
+              const hrs = Math.floor(m / 60);
+              const mins = m % 60;
+              if (hrs < 24) return `hace ${hrs}h ${mins}m`;
+              const days = Math.floor(hrs / 24);
+              return `hace ${days}d`;
+            };
+
+            fuentesTableBody.innerHTML = fuentes.map(f => {
+              let statusBadge = "";
+              if (f.estado === "ok") {
+                statusBadge = `<span class="badge success" style="font-size: 11px;">🟢 OK</span>`;
+              } else if (f.estado === "lento") {
+                statusBadge = `<span class="badge warning" style="font-size: 11px;">🟡 LENTO</span>`;
+              } else if (f.estado === "error") {
+                statusBadge = `<span class="badge danger" style="font-size: 11px; cursor: help;" title="${f.errorMsg || 'Error desconocido'}">🔴 ERROR</span>`;
+              } else {
+                statusBadge = `<span class="badge info" style="font-size: 11px;">⚪ N/D</span>`;
+              }
+
+              const ms = f.tiempoMs !== null ? `${f.tiempoMs}ms` : '—';
+              const when = formatMins(f.minutosDesdeUltAct);
+              const nameText = f.nombre || f.codigo || 'Fuente';
+
+              return `
+                <tr>
+                  <td style="padding: 8px 10px;">
+                    <div style="font-weight: 700; font-size: 12px; color: var(--text);">${nameText}</div>
+                    <div style="font-size: 10px; color: var(--muted);">${f.categoria || 'general'} · ${when}</div>
+                  </td>
+                  <td style="padding: 8px 10px; text-align: center; font-size: 11px; font-weight: 600; color: var(--muted);">${ms}</td>
+                  <td style="padding: 8px 10px; text-align: right;">${statusBadge}</td>
+                </tr>
+              `;
+            }).join("");
+          }
+        }
+
+        const conIA = Number(metricas.consultasConIAHoy || 0);
+        const fallback = Number(metricas.consultasFallbackHoy || 0);
+        $("iaConsultasHoy").textContent = num(conIA);
+        $("iaFallbackHoy").textContent = num(fallback);
+
+        const total = conIA + fallback;
+        const tasaExit = total > 0 ? ((conIA / total) * 100).toFixed(1) : "0.0";
+        $("iaTasaExitPct").textContent = `${tasaExit}%`;
+        $("iaProgressFill").style.width = `${tasaExit}%`;
+
+        $("iaOrdenFallback").textContent = (ia.ordenFallback || []).join(" ➔ ") || "Ninguno";
+
+        // 3. Render Quota Alert Banner and Breakdown Table
+        const breakdownIAs = metricas.breakdownIAs || [];
+        const alertsActivas = metricas.alertasCuotaActiva || false;
+
+        const quotaBanner = $("quotaAlertBanner");
+        if (alertsActivas) {
+          quotaBanner.style.display = "flex";
+          const exProviders = breakdownIAs.filter(x => x.cuotaExcedida).map(x => x.nombre).join(", ");
+          $("quotaAlertDesc").innerHTML = `
+            ⚠️ Se detectó que el/los proveedor(es) <strong>${exProviders}</strong> superó/aron su límite o arrojó/aron errores 429 de Rate Limit.
+            El backend de AgroHabilis ha conmutado transparentemente y al instante a las claves de fallback o mecanismos de contingencia locales para garantizar servicio continuo.
+          `;
+        } else {
+          quotaBanner.style.display = "none";
+        }
+
+        const tableBodyHtml = breakdownIAs.map(item => {
+          let statusBadge = "";
+          if (item.cuotaExcedida) {
+            statusBadge = `<span class="badge danger" style="font-size: 11px;">⚠️ LIMITE EXCEDIDO</span>`;
+          } else if (item.totalHoy > 0) {
+            statusBadge = `<span class="badge success" style="font-size: 11px;">🟢 ACTIVO</span>`;
+          } else {
+            statusBadge = `<span class="badge info" style="font-size: 11px;">⚪ INACTIVO</span>`;
+          }
+
+          let emoji = "🤖";
+          if (item.id === "gemini_gratis" || item.id === "gemini_pago" || item.id === "gemini_vision") {
+            emoji = "🧠";
+          } else if (item.id === "groq") {
+            emoji = "⚡";
+          } else if (item.id === "openrouter") {
+            emoji = "🌐";
+          } else if (item.id === "ollama") {
+            emoji = "🦙";
+          } else if (item.id === "heuristica") {
+            emoji = "⚙️";
+          }
+
+          return `
+            <tr>
+              <td><strong>${emoji} ${item.nombre}</strong></td>
+              <td style="text-align: center; font-weight: 700;">${num(item.totalHoy)}</td>
+              <td style="text-align: center; color: var(--muted); font-size: 13px;">${item.limiteCuota}</td>
+              <td style="text-align: right;">${statusBadge}</td>
+            </tr>
+          `;
+        }).join("");
+
+        $("iaBreakdownTableBody").innerHTML = tableBodyHtml || `<tr><td colspan="4" class="muted">Sin desglose de motores de IA hoy.</td></tr>`;
+
+        // 4. Token footprint table
+        const tokens = ia.tokens?.porUsuario || [];
+        const tableHtml = tokens.map(t => {
+          const limitClass = t.tokens_totales > 200000 ? "badge danger" : t.tokens_totales > 50000 ? "badge warning" : "badge success";
+          const limitText = t.tokens_totales > 200000 ? "Alto" : t.tokens_totales > 50000 ? "Medio" : "Bajo";
+          return `
+            <tr>
+              <td><strong>${t.nombre || "Productor General"}</strong></td>
+              <td><code>${t.whatsapp || "—"}</code></td>
+              <td>${num(t.tokens_totales > 0 ? Math.round(t.tokens_totales / 500) : 0)}</td>
+              <td><strong>${num(t.tokens_totales)} tokens</strong></td>
+              <td><span class="${limitClass}">${limitText}</span></td>
+            </tr>
+          `;
+        }).join("");
+
+        $("tokensTableBody").innerHTML = tableHtml || `<tr><td colspan="5" class="muted">Sin datos de tokens de usuarios hoy.</td></tr>`;
+      }
+
+      $("btnReload").addEventListener("click", fetchStatus);
+
+      // Initial fetch
+      fetchStatus().catch(console.error);
+    </script>
+  </body>
+</html>

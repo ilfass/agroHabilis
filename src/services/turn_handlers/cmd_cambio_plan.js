@@ -40,19 +40,22 @@ const PLANES_VALIDOS = new Set([
   "QUIERO PLAN GRATIS",
   "QUIERO PLAN BASICO",
   "QUIERO PLAN PRO",
+  "QUIERO PLAN PRO MAX",
+  "QUIERO PLAN PROMAX",
 ]);
 
 const detectarPedidoPlan = (ctx) => {
-  const alias = String(ctx?.comandoAlias || "").toUpperCase();
+  const alias = String(ctx?.comandoAlias || "").toUpperCase().replace(/\s+/g, " ").trim();
   if (PLANES_VALIDOS.has(alias)) return alias;
-  const natural = String(ctx?.comandoNatural || "").toUpperCase();
+  const natural = String(ctx?.comandoNatural || "").toUpperCase().replace(/\s+/g, " ").trim();
   if (PLANES_VALIDOS.has(natural)) return natural;
-  const heur = String(inferirComandoNatural(ctx?.consulta || "") || "").toUpperCase();
+  const heur = String(inferirComandoNatural(ctx?.consulta || "") || "").toUpperCase().replace(/\s+/g, " ").trim();
   if (PLANES_VALIDOS.has(heur)) return heur;
   return null;
 };
 
 const planObjetivoDesdeAlias = (alias) => {
+  if (alias.endsWith("PRO MAX") || alias.endsWith("PROMAX")) return "pro_max";
   if (alias.endsWith("PRO")) return "pro";
   if (alias.endsWith("BASICO")) return "basico";
   return "gratis";

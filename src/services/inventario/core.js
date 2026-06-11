@@ -2,6 +2,7 @@
 
 const { query } = require("../../config/database");
 const { fechaISOArgentina } = require("../../utils/fecha_ar");
+const { generarCodigo, PREFIJOS } = require("../../utils/codigo_visible");
 
 const ESPECIES_KEYS = [
   { especie: "vacuno", keys: ["vacuno", "bovino", "novillo", "novillos", "ternero", "terneros", "vaca", "vacas", "vaquillona", "toro", "toros", "cabez"] },
@@ -56,7 +57,7 @@ function claseDominioMovimiento(dominio) {
   return "stock";
 }
 
-async function leerCantidadSaldoActual(usuarioId, dominio, itemClave, loteId, campanaId) {
+async function leerCantidadSaldoActual(usuarioId, dominio, itemClave, ubicacionId, campanaId) {
   const r = await query(
     `
       SELECT cantidad
@@ -64,22 +65,22 @@ async function leerCantidadSaldoActual(usuarioId, dominio, itemClave, loteId, ca
       WHERE usuario_id = $1
         AND dominio = $2
         AND item_clave = $3
-        AND (lote_id IS NOT DISTINCT FROM $4)
+        AND (ubicacion_id IS NOT DISTINCT FROM $4)
         AND (campana_id IS NOT DISTINCT FROM $5)
       LIMIT 1
     `,
-    [usuarioId, dominio, itemClave, loteId, campanaId]
+    [usuarioId, dominio, itemClave, ubicacionId, campanaId]
   );
   if (!r.rows.length) return 0;
   const n = Number(r.rows[0].cantidad);
   return Number.isFinite(n) ? n : 0;
 }
 
-async function asegurarLoteUsuario(usuarioId, loteId) {
-  if (loteId == null || loteId === "") return;
-  const id = Number(loteId);
+async function asegurarLoteUsuario(usuarioId, ubicacionId) {
+  if (ubicacionId == null || ubicacionId === "") return;
+  const id = Number(ubicacionId);
   if (!Number.isFinite(id)) throw new Error("lote_invalido");
-  const r = await query(`SELECT 1 FROM lotes WHERE id = $1 AND usuario_id = $2 LIMIT 1`, [id, usuarioId]);
+  const r = await query(`SELECT 1 FROM ubicaciones WHERE id = $1 AND usuario_id = $2 LIMIT 1`, [id, usuarioId]);
   if (!r.rows.length) throw new Error("Lote no válido o no pertenece al usuario.");
 }
 
@@ -146,9 +147,10 @@ async function listarLotesUsuario(usuarioId) {
   if (!usuarioId) return [];
   const r = await query(
     `
-      SELECT id, nombre, hectareas, cultivo, arrendado
-      FROM lotes
+      SELECT id, nombre, hectareas, cultivo, arrendado, cliente, firma, provincia, partido, tipo, lat, lng, codigo
+      FROM ubicaciones
       WHERE usuario_id = $1
+        AND (tipo IS NULL OR tipo NOT IN ('feedlot','corral'))
       ORDER BY nombre NULLS LAST, id ASC
     `,
     [usuarioId]
@@ -156,17 +158,48 @@ async function listarLotesUsuario(usuarioId) {
   return r.rows || [];
 }
 
-async function crearLoteUsuario({ usuarioId, nombre, hectareas = null, cultivo = null, arrendado = false }) {
+async function crearLoteUsuario({ 
+  usuarioId, 
+  nombre, 
+  hectareas = null, 
+  cultivo = null, 
+  arrendado = false, 
+  cliente = null,
+  firma = null,
+  provincia = null,
+  partido = null,
+  tipo = 'lote',
+  lat = null,
+  lng = null
+}) {
   const n = String(nombre || "").trim();
   if (!n) throw new Error("nombre_obligatorio");
   const ha = hectareas === null || hectareas === undefined || hectareas === "" ? null : Number(hectareas);
+  const lLat = lat === null || lat === undefined || lat === "" ? null : Number(lat);
+  const lLng = lng === null || lng === undefined || lng === "" ? null : Number(lng);
+  const tipoSan = tipo ? String(tipo).trim() : 'lote';
+  const codigo = await generarCodigo(query, "ubicaciones", PREFIJOS.lotes, usuarioId);
   const r = await query(
     `
-      INSERT INTO lotes (usuario_id, nombre, hectareas, cultivo, arrendado)
-      VALUES ($1, $2, $3, $4, $5)
-      RETURNING id, nombre, hectareas, cultivo, arrendado
+      INSERT INTO ubicaciones (usuario_id, nombre, hectareas, cultivo, arrendado, cliente, firma, provincia, partido, tipo, lat, lng, codigo)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+      RETURNING id, nombre, hectareas, cultivo, arrendado, cliente, firma, provincia, partido, tipo, lat, lng, codigo
     `,
-    [usuarioId, n, Number.isFinite(ha) ? ha : null, cultivo ? String(cultivo).trim() : null, Boolean(arrendado)]
+    [
+      usuarioId,
+      n,
+      Number.isFinite(ha) ? ha : null,
+      cultivo ? String(cultivo).trim() : null,
+      Boolean(arrendado),
+      cliente ? String(cliente).trim() : null,
+      firma ? String(firma).trim() : null,
+      provincia ? String(provincia).trim() : null,
+      partido ? String(partido).trim() : null,
+      tipoSan,
+      Number.isFinite(lLat) ? lLat : null,
+      Number.isFinite(lLng) ? lLng : null,
+      codigo
+    ]
   );
   return r.rows[0];
 }
@@ -222,7 +255,7 @@ async function expirarOtrosPendientes(usuarioId, exceptoId = null) {
 async function insertarMovimientoBase({
   usuarioId,
   campanaId = null,
-  loteId = null,
+  ubicacionId = null,
   dominio,
   clase = "stock",
   efecto = "replace",
@@ -236,7 +269,7 @@ async function insertarMovimientoBase({
   const r = await query(
     `
       INSERT INTO inventario_movimiento (
-        usuario_id, campana_id, lote_id, dominio, clase, efecto, payload,
+        usuario_id, campana_id, ubicacion_id, dominio, clase, efecto, payload,
         fecha_referencia, texto_nl, estado, canal, idempotency_key, confirmado_en
       )
       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11, $12, $13)
@@ -245,7 +278,7 @@ async function insertarMovimientoBase({
     [
       usuarioId,
       campanaId,
-      loteId,
+      ubicacionId,
       dominio,
       clase,
       efecto,
@@ -263,7 +296,7 @@ async function insertarMovimientoBase({
 
 async function upsertSaldoDesdeMovimientoConfirmado(movRow) {
   const efecto = movRow.efecto === "delta" ? "delta" : "replace";
-  const { usuario_id: usuarioId, campana_id: campanaId, lote_id: loteId, dominio, id, payload } = movRow;
+  const { usuario_id: usuarioId, campana_id: campanaId, ubicacion_id: ubicacionId, dominio, id, payload } = movRow;
   const pj = typeof payload === "object" && payload ? payload : JSON.parse(payload || "{}");
   let item_clave = null;
   let cantidad = null;
@@ -279,7 +312,7 @@ async function upsertSaldoDesdeMovimientoConfirmado(movRow) {
     if (efecto === "delta") {
       const d = Number(pj.delta ?? pj.cambio ?? pj.variacion);
       if (!Number.isFinite(d)) throw new Error("delta_ganado_invalido");
-      const base = await leerCantidadSaldoActual(usuarioId, dominio, item_clave, loteId, campanaId);
+      const base = await leerCantidadSaldoActual(usuarioId, dominio, item_clave, ubicacionId, campanaId);
       cantidad = Math.round(base + d);
       if (cantidad < 0) throw new Error("saldo_final_negativo");
     } else {
@@ -289,27 +322,41 @@ async function upsertSaldoDesdeMovimientoConfirmado(movRow) {
     }
     
     if (Array.isArray(pj.animales_individuales) && pj.animales_individuales.length > 0) {
+      const { calcularCarencia } = require("../../utils/carencia");
       for (const anim of pj.animales_individuales) {
+        let carenciaHasta = null;
+        let carenciaDetalle = null;
+        const carenciaInfo = calcularCarencia(anim.observaciones || "");
+        if (carenciaInfo) {
+          const dias = carenciaInfo.dias;
+          const fechaRef = new Date(pj.fecha_referencia || new Date());
+          fechaRef.setDate(fechaRef.getDate() + dias);
+          carenciaHasta = fechaRef;
+          carenciaDetalle = carenciaInfo.motivo;
+        }
+
         // Insertamos o actualizamos datos maestros del animal
         const resAnim = await query(
           `
             INSERT INTO animales_individuales (
-              usuario_id, lote_id, caravana, categoria, estado, observaciones, 
-              peso, sexo, raza
+              usuario_id, ubicacion_id, caravana, categoria, estado, observaciones, 
+              peso, sexo, raza, carencia_hasta, carencia_detalle
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
             ON CONFLICT (usuario_id, caravana) WHERE caravana IS NOT NULL
             DO UPDATE SET
-              lote_id = EXCLUDED.lote_id,
+              ubicacion_id = EXCLUDED.ubicacion_id,
               categoria = EXCLUDED.categoria,
               estado = EXCLUDED.estado,
               peso = COALESCE(EXCLUDED.peso, animales_individuales.peso),
-              observaciones = COALESCE(EXCLUDED.observaciones, animales_individuales.observaciones)
+              observaciones = COALESCE(EXCLUDED.observaciones, animales_individuales.observaciones),
+              carencia_hasta = EXCLUDED.carencia_hasta,
+              carencia_detalle = EXCLUDED.carencia_detalle
             RETURNING id
           `,
           [
             usuarioId,
-            loteId,
+            ubicacionId,
             anim.caravana || null,
             anim.categoria || etiqueta,
             anim.estado || "sano",
@@ -317,6 +364,8 @@ async function upsertSaldoDesdeMovimientoConfirmado(movRow) {
             anim.peso != null ? Number(anim.peso) : null,
             anim.sexo || null,
             anim.raza || null,
+            carenciaHasta,
+            carenciaDetalle,
           ]
         );
 
@@ -360,7 +409,7 @@ async function upsertSaldoDesdeMovimientoConfirmado(movRow) {
     if (efecto === "delta") {
       const d = Number(pj.delta ?? pj.cambio ?? pj.hectareas_delta);
       if (!Number.isFinite(d)) throw new Error("delta_cultivo_invalido");
-      const base = await leerCantidadSaldoActual(usuarioId, dominio, item_clave, loteId, campanaId);
+      const base = await leerCantidadSaldoActual(usuarioId, dominio, item_clave, ubicacionId, campanaId);
       cantidad = base + d;
       if (cantidad < 0) throw new Error("saldo_final_negativo");
     } else {
@@ -370,43 +419,55 @@ async function upsertSaldoDesdeMovimientoConfirmado(movRow) {
     }
 
     // Actualización de datos maestros del lote si vienen en el mensaje
-    if (loteId && (pj.variedad || pj.fecha_siembra || pj.densidad || pj.rinde_esperado)) {
+    if (ubicacionId && (cultivo || pj.variedad || pj.fecha_siembra || pj.densidad || pj.rinde_esperado || pj.siembra_tipo || pj.densidad_por_metro || pj.distancia_surcos || pj.fertilizante || pj.fertilizante_dosis || pj.arrendado !== undefined)) {
       await query(
         `
-          UPDATE lotes 
+          UPDATE ubicaciones 
           SET variedad = COALESCE($3, variedad),
               fecha_siembra = COALESCE($4, fecha_siembra),
               densidad = COALESCE($5, densidad),
               rinde_esperado = COALESCE($6, rinde_esperado),
-              cultivo = COALESCE($7, cultivo)
+              cultivo = COALESCE($7, cultivo),
+              arrendado = COALESCE($8, arrendado),
+              siembra_tipo = COALESCE($9, siembra_tipo),
+              densidad_por_metro = COALESCE($10, densidad_por_metro),
+              distancia_surcos = COALESCE($11, distancia_surcos),
+              fertilizante = COALESCE($12, fertilizante),
+              fertilizante_dosis = COALESCE($13, fertilizante_dosis)
           WHERE id = $1 AND usuario_id = $2
         `,
         [
-          loteId,
+          ubicacionId,
           usuarioId,
           pj.variedad || null,
           pj.fecha_siembra || null,
           pj.densidad != null ? Number(pj.densidad) : null,
           pj.rinde_esperado != null ? Number(pj.rinde_esperado) : null,
-          cultivo
+          cultivo,
+          pj.arrendado !== undefined ? Boolean(pj.arrendado) : null,
+          pj.siembra_tipo || null,
+          pj.densidad_por_metro != null ? Number(pj.densidad_por_metro) : null,
+          pj.distancia_surcos != null ? Number(pj.distancia_surcos) : null,
+          pj.fertilizante || null,
+          pj.fertilizante_dosis != null ? Number(pj.fertilizante_dosis) : null
         ]
       );
     }
 
     // Registro de monitoreo si viene data específica
-    if (loteId && pj.monitoreo) {
+    if (ubicacionId && pj.monitoreo) {
       const m = pj.monitoreo;
       await query(
         `
           INSERT INTO monitoreo_agricola (
-            usuario_id, lote_id, campana_id, fecha, 
+            usuario_id, ubicacion_id, campana_id, fecha, 
             estado_fenologico, humedad_suelo, incidencia_sanitaria, observaciones
           )
           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         `,
         [
           usuarioId,
-          loteId,
+          ubicacionId,
           campanaId,
           pj.fecha_referencia || new Date(),
           m.estado_fenologico || null,
@@ -425,7 +486,7 @@ async function upsertSaldoDesdeMovimientoConfirmado(movRow) {
     if (efecto === "delta") {
       const d = Number(pj.delta ?? pj.cambio);
       if (!Number.isFinite(d)) throw new Error("delta_insumo_invalido");
-      const base = await leerCantidadSaldoActual(usuarioId, dominio, item_clave, loteId, campanaId);
+      const base = await leerCantidadSaldoActual(usuarioId, dominio, item_clave, ubicacionId, campanaId);
       cantidad = base + d;
       if (cantidad < 0) throw new Error("saldo_final_negativo");
     } else {
@@ -441,7 +502,7 @@ async function upsertSaldoDesdeMovimientoConfirmado(movRow) {
     if (efecto === "delta") {
       const d = Number(pj.delta ?? pj.cambio ?? pj.delta_toneladas);
       if (!Number.isFinite(d)) throw new Error("delta_grano_invalido");
-      const base = await leerCantidadSaldoActual(usuarioId, dominio, item_clave, loteId, campanaId);
+      const base = await leerCantidadSaldoActual(usuarioId, dominio, item_clave, ubicacionId, campanaId);
       cantidad = base + d;
       if (cantidad < 0) throw new Error("saldo_final_negativo");
     } else {
@@ -462,22 +523,22 @@ async function upsertSaldoDesdeMovimientoConfirmado(movRow) {
       WHERE usuario_id = $5
         AND dominio = $6
         AND item_clave = $7
-        AND (lote_id IS NOT DISTINCT FROM $8)
+        AND (ubicacion_id IS NOT DISTINCT FROM $8)
         AND (campana_id IS NOT DISTINCT FROM $9)
     `,
-    [cantidad, unidad, etiqueta, id, usuarioId, dominio, item_clave, loteId, campanaId]
+    [cantidad, unidad, etiqueta, id, usuarioId, dominio, item_clave, ubicacionId, campanaId]
   );
   if (upd.rowCount > 0) return;
 
   await query(
     `
       INSERT INTO inventario_saldo (
-        usuario_id, campana_id, lote_id, dominio, item_clave,
+        usuario_id, campana_id, ubicacion_id, dominio, item_clave,
         cantidad, unidad, etiqueta, ultimo_movimiento_id
       )
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
     `,
-    [usuarioId, campanaId, loteId, dominio, item_clave, cantidad, unidad, etiqueta, id]
+    [usuarioId, campanaId, ubicacionId, dominio, item_clave, cantidad, unidad, etiqueta, id]
   );
 }
 
@@ -490,14 +551,14 @@ async function crearRegistroPendiente({
   usuarioId,
   dominio,
   payload,
-  loteId = null,
+  ubicacionId = null,
   campanaId = null,
   efecto = "replace",
   textoNl = "",
   fechaReferencia,
   canal = "whatsapp",
 }) {
-  await asegurarLoteUsuario(usuarioId, loteId);
+  await asegurarLoteUsuario(usuarioId, ubicacionId);
   await asegurarCampanaUsuario(usuarioId, campanaId);
   await expirarOtrosPendientes(usuarioId);
   const f = fechaReferencia || fechaISOArgentina();
@@ -505,7 +566,7 @@ async function crearRegistroPendiente({
   const mov = await insertarMovimientoBase({
     usuarioId,
     campanaId,
-    loteId,
+    ubicacionId,
     dominio,
     clase: claseDominioMovimiento(dominio),
     efecto: efectoSan,
@@ -543,7 +604,7 @@ async function confirmarMovimientoPorId(id, usuarioId) {
       const child = await insertarMovimientoBase({
         usuarioId: row.usuario_id,
         campanaId: row.campana_id,
-        loteId: row.lote_id,
+        ubicacionId: row.ubicacion_id,
         dominio: dom,
         clase: claseDominioMovimiento(dom),
         efecto: ef,
@@ -567,7 +628,7 @@ async function confirmarMovimientoPorId(id, usuarioId) {
       const child = await insertarMovimientoBase({
         usuarioId: row.usuario_id,
         campanaId: row.campana_id,
-        loteId: row.lote_id,
+        ubicacionId: row.ubicacion_id,
         dominio: "ganado",
         clase: "stock",
         efecto: "replace",
@@ -603,7 +664,7 @@ async function registroConfirmadoDirecto({
   usuarioId,
   dominio,
   payload,
-  loteId = null,
+  ubicacionId = null,
   campanaId = null,
   efecto = "replace",
   textoNl = null,
@@ -611,7 +672,7 @@ async function registroConfirmadoDirecto({
   canal = "web",
   idempotencyKey = null,
 }) {
-  await asegurarLoteUsuario(usuarioId, loteId);
+  await asegurarLoteUsuario(usuarioId, ubicacionId);
   await asegurarCampanaUsuario(usuarioId, campanaId);
   await expirarOtrosPendientes(usuarioId);
   const f = fechaReferencia || fechaISOArgentina();
@@ -619,7 +680,7 @@ async function registroConfirmadoDirecto({
   const mov = await insertarMovimientoBase({
     usuarioId,
     campanaId,
-    loteId,
+    ubicacionId,
     dominio,
     clase: claseDominioMovimiento(dominio),
     efecto: efectoSan,
@@ -634,16 +695,16 @@ async function registroConfirmadoDirecto({
   return mov;
 }
 
-async function listarSaldos({ usuarioId, loteId = undefined, campanaId = undefined, dominio = undefined }) {
+async function listarSaldos({ usuarioId, ubicacionId = undefined, campanaId = undefined, dominio = undefined }) {
   const cond = ["s.usuario_id = $1"];
   const vals = [usuarioId];
   if (dominio) {
     vals.push(dominio);
     cond.push(`s.dominio = $${vals.length}`);
   }
-  if (loteId !== undefined && loteId !== null && loteId !== "") {
-    vals.push(Number(loteId));
-    cond.push(`s.lote_id = $${vals.length}`);
+  if (ubicacionId !== undefined && ubicacionId !== null && ubicacionId !== "") {
+    vals.push(Number(ubicacionId));
+    cond.push(`s.ubicacion_id = $${vals.length}`);
   }
   if (campanaId !== undefined && campanaId !== null && campanaId !== "") {
     vals.push(Number(campanaId));
@@ -651,12 +712,12 @@ async function listarSaldos({ usuarioId, loteId = undefined, campanaId = undefin
   }
   const r = await query(
     `
-      SELECT s.id, s.lote_id, s.campana_id, s.dominio, s.item_clave, s.cantidad, s.unidad,
+      SELECT s.id, s.ubicacion_id, s.campana_id, s.dominio, s.item_clave, s.cantidad, s.unidad,
              s.etiqueta, s.actualizado_en,
              l.nombre AS lote_nombre,
              c.nombre AS campana_nombre
       FROM inventario_saldo s
-      LEFT JOIN lotes l ON l.id = s.lote_id AND l.usuario_id = s.usuario_id
+      LEFT JOIN ubicaciones l ON l.id = s.ubicacion_id AND l.usuario_id = s.usuario_id
       LEFT JOIN campanas_agricolas c ON c.id = s.campana_id AND c.usuario_id = s.usuario_id
       WHERE ${cond.join(" AND ")}
       ORDER BY s.dominio ASC, s.etiqueta ASC
@@ -670,12 +731,12 @@ async function listarMovimientos({ usuarioId, limit = 40 }) {
   const lim = Math.min(500, Math.max(1, Number(limit) || 40));
   const r = await query(
     `
-      SELECT m.id, m.dominio, m.lote_id, m.campana_id, m.estado, m.efecto, m.payload, m.fecha_referencia,
+      SELECT m.id, m.dominio, m.ubicacion_id, m.campana_id, m.estado, m.efecto, m.payload, m.fecha_referencia,
              m.texto_nl, m.canal, m.creado_en, m.confirmado_en,
              l.nombre AS lote_nombre,
              ca.nombre AS campana_nombre
       FROM inventario_movimiento m
-      LEFT JOIN lotes l ON l.id = m.lote_id AND l.usuario_id = m.usuario_id
+      LEFT JOIN ubicaciones l ON l.id = m.ubicacion_id AND l.usuario_id = m.usuario_id
       LEFT JOIN campanas_agricolas ca ON ca.id = m.campana_id AND ca.usuario_id = m.usuario_id
       WHERE m.usuario_id = $1 AND m.estado <> 'pendiente_confirmacion'
       ORDER BY m.creado_en DESC
@@ -686,16 +747,16 @@ async function listarMovimientos({ usuarioId, limit = 40 }) {
   return r.rows || [];
 }
 
-async function consultarHistorialSanidad({ usuarioId, caravana = null, loteId = null, limit = 20 }) {
+async function consultarHistorialSanidad({ usuarioId, caravana = null, ubicacionId = null, limit = 20 }) {
   const cond = ["e.usuario_id = $1"];
   const vals = [usuarioId];
   if (caravana) {
     vals.push(String(caravana).trim());
     cond.push(`a.caravana = $${vals.length}`);
   }
-  if (loteId) {
-    vals.push(Number(loteId));
-    cond.push(`a.lote_id = $${vals.length}`);
+  if (ubicacionId) {
+    vals.push(Number(ubicacionId));
+    cond.push(`a.ubicacion_id = $${vals.length}`);
   }
 
   const r = await query(
@@ -704,7 +765,7 @@ async function consultarHistorialSanidad({ usuarioId, caravana = null, loteId = 
              a.caravana, a.categoria, l.nombre AS lote_nombre
       FROM animales_eventos e
       JOIN animales_individuales a ON a.id = e.animal_id
-      LEFT JOIN lotes l ON l.id = a.lote_id
+      LEFT JOIN ubicaciones l ON l.id = a.ubicacion_id
       WHERE ${cond.join(" AND ")}
       ORDER BY e.fecha DESC, e.creado_en DESC
       LIMIT $${vals.length + 1}
@@ -766,9 +827,28 @@ function resumenMovimientoParaHumano(row, loteNombre = "", campanaNombre = "") {
       det = `${cr} (stock): Δ ${Number.isFinite(d) && d > 0 ? "+" : ""}${numeroFormateado(d)} tn`;
     } else det = `${cr} (stock): ${numeroFormateado(p.toneladas ?? p.tn)} tn`;
   } else det = "?";
-  const lf = row.lote_id ? `\n📍 ${loteNombre || `lote #${row.lote_id}`}` : `\n📍 establecimiento (sin lote)`;
+  const lf = row.ubicacion_id ? `\n📍 ${loteNombre || `lote #${row.ubicacion_id}`}` : `\n📍 establecimiento (sin lote)`;
   const cf = row.campana_id ? `\n🌾 ${campanaNombre || `campaña #${row.campana_id}`}` : "";
-  return `${det}${lf}${cf}\n📅 ${String(row.fecha_referencia || "")}`;
+  
+  let carenciaAlert = "";
+  if (row.dominio === "ganado" && Array.isArray(p.animales_individuales)) {
+    const { calcularCarencia } = require("../../utils/carencia");
+    const alertas = [];
+    for (const anim of p.animales_individuales) {
+      const carenciaInfo = calcularCarencia(anim.observaciones || "");
+      if (carenciaInfo && carenciaInfo.dias > 0) {
+        const fechaRef = new Date(row.fecha_referencia || new Date());
+        fechaRef.setDate(fechaRef.getDate() + carenciaInfo.dias);
+        const fechaFormateada = `${String(fechaRef.getDate()).padStart(2, '0')}/${String(fechaRef.getMonth() + 1).padStart(2, '0')}/${fechaRef.getFullYear()}`;
+        alertas.push(`• *Caravana ${anim.caravana || 's/d'}*: ⚠️ *Retiro/Carencia hasta ${fechaFormateada}* (${carenciaInfo.motivo})`);
+      }
+    }
+    if (alertas.length) {
+      carenciaAlert = `\n\n🛡️ *Período de Carencia (SENASA):*\n${alertas.join("\n")}`;
+    }
+  }
+
+  return `${det}${lf}${cf}\n📅 ${String(row.fecha_referencia || "")}${carenciaAlert}`;
 }
 
 function numeroFormateado(x) {

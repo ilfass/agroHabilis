@@ -33,6 +33,10 @@ Esta carpeta separa el conocimiento de comercializacion agro por modulo para que
 - `37-glosario-terminos.md`
 - `../fuentes/fuentes-curadas.md`
 
+## Relación con el backend (Node)
+
+Esta carpeta define **cómo debe sonar la respuesta** por dominio agro (tono, secciones, datos). **No** define el enrutado del código: clasificador, `router`, `agent/pipeline` y plantillas viven bajo `src/services/`. Referencia canónica del cableado: [../operacion/arquitectura-consultas-whatsapp.md](../operacion/arquitectura-consultas-whatsapp.md).
+
 ## Regla de uso
 - Priorizar el archivo del tema consultado.
 - Si la consulta mezcla temas, combinar hasta 7 archivos relevantes.

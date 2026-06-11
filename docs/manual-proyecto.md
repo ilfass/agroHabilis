@@ -19,7 +19,8 @@ El sistema combina:
 - `src/jobs/recolector.js`: recolecta/normaliza/valida datos y guarda en DB.
 - `src/jobs/enviador.js`: envio de resumenes por WhatsApp segun plan/frecuencia.
 - `src/services/resumen.js`: arma resumen diario por usuario y plan.
-- `src/services/consultas.js`: procesa consultas de WhatsApp.
+- `src/services/consultas.js`: entrada de consultas WhatsApp (comandos de control del bot + delegación a `agent/pipeline/consulta_whatsapp.js`).
+- Referencia del flujo completo (evitar suposiciones obsoletas): [docs/operacion/arquitectura-consultas-whatsapp.md](operacion/arquitectura-consultas-whatsapp.md).
 - `src/config/whatsapp.js`: cliente WhatsApp Web y enrutamiento de mensajes.
 - `src/services/fuentes_monitor.js`: chequeo tecnico de disponibilidad de fuentes.
 - `scripts/db/setup-db.js`: alta/actualizacion de tablas.
@@ -242,7 +243,14 @@ Dashboard:
 
 ---
 
-## 13) Pendientes sugeridos (siguientes iteraciones)
+## 13) Trabajo con Antigravity, Cursor u otro agente de código
+
+- Contexto unificado (producto + dirección “estilo agente” + mapa de `src/services/agent/`): [operacion/antigravity-contexto-proyecto.md](operacion/antigravity-contexto-proyecto.md).
+- Puntero en la raíz del repo: `ANTIGRAVITY.md`.
+
+---
+
+## 14) Pendientes sugeridos (siguientes iteraciones)
 
 - Dashboard de calidad de validaciones (`validaciones_precios`) con tasa de rechazo por fuente.
 - Alertas operativas por degradacion de fuente (no solo estado HTTP).

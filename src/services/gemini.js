@@ -2,8 +2,10 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 const axios = require("axios");
 const { generarChatOpenRouter } = require("./openrouter");
 const { generarChatGroq } = require("./groq");
+const { ollamaHabilitado, generarChatOllama } = require("./ollama");
 const fs = require("fs");
 const path = require("path");
+const { markFreeKeyAsFailed, iaRequestContext } = require("./gemini_keys");
 
 const getModelName = () =>
   process.env.GEMINI_MODEL?.trim() || "gemini-flash-latest";
@@ -116,7 +118,7 @@ const construirSystemBase = (system = "") => {
   const reglas = [
     "POLITICA OBLIGATORIA AGROHABILIS:",
     "- Basate primero en datos de la base interna/contexto recibido; no inventes valores.",
-    "- Si un dato no aparece en el contexto que recibís (JSON/campos explícitos), decí exactamente: 'sin datos en base'. Si el contexto ya trae precio, fecha o fuente para ese punto, no digas que falta.",
+    "- Si un dato no aparece en el contexto que recibís (JSON/campos explícitos), explicalo de forma sumamente empática, honesta y natural (usando voseo argentino), indicando qué referencia falta y sugiriendo la acción práctica más cercana. Queda terminantemente PROHIBIDO responder con frases robóticas o secas como 'sin datos en base' o 'referencia puntual no informada'.",
     "- No inventes nombres de asistente, slogans ni texto comercial.",
     "- Cuando cites un dato factual, incluye fecha y fuente si está disponible en el contexto.",
   ].join("\n");
@@ -263,7 +265,12 @@ const generarConGroundingGoogleSearch = async ({ prompt, contextLabel = "IA.grou
       `${contextLabel}.sdk`
     );
     const response = result.response;
-    const texto = String(response.text() || "").trim();
+    let texto;
+    try {
+      texto = String(response.text() || "").trim();
+    } catch (textErr) {
+      throw new Error("Error al obtener texto de respuesta con grounding de Gemini: " + textErr.message);
+    }
     const cand = response.candidates?.[0];
     const { urls, queries } = extraerUrlsGrounding(cand);
     if (!texto) throw lastError || new Error("Gemini grounding SDK: sin texto");
@@ -277,8 +284,18 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const esErrorReintentableGemini = (error) => {
   const status = Number(error?.response?.status);
-  if (status === 503 || status === 429) return true;
   const msg = String(error?.message || "").toLowerCase();
+  const es429 = status === 429 || msg.includes("429") || msg.includes("resource exhausted") || msg.includes("quota");
+  const es403 = status === 403 || msg.includes("403") || msg.includes("api_key_service_blocked");
+  
+  if (es429 || es403) {
+    try {
+      markFreeKeyAsFailed(true);
+    } catch (e) {
+      console.warn("[Gemini] Error conmutando clave a fallback:", e.message);
+    }
+  }
+  if (status === 503 || status === 429 || status === 403) return true;
   return (
     msg.includes("503") ||
     msg.includes("429") ||
@@ -322,11 +339,24 @@ const generarTexto = async (prompt, opts = {}) => {
   if (Number.isFinite(Number(opts.temperature))) {
     genCfg.temperature = Number(opts.temperature);
   }
-  const modelOpts =
-    Object.keys(genCfg).length > 0 ? { model: modelName, generationConfig: genCfg } : { model: modelName };
+  if (typeof opts.responseMimeType === "string" && opts.responseMimeType.trim()) {
+    genCfg.responseMimeType = opts.responseMimeType.trim();
+  }
+  const modelOpts = { model: modelName };
+  if (Object.keys(genCfg).length > 0) {
+    modelOpts.generationConfig = genCfg;
+  }
+  if (typeof opts.systemInstruction === "string" && opts.systemInstruction.trim()) {
+    modelOpts.systemInstruction = opts.systemInstruction.trim();
+  }
   const model = genAI.getGenerativeModel(modelOpts);
   const result = await conTimeout(model.generateContent(prompt), ms, "Gemini.generateContent");
-  const texto = result.response.text();
+  let texto;
+  try {
+    texto = result.response.text();
+  } catch (textErr) {
+    throw new Error("Error al obtener texto de respuesta de Gemini: " + textErr.message);
+  }
   const usage = result.response.usageMetadata;
   const tokensUsados =
     typeof usage?.totalTokenCount === "number"
@@ -360,63 +390,263 @@ const generarTextoConReintentos = async (prompt, contextLabel = "IA", opts = {})
 };
 
 /**
- * Resumen post-sync BCR (job `pipelineDiario`): una sola llamada a Gemini (`generarTexto`).
- * No usa `generarConPromptLibre` ni IA_PROVIDER_ORDER; el chat sí usa esa cadena para consultas abiertas.
+ * Resumen post-sync BCR (job `pipelineDiario`): usa la cadena de proveedores.
+ * Si Gemini está con cuota, pasa a Groq/OpenRouter/Ollama.
  */
 const generarResumenMercado = async (textoContexto) => {
-  const prompt = [
+  const system = [
     "Sos un asistente agropecuario para productores argentinos.",
     "Genera un resumen breve (maximo 8 lineas) en espanol rioplatense.",
     "Prioriza claridad: cultivos, rangos o valores representativos, moneda (ARS/USD) y fecha.",
     "No inventes datos fuera del contexto. Si falta informacion, decilo explicitamente.",
-    "",
-    "Contexto:",
-    textoContexto,
   ].join("\n");
-  return generarTexto(prompt);
+  const user = `Contexto:\n${textoContexto}`;
+  return runProviderChain({ system, user, contextLabel: "IA.resumen" });
 };
 
-const getProviderOrder = () => {
-  const raw = String(process.env.IA_PROVIDER_ORDER || "gemini,groq,openrouter")
+/**
+ * Orden de proveedores parametrizable por variable de entorno.
+ * @param {string} [orderEnvVar='IA_PROVIDER_ORDER'] - Nombre de la variable de entorno que define el orden.
+ * @param {string[]} [forcedOrder] - Orden explícito (ignora env var si se provee).
+ */
+const getProviderOrder = (orderEnvVar = "IA_PROVIDER_ORDER", forcedOrder = null) => {
+  if (Array.isArray(forcedOrder) && forcedOrder.length) {
+    return forcedOrder;
+  }
+  const raw = String(process.env[orderEnvVar] || process.env.IA_PROVIDER_ORDER || "gemini,groq,openrouter")
     .split(",")
     .map((x) => x.trim().toLowerCase())
     .filter(Boolean);
-  const order = raw.filter((x) =>
-    ["groq", "openrouter", "gemini"].includes(x)
-  );
-  return order.length ? order : ["gemini", "groq", "openrouter"];
+  const known = ["groq", "openrouter", "gemini"];
+  if (ollamaHabilitado()) {
+    known.push("ollama");
+  }
+  const order = raw.filter((x) => known.includes(x));
+  return order.length
+    ? order
+    : ollamaHabilitado()
+    ? ["gemini", "groq", "openrouter", "ollama"]
+    : ["gemini", "groq", "openrouter"];
 };
 
-const runProviderChain = async ({ system, user, contextLabel = "IA" }) => {
-  const order = getProviderOrder();
+const registrarStoreExito = (providerName) => {
+  const store = iaRequestContext?.getStore();
+  if (store) {
+    let exactProvider = providerName;
+    if (providerName === "gemini") {
+      const { getGeminiApiKeyStatus } = require("./gemini_keys");
+      const status = getGeminiApiKeyStatus();
+      exactProvider = status.activeKeyType === "paga" ? "gemini_pago" : "gemini_gratis";
+    }
+    store.providerUsed = exactProvider;
+  }
+};
+
+const registrarStoreFallo = (provider, errorMsg) => {
+  const store = iaRequestContext?.getStore();
+  if (store) {
+    store.providerTrace.push({ provider, ok: false, error: errorMsg });
+  }
+};
+
+const registrarStoreIntentoExito = (provider, forced = false) => {
+  const store = iaRequestContext?.getStore();
+  if (store) {
+    let exactProvider = provider;
+    if (provider === "gemini") {
+      const { getGeminiApiKeyStatus } = require("./gemini_keys");
+      const status = getGeminiApiKeyStatus();
+      exactProvider = status.activeKeyType === "paga" ? "gemini_pago" : "gemini_gratis";
+    }
+    const item = { provider: exactProvider, ok: true };
+    if (forced) item.forced = true;
+    store.providerTrace.push(item);
+  }
+};
+
+function optimizarPromptsParaOllama(system, user) {
+  let nuevoSystem = system;
+  let nuevoUser = user;
+
+  if (system.includes("Sos el asistente de inventario de AgroHabilis")) {
+    nuevoSystem = [
+      "Sos el asistente de inventario de AgroHabilis por WhatsApp (Argentina).",
+      "Respondé SOLO un JSON válido con la estructura:",
+      '{"accion": "registro"|"consulta"|"conversacion"|"no_inventario"|"multi_lote",',
+      ' "mensaje": "explicación o pregunta si faltan datos importantes o es ambiguo",',
+      ' "consulta_filtro_lote": "nombre del lote si consulta stock",',
+      ' "registro": {"dominio": "ganado"|"cultivo"|"grano"|"insumo", "efecto": "replace"|"delta",',
+      ' "cantidad_cabezas": number|null, "hectareas": number|null, "toneladas_grano": number|null,',
+      ' "producto_insumo": string|null, "cantidad_insumo": number|null, "lote_nombre_libre": string|null,',
+      ' "categoria_ganado": string|null, "cultivo": string|null, "especie": string|null, "raza": string|null,',
+      ' "peso_promedio": number|null, "dias_carencia": number|null, "sanidad_tratamiento": string|null}}',
+      "",
+      "Reglas:",
+      "- accion = no_inventario: saludos, precios, clima o pedidos de crear/agregar nuevos lotes/campos.",
+      "- accion = consulta: quiere ver stock.",
+      "- accion = registro: quiere guardar/anotar. Completá lote_nombre_libre con el lote mencionado.",
+      "- accion = conversacion: datos incompletos o ambiguos."
+    ].join("\n");
+
+    nuevoUser = user
+      .replace(/Lotes disponibles en catálogo:[\s\S]*?(?=(Campañas disponibles|Modo forzado|Generá la respuesta|$))/g, "Lotes disponibles en catálogo: []\n")
+      .replace(/Campañas disponibles en catálogo:[\s\S]*?(?=(Modo forzado|Generá la respuesta|$))/g, "Campañas disponibles en catálogo: []\n");
+  }
+
+  if (system.includes("Extracción estructurada para inventario de campo")) {
+    nuevoSystem = [
+      "Extracción estructurada para inventario de campo (Argentina). Respondé SOLO un JSON válido.",
+      "Schema:",
+      '{"intencion":"registro_inventario"|null,"dominio":"ganado"|"cultivo"|"grano"|"insumo"|null,"efecto":"replace"|"delta",',
+      '"cantidad_cabezas": number|null,"delta_cabezas": number|null,"hectareas": number|null,"delta_hectareas": number|null,',
+      '"toneladas_grano": number|null,"delta_toneladas": number|null,',
+      '"producto_insumo": string|null,"unidad_insumo": string|null,"cantidad_insumo": number|null,"delta_insumo": number|null,',
+      '"categoria_ganado": string|null,"cultivo": string|null,"especie": string|null,',
+      '"lote_nombre_libre": string|null,"campana_nombre_libre": string|null,',
+      '"peso_promedio": number|null,"raza": string|null,"sanidad_tratamiento": string|null,"dias_carencia": number|null}',
+      "",
+      "Reglas:",
+      "- Extraé los números y entidades tal cual aparecen. Completá lote_nombre_libre con el lote del texto."
+    ].join("\n");
+
+    nuevoUser = user
+      .replace(/lotes_catalogo_json:[\s\S]*?(?=(campanas_catalogo_json|mensaje_productor|$))/g, "lotes_catalogo_json: []\n")
+      .replace(/campanas_catalogo_json:[\s\S]*?(?=(mensaje_productor|$))/g, "campanas_catalogo_json: []\n");
+  }
+
+  return { system: nuevoSystem, user: nuevoUser };
+}
+
+/**
+ * Cadena unificada de proveedores IA con failover automático.
+ * @param {object} params
+ * @param {string} params.system - Instrucciones del sistema.
+ * @param {string} params.user - Mensaje del usuario.
+ * @param {string} [params.contextLabel='IA'] - Etiqueta para logs.
+ * @param {object} [params.opts] - Opciones avanzadas de generación.
+ * @param {number} [params.opts.temperature] - Temperatura.
+ * @param {number} [params.opts.maxOutputTokens] - Límite de tokens de salida.
+ * @param {string} [params.opts.responseMimeType] - "application/json" para forzar JSON.
+ * @param {string} [params.opts.orderEnvVar] - Variable de entorno para el orden.
+ * @param {string[]} [params.opts.forcedOrder] - Orden explícito de proveedores.
+ * @param {string} [params.opts.geminiModel] - Modelo específico de Gemini a usar.
+ */
+const runProviderChain = async ({ system, user, contextLabel = "IA", opts = {} }) => {
+  const {
+    temperature,
+    maxOutputTokens,
+    responseMimeType,
+    orderEnvVar = "IA_PROVIDER_ORDER",
+    forcedOrder = null,
+    geminiModel = null,
+    usePremiumModel = false,
+  } = opts;
+
+  const order = getProviderOrder(orderEnvVar, forcedOrder);
   let lastError = null;
   const trace = [];
+
+  // Forzar premium en caliente para rescate o escalamiento conversacional
+  const forcePremium = usePremiumModel || process.env.GEMINI_FORCE_PREMIUM_TURN === "true";
+
+  // Opciones compartidas para proveedores OpenAI-compatible
+  const sharedOpts = {};
+  if (Number.isFinite(Number(maxOutputTokens)) && Number(maxOutputTokens) > 0) {
+    sharedOpts.maxTokens = Math.floor(Number(maxOutputTokens));
+  }
+  if (Number.isFinite(Number(temperature))) {
+    sharedOpts.temperature = Number(temperature);
+  }
+  if (typeof responseMimeType === "string" && responseMimeType.trim()) {
+    sharedOpts.responseMimeType = responseMimeType;
+  }
 
   for (const provider of order) {
     try {
       if (provider === "groq" && process.env.GROQ_API_KEY?.trim()) {
-        const out = await generarChatGroq({ system, user });
+        const out = await generarChatGroq({ system, user, ...sharedOpts });
+        registrarStoreExito("groq");
+        registrarStoreIntentoExito("groq");
         return { ...out, providerUsed: "groq", providerTrace: [...trace, { provider, ok: true }] };
       }
       if (provider === "openrouter" && process.env.OPENROUTER_API_KEY?.trim()) {
-        const out = await generarChatOpenRouter({ system, user });
+        const out = await generarChatOpenRouter({ system, user, ...sharedOpts });
+        registrarStoreExito("openrouter");
+        registrarStoreIntentoExito("openrouter");
         return { ...out, providerUsed: "openrouter", providerTrace: [...trace, { provider, ok: true }] };
       }
       if (provider === "gemini" && process.env.GEMINI_API_KEY?.trim()) {
-        const out = await generarTextoConReintentos(`${system}\n\n${user}`, contextLabel);
-        return { ...out, providerUsed: "gemini", providerTrace: [...trace, { provider, ok: true }] };
+        const originalKey = process.env.GEMINI_API_KEY;
+        const fallbackKey = process.env.GEMINI_API_KEY_FALLBACK?.trim();
+        const premiumModel = process.env.GEMINI_PREMIUM_MODEL?.trim() || getModelName();
+        
+        let targetKey = originalKey;
+        let targetModel = geminiModel;
+        let keyChanged = false;
+        
+        if (forcePremium) {
+          if (fallbackKey) {
+            targetKey = fallbackKey;
+            // Intercambiar clave en process.env temporalmente para que generarTextoConReintentos la lea
+            process.env.GEMINI_API_KEY = fallbackKey;
+            keyChanged = true;
+          }
+          targetModel = premiumModel;
+        }
+
+        const geminiOpts = {
+          systemInstruction: system,
+          timeoutMs: getIaTimeoutMs(),
+        };
+        if (targetModel) geminiOpts.model = targetModel;
+        if (Number.isFinite(Number(maxOutputTokens)) && Number(maxOutputTokens) > 0) {
+          geminiOpts.maxOutputTokens = Math.floor(Number(maxOutputTokens));
+        }
+        if (Number.isFinite(Number(temperature))) {
+          geminiOpts.temperature = Number(temperature);
+        }
+        if (typeof responseMimeType === "string" && responseMimeType.trim()) {
+          geminiOpts.responseMimeType = responseMimeType;
+        }
+        
+        try {
+          const out = await generarTextoConReintentos(user, contextLabel, geminiOpts);
+          // Restaurar clave original solo si la modificamos por forcePremium
+          if (keyChanged) {
+            process.env.GEMINI_API_KEY = originalKey;
+          }
+          registrarStoreExito("gemini");
+          registrarStoreIntentoExito("gemini");
+          return { ...out, providerUsed: "gemini", providerTrace: [...trace, { provider, ok: true }] };
+        } catch (geminiError) {
+          if (keyChanged) {
+            process.env.GEMINI_API_KEY = originalKey;
+          }
+          throw geminiError;
+        }
+      }
+      if (provider === "ollama" && ollamaHabilitado()) {
+        const optim = optimizarPromptsParaOllama(system, user);
+        const out = await generarChatOllama({ system: optim.system, user: optim.user, ...sharedOpts });
+        registrarStoreExito("ollama");
+        registrarStoreIntentoExito("ollama");
+        return { ...out, providerUsed: "ollama", providerTrace: [...trace, { provider, ok: true }] };
       }
       trace.push({ provider, ok: false, error: "no_configurado" });
+      registrarStoreFallo(provider, "no_configurado");
     } catch (error) {
       lastError = error;
       trace.push({ provider, ok: false, error: error.message });
+      registrarStoreFallo(provider, error.message);
       console.warn(`[${contextLabel}] ${provider} fallo:`, error.message);
     }
   }
 
   // Último intento Gemini aunque no esté en orden (mantiene compatibilidad).
   try {
-    const out = await generarTextoConReintentos(`${system}\n\n${user}`, contextLabel);
+    const out = await generarTextoConReintentos(user, contextLabel, { systemInstruction: system });
+    registrarStoreExito("gemini");
+    registrarStoreIntentoExito("gemini", true);
     return { ...out, providerUsed: "gemini", providerTrace: [...trace, { provider: "gemini", ok: true, forced: true }] };
   } catch (e) {
     e.providerTrace = trace;
@@ -429,29 +659,34 @@ const getIntentClassifierModel = () =>
 
 const getIntentClassifierTimeoutMs = () => {
   const n = Number(process.env.INTENT_CLASSIFIER_TIMEOUT_MS);
-  return Number.isFinite(n) && n > 0 ? Math.min(Math.floor(n), 60_000) : 8000;
+  return Number.isFinite(n) && n > 0 ? Math.min(Math.floor(n), 60_000) : 20000;
 };
 
 const getIntentClassifierMaxOutputTokens = () => {
   const n = Number(process.env.INTENT_CLASSIFIER_MAX_OUTPUT_TOKENS);
-  return Number.isFinite(n) && n > 0 ? Math.min(Math.floor(n), 1024) : 256;
+  return Number.isFinite(n) && n > 0 ? Math.min(Math.floor(n), 8192) : 4096;
 };
 
 /**
- * Solo clasificación de intención: Gemini directo (sin cadena Groq/OpenRouter ni política fuentes.md).
- * Modelo: GEMINI_INTENT_MODEL o INTENT_CLASSIFIER_MODEL o GEMINI_MODEL.
+ * Clasificación de intención con cadena de proveedores.
+ * Modelo: GEMINI_INTENT_MODEL o INTENT_CLASSIFIER_MODEL o GEMINI_MODEL (solo para proveedor Gemini).
+ * Si Gemini falla por cuota/429, pasa a Groq → OpenRouter → Ollama.
  */
 const generarClasificacionIntencion = async ({ system, user }) => {
   if (!system || !user) {
     throw new Error("Faltan system/user para generarClasificacionIntencion");
   }
-  const prompt = `${String(system).trim()}\n\n${String(user).trim()}`;
   const model = getIntentClassifierModel() || getModelName();
-  return generarTextoConReintentos(prompt, "IA.intent", {
-    model,
-    timeoutMs: getIntentClassifierTimeoutMs(),
-    maxOutputTokens: getIntentClassifierMaxOutputTokens(),
-    temperature: 0,
+  return runProviderChain({
+    system,
+    user,
+    contextLabel: "IA.intent",
+    opts: {
+      geminiModel: model,
+      maxOutputTokens: getIntentClassifierMaxOutputTokens(),
+      temperature: 0,
+      responseMimeType: "application/json",
+    },
   });
 };
 
@@ -512,13 +747,22 @@ const generarRespuestaConsulta = async ({ contextoDatos, pregunta }) => {
   });
 };
 
-/** Respuesta corta (p. ej. JSON de clasificación); Flash con techo de tokens. */
+/** Respuesta corta (p. ej. JSON de clasificación); cadena de proveedores con techo de tokens. */
 const generarTextoClasificadorRapido = async (prompt) => {
   const p = String(prompt || "").trim();
   if (!p) throw new Error("Falta prompt");
-  return generarTextoConReintentos(p, "IA.clasificador", {
-    maxOutputTokens: Number(process.env.CLASIFICADOR_MAX_OUT || 128),
-    temperature: 0,
+  // El prompt legacy viene como "system\n\nuser" concatenado; lo partimos si hay doble newline.
+  const idx = p.indexOf("\n\n");
+  const system = idx > 0 ? p.slice(0, idx) : "";
+  const user = idx > 0 ? p.slice(idx + 2) : p;
+  return runProviderChain({
+    system,
+    user,
+    contextLabel: "IA.clasificador",
+    opts: {
+      maxOutputTokens: Number(process.env.CLASIFICADOR_MAX_OUT || 128),
+      temperature: 0,
+    },
   });
 };
 
@@ -530,4 +774,8 @@ module.exports = {
   generarConGroundingGoogleSearch,
   getGroundingMaxChars,
   generarTextoClasificadorRapido,
+  /** Cadena unificada de proveedores IA con failover automático. */
+  runProviderChain,
+  /** Reintentos + timeout sobre Gemini SDK; útil para usos directos sin cadena. */
+  generarTextoConReintentos,
 };

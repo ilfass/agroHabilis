@@ -5,35 +5,164 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AgroHabilis - Usuarios Admin</title>
     <style>
-      :root { --bg:#f3f7ff; --bg-soft:#eef4ff; --panel:#ffffff; --panel-soft:#f7faff; --text:#17233a; --muted:#5f7294; --accent:#2f8bff; --line:#dbe7ff; --danger:#e45858; --shadow:0 12px 30px rgba(39,81,161,.12); }
+      :root {
+        --bg: #07090e;
+        --bg-soft: #0d121f;
+        --panel: #111726;
+        --panel-soft: #192239;
+        --text: #f1f5f9;
+        --muted: #64748b;
+        --accent: #10b981;
+        --accent-soft: rgba(16, 185, 129, 0.12);
+        --line: rgba(255, 255, 255, 0.06);
+        --shadow: 0 20px 40px rgba(0, 0, 0, 0.55);
+        --danger: #ef4444;
+      }
       * { box-sizing:border-box; }
-      body { margin:0; font-family:Inter,Segoe UI,Arial,sans-serif; font-size:15px; background: linear-gradient(180deg, var(--bg-soft), var(--bg)); color:var(--text); padding:24px 24px 24px 276px; }
+      body {
+        margin:0;
+        font-family:Inter,Segoe UI,Arial,sans-serif;
+        font-size:15px;
+        background: radial-gradient(1000px 500px at 15% 0%, rgba(16, 185, 129, 0.08), transparent 50%), var(--bg);
+        color:var(--text);
+        padding:24px 24px 24px 276px;
+      }
       .topbar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:12px; }
-      .nav { position: fixed; left: 18px; top: 18px; width: 230px; display:flex; flex-direction:column; gap:8px; padding:12px; border:1px solid var(--line); border-radius:16px; background:#fff; box-shadow: var(--shadow); margin-bottom:14px; }
-      .nav .brand { display:flex; align-items:center; gap:10px; padding:8px 10px 12px; border-bottom:1px solid #e7efff; margin-bottom:4px; font-weight:800; color:#1e3b6e; }
-      .brand-dot { width:10px; height:10px; border-radius:999px; background:#2f8bff; box-shadow:0 0 0 4px rgba(47,139,255,.12); }
-      .nav a { text-decoration:none; padding:9px 12px; border-radius:10px; border:1px solid #d5e3ff; color:#38507b; background:#fff; font-size:13px; font-weight:600; width:100%; }
-      .nav a.active { background: linear-gradient(180deg, var(--accent), #1f66c9); border:none; color:#fff; font-weight:700; }
-      .card { background: linear-gradient(180deg, var(--panel), var(--panel-soft)); border:1px solid var(--line); border-radius:16px; padding:16px; margin-bottom:14px; box-shadow:var(--shadow); }
+      .nav {
+        position: fixed;
+        left: 18px;
+        top: 18px;
+        width: 230px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 16px;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background: var(--bg-soft);
+        box-shadow: var(--shadow);
+        margin-bottom: 14px;
+      }
+      .nav .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 10px 16px;
+        border-bottom: 1px solid var(--line);
+        margin-bottom: 8px;
+        font-weight: 800;
+        color: var(--text);
+      }
+      .brand-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        background: var(--accent);
+        box-shadow: 0 0 10px var(--accent);
+      }
+      .nav a {
+        text-decoration: none;
+        padding: 9px 12px;
+        border-radius: 10px;
+        border: 1px solid transparent;
+        color: var(--muted);
+        background: transparent;
+        font-size: 13px;
+        font-weight: 600;
+        width: 100%;
+        transition: all 0.2s ease;
+      }
+      .nav a.active {
+        background: var(--accent-soft);
+        border-color: rgba(16, 185, 129, 0.25);
+        color: var(--accent);
+        font-weight: 700;
+      }
+      .nav a:hover:not(.active) {
+        background: var(--panel-soft);
+        color: var(--text);
+        transform: translateX(3px);
+      }
+      .card {
+        background: linear-gradient(170deg, var(--panel) 0%, rgba(17, 23, 38, 0.8) 100%);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 20px;
+        margin-bottom: 16px;
+        box-shadow: var(--shadow);
+      }
       .tools { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px; }
       .tools .grow { flex:1; min-width:240px; }
-      input, select, button { padding:11px 13px; border-radius:10px; border:1px solid #cfddfa; background:#fff; color:#24395f; }
-      button.primary { background:linear-gradient(180deg,var(--accent),#1f7a3f); border:none; color:#07210f; font-weight:700; cursor:pointer; }
-      button.secondary { background:linear-gradient(180deg,#9fc0ff,#5f84de); border:none; color:#07112b; font-weight:700; cursor:pointer; }
-      button.danger { background:linear-gradient(180deg,#ffb0b0,#df5a5a); border:none; color:#300808; font-weight:700; cursor:pointer; }
+      input, select, textarea {
+        padding: 10px 14px;
+        border-radius: 10px;
+        border: 1px solid var(--line);
+        background: var(--bg-soft);
+        color: var(--text);
+        transition: all 0.2s ease;
+      }
+      input:focus, select:focus, textarea:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-soft);
+      }
+      button {
+        padding: 10px 14px;
+        border-radius: 10px;
+        border: none;
+        background: var(--panel-soft);
+        color: var(--text);
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        border: 1px solid var(--line);
+      }
+      button:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+      button.primary {
+        background: linear-gradient(180deg, var(--accent), #059669);
+        color: #06090e;
+        border: none;
+      }
+      button.primary:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 16px rgba(16, 185, 129, 0.35);
+      }
+      button.secondary {
+        background: var(--panel-soft);
+        color: var(--text);
+        border: 1px solid var(--line);
+      }
+      button.secondary:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+      button.danger {
+        background: rgba(239, 68, 68, 0.15);
+        color: var(--danger);
+        border: 1px solid rgba(239, 68, 68, 0.25);
+      }
+      button.danger:hover {
+        background: var(--danger);
+        color: #06090e;
+        border-color: transparent;
+      }
       table { width:100%; border-collapse: collapse; }
       th, td { border-bottom:1px solid var(--line); padding:10px 8px; text-align:left; font-size:14px; }
-      th { color:var(--muted); }
-      .chip { display:inline-block; padding:3px 8px; border-radius:999px; border:1px solid #35548d; font-size:11px; }
-      .ok { color:#8af7b8; }
-      .bad { color:var(--danger); }
+      th { color:var(--muted); font-weight: 700; background: rgba(15, 21, 36, 0.9); }
+      .chip { display:inline-block; padding:3px 8px; border-radius:999px; border:1px solid var(--line); font-size:11px; background:var(--panel-soft); color:var(--text); cursor:pointer; }
+      .ok { color:var(--accent); font-weight:700; }
+      .bad { color:var(--danger); font-weight:700; }
+      .warn { color:#f59e0b; font-weight:700; }
       .muted { color:var(--muted); }
       .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:8px; margin-bottom:10px; }
-      .kpi { border:1px solid #d8e5ff; border-radius:12px; padding:12px; background:#fff; }
+      .kpi { border:1px solid var(--line); border-radius:12px; padding:12px; background:var(--panel-soft); }
       .kpi .v { font-size:24px; font-weight:800; margin-top:4px; }
       .delta { font-size:12px; margin-top:2px; }
-      .up { color:#8af7b8; }
-      .down { color:#ffb2b2; }
+      .up { color:var(--accent); }
+      .down { color:var(--danger); }
       .status { font-size:12px; color:var(--muted); margin-top:8px; }
       .page-head { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:14px; }
       .crumb { color:var(--muted); font-size:13px; }
@@ -67,6 +196,9 @@
       <a href="/dashboard/metricas">📊 Métricas</a>
       <a href="/dashboard/precios">💹 Precios</a>
       <a href="/dashboard/usuarios" class="active">👥 Usuarios</a>
+      <a href="/dashboard/campanas">🚀 Campañas</a>
+      <a href="/dashboard/planes">🤖 Planes</a>
+      <a href="/dashboard/ia">🧠 IA & Gemini</a>
       <a href="/dashboard/comandos">⌨️ Comandos</a>
       <a href="/dashboard/templates">🧩 Templates</a>
       <a href="/dashboard/cliente">🙍 Cliente</a>
@@ -96,6 +228,7 @@
           <option value="gratis">Gratis</option>
           <option value="basico">Básico</option>
           <option value="pro">Pro</option>
+          <option value="pro_max">Pro Max</option>
         </select>
         <select id="fPerfil" title="Perfil productivo (onboarding)">
           <option value="todos">Todos los perfiles</option>
@@ -108,6 +241,14 @@
         <button id="btnPausarSel" class="secondary">Pausar seleccionados</button>
         <button id="btnEliminarSel" class="danger">Eliminar seleccionados</button>
         <button id="btnExportCsv" class="secondary">Exportar CSV</button>
+        <select id="bulkPlanSelect" title="Cambiar plan masivamente" style="background: var(--bg-soft); color: var(--text); border: 1px solid var(--line);">
+          <option value="">Cambiar plan a...</option>
+          <option value="gratis">Gratis</option>
+          <option value="basico">Básico</option>
+          <option value="pro">Pro</option>
+          <option value="pro_max">Pro Max</option>
+        </select>
+        <button id="btnCambiarPlanSel" class="secondary">Aplicar Plan</button>
       </div>
       <div class="tools" style="margin-top:8px;">
         <select id="fProvincia" title="Provincia">
@@ -153,6 +294,28 @@
     </div>
 
     <div class="card">
+      <h3 style="margin:0 0 12px;">👥 Integrantes de Campo / Teléfonos Delegados</h3>
+      <p class="muted" style="margin:0 0 14px;font-size:14px;">
+        Esta tabla muestra los operarios, delegados o contratistas autorizados por los productores para usar el bot desde sus propios números de WhatsApp.
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>Nombre Contacto</th>
+            <th>WhatsApp Integrante</th>
+            <th>Rol Asignado</th>
+            <th>Productor / Dueño de Campo</th>
+            <th>Estado Invitación</th>
+            <th>Creado</th>
+          </tr>
+        </thead>
+        <tbody id="bodyTeam">
+          <tr><td colspan="6" class="muted">Cargando integrantes...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
       <div id="waMasivoWarn" style="display:none;padding:12px 14px;border-radius:12px;background:#fff7e8;border:1px solid #e8b84a;margin-bottom:12px;">
         <strong style="color:#7a4b00;">WhatsApp del servidor no está listo para enviar.</strong>
         <div id="waMasivoWarnTxt" class="muted" style="margin-top:6px;font-size:14px;"></div>
@@ -176,7 +339,7 @@
       const $ = (id) => document.getElementById(id);
       const fmt = (v) => (v ? new Date(v).toLocaleString("es-AR") : "-");
       const num = (n) => Number(n || 0).toLocaleString("es-AR");
-      const state = { users: [], resumen: null, selected: new Set() };
+      const state = { users: [], resumen: null, telefonos: [], selected: new Set() };
       let waEstadoPoll = null;
       const FILTERS_KEY = "agro_admin_users_filters_v2";
       const SNAPSHOT_KEY = "agro_admin_users_snapshot_v1";
@@ -359,6 +522,9 @@
       }
 
       function zonaLabel(u) {
+        if (u.es_invitado) {
+          return `👥 Equipo de: ${u.owner_nombre || 'ID: ' + u.usuario_principal_id}`;
+        }
         const pr = (u.provincia || "").trim() || "—";
         const pa = (u.partido || "").trim() || "—";
         const s = `${pr} · ${pa}`;
@@ -373,6 +539,9 @@
       }
 
       function labelPerfil(u) {
+        if (u.es_invitado) {
+          return `👤 Invitado: ${String(u.rol || 'operario').toUpperCase()}`;
+        }
         const p = (u.perfil_productivo || "").toLowerCase();
         if (!p) return "—";
         if (p === "ganaderia") return "Ganadería";
@@ -386,14 +555,23 @@
         const nCons = (u) => num(String(u.consultas_total ?? 0));
         $("body").innerHTML = rows.map((u) => `
           <tr>
-            <td><input class="sel" type="checkbox" data-id="${u.id}" ${state.selected.has(Number(u.id)) ? "checked" : ""} /></td>
+            <td><input class="sel" type="checkbox" data-id="${u.id}" ${state.selected.has(u.id) || state.selected.has(Number(u.id)) ? "checked" : ""} /></td>
             <td>${u.id}</td>
             <td>${u.nombre || "-"}</td>
             <td title="${String(u.provincia || "").trim()} / ${String(u.partido || "").trim()}">${zonaLabel(u)}</td>
             <td>${u.whatsapp || "-"}</td>
             <td><span class="chip">${labelPerfil(u)}</span></td>
-            <td><span class="chip">${String(u.plan || "gratis").toUpperCase()}</span></td>
-            <td class="${u.activo ? "ok" : "bad"}">${u.activo ? "Activo" : "Inactivo"}</td>
+            <td>
+              ${u.es_invitado ? `<span class="chip">GRATIS</span>` : `
+                <select class="plan-select" data-id="${u.id}" onchange="cambiarPlanIndividual(${u.id}, this.value)" style="padding: 4px 8px; border-radius: 8px; font-size: 12px; background: var(--panel-soft); color: var(--text); border: 1px solid var(--line); cursor: pointer; outline: none;">
+                  <option value="gratis" ${String(u.plan || "gratis").toLowerCase() === "gratis" ? "selected" : ""}>GRATIS</option>
+                  <option value="basico" ${String(u.plan || "gratis").toLowerCase() === "basico" ? "selected" : ""}>BÁSICO</option>
+                  <option value="pro" ${String(u.plan || "gratis").toLowerCase() === "pro" ? "selected" : ""}>PRO</option>
+                  <option value="pro_max" ${String(u.plan || "gratis").toLowerCase() === "pro_max" ? "selected" : ""}>PRO MAX</option>
+                </select>
+              `}
+            </td>
+            <td class="${u.es_invitado && !u.aceptado ? "warn" : (u.activo ? "ok" : "bad")}">${u.es_invitado && !u.aceptado ? "🟡 Pendiente" : (u.activo ? "🟢 Activo" : "Inactivo")}</td>
             <td>${nCons(u)}</td>
             <td>${fmt(u.creado_en)}</td>
           </tr>
@@ -403,12 +581,39 @@
           : "";
         $("body").querySelectorAll(".sel").forEach((cb) => {
           cb.addEventListener("change", () => {
-            const id = Number(cb.getAttribute("data-id"));
+            const id = cb.getAttribute("data-id");
             if (cb.checked) state.selected.add(id);
             else state.selected.delete(id);
           });
         });
         persistFilters();
+      }
+
+      function renderTeam() {
+        const body = $("bodyTeam");
+        if (!body) return;
+        const list = state.telefonos || [];
+        body.innerHTML = list.map((t) => {
+          let estadoBadge = `<span style="color:#e45858;font-weight:700;">Inactivo</span>`;
+          if (t.activo) {
+            if (t.aceptado) {
+              estadoBadge = `<span style="color:#2f8bff;font-weight:700;">🟢 Activo</span>`;
+            } else {
+              estadoBadge = `<span style="color:#f59e0b;font-weight:700;">🟡 Pendiente</span>`;
+            }
+          }
+          const ownerLabel = t.owner_nombre ? `${t.owner_nombre} (ID: ${t.usuario_principal_id})` : `ID: ${t.usuario_principal_id}`;
+          return `
+            <tr>
+              <td><strong>${t.nombre_contacto || "-"}</strong></td>
+              <td>${t.whatsapp_autorizado || "-"}</td>
+              <td><span class="chip">${String(t.rol || "operario").toUpperCase()}</span></td>
+              <td>${ownerLabel}</td>
+              <td>${estadoBadge}</td>
+              <td>${fmt(t.creado_en)}</td>
+            </tr>
+          `;
+        }).join("") || `<tr><td colspan="6" class="muted">No hay integrantes de equipo registrados en el sistema.</td></tr>`;
       }
 
       function csvEscape(v) {
@@ -486,6 +691,60 @@
           if (d.ok) ok += 1;
         }
         $("status").textContent = `${accion} finalizado: ${ok}/${ids.length} aplicados`;
+        state.selected.clear();
+        await load();
+      }
+
+      async function cambiarPlanIndividual(usuarioId, planObjetivo) {
+        const u = state.users.find(x => String(x.id) === String(usuarioId));
+        const nombre = u ? u.nombre || `ID: ${usuarioId}` : `ID: ${usuarioId}`;
+        const planLabel = planObjetivo === "pro_max" ? "PRO MAX" : planObjetivo === "pro" ? "PRO" : planObjetivo === "basico" ? "BÁSICO" : "GRATIS";
+        if (!confirm(`¿Estás seguro de que querés cambiar el plan de ${nombre} a ${planLabel}?`)) {
+          await load();
+          return;
+        }
+        $("status").textContent = `Cambiando plan de ${nombre} a ${planLabel}...`;
+        try {
+          const r = await fetch("/api/dashboard/admin/usuario-accion", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ usuarioId, accion: "cambiar_plan", planObjetivo }),
+          });
+          const d = await r.json();
+          if (d.ok) {
+            $("status").textContent = `Plan de ${nombre} actualizado a ${planLabel} con éxito.`;
+          } else {
+            alert("Error al cambiar plan: " + (d.error || "error desconocido"));
+          }
+        } catch (err) {
+          alert("Error de red: " + err.message);
+        }
+        await load();
+      }
+
+      async function aplicarCambioPlanMasivo() {
+        const planObjetivo = $("bulkPlanSelect").value;
+        if (!planObjetivo) return alert("Elegí un plan para aplicar masivamente");
+        const ids = [...state.selected].filter((id) => !!id && id !== 1 && !String(id).startsWith("t_"));
+        if (!ids.length) return alert("Seleccioná al menos un usuario principal (no delegados ni usuario sistema)");
+        
+        const planLabel = planObjetivo === "pro_max" ? "PRO MAX" : planObjetivo === "pro" ? "PRO" : planObjetivo === "basico" ? "BÁSICO" : "GRATIS";
+        if (!confirm(`¿Confirmar cambio masivo de plan a ${planLabel} para ${ids.length} usuarios seleccionados?`)) return;
+        
+        $("status").textContent = `Ejecutando cambio de plan masivo a ${planLabel} para ${ids.length} usuarios...`;
+        let ok = 0;
+        for (const usuarioId of ids) {
+          try {
+            const r = await fetch("/api/dashboard/admin/usuario-accion", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ usuarioId, accion: "cambiar_plan", planObjetivo }),
+            });
+            const d = await r.json();
+            if (d.ok) ok += 1;
+          } catch (_e) {}
+        }
+        $("status").textContent = `Cambio de plan finalizado: ${ok}/${ids.length} aplicados a ${planLabel}`;
         state.selected.clear();
         await load();
       }
@@ -610,16 +869,20 @@
 
       async function load() {
         const fetchOpts = { credentials: "same-origin", cache: "no-store" };
-        const [r1, r2] = await Promise.all([
+        const [r1, r2, r3] = await Promise.all([
           fetch("/api/dashboard/admin/usuarios?limit=2000", fetchOpts),
           fetch("/api/dashboard/admin/resumen", fetchOpts),
+          fetch("/api/dashboard/admin/telefonos", fetchOpts),
         ]);
         const d1 = await r1.json();
         const d2 = await r2.json();
+        const d3 = await r3.json();
         if (!d1.ok) throw new Error(d1.error || "Error usuarios");
         if (!d2.ok) throw new Error(d2.error || "Error resumen");
+        if (!d3.ok) throw new Error(d3.error || "Error telefonos");
         state.users = d1.usuarios || [];
         state.resumen = d2.data || {};
+        state.telefonos = d3.telefonos || [];
         const prev = (() => {
           try { return JSON.parse(localStorage.getItem(SNAPSHOT_KEY) || "null"); } catch (_e) { return null; }
         })();
@@ -639,6 +902,7 @@
         updateWaMasivoBanner();
         iniciarPollEstadoWhatsapp();
         render();
+        renderTeam();
       }
 
       ["q", "fEstado", "fPlan", "fPartido"].forEach((id) => $(id).addEventListener("input", render));
@@ -649,7 +913,7 @@
         const on = $("selAll").checked;
         $("body").querySelectorAll(".sel").forEach((cb) => {
           cb.checked = on;
-          const id = Number(cb.getAttribute("data-id"));
+          const id = cb.getAttribute("data-id");
           if (on) state.selected.add(id);
           else state.selected.delete(id);
         });
@@ -658,6 +922,7 @@
       $("btnPausarSel").addEventListener("click", () => aplicarAccionMasiva("pausar").catch((e) => alert(e.message)));
       $("btnEliminarSel").addEventListener("click", () => aplicarAccionMasiva("eliminar").catch((e) => alert(e.message)));
       $("btnExportCsv").addEventListener("click", exportCsv);
+      $("btnCambiarPlanSel").addEventListener("click", () => aplicarCambioPlanMasivo().catch((e) => alert(e.message)));
       $("btnEnviarMasivo").addEventListener("click", () => enviarMasivo().catch((e) => alert(e.message)));
       $("btnReload").addEventListener("click", () => load().catch((e) => alert(e.message)));
       restoreFilters();

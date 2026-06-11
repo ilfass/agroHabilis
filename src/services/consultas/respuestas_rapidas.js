@@ -16,11 +16,9 @@ const responderReclamoFaltaDatosConversacional = () =>
 const responderPoliticaAlertasDeterministica = async ({
   numeroWhatsapp,
   obtenerContextoPlanPorWhatsapp,
-  puedeUsarAlertas,
 } = {}) => {
   const planCtx = await obtenerContextoPlanPorWhatsapp(numeroWhatsapp);
   const planTxt = String(planCtx?.planEfectivo || "gratis").toUpperCase();
-  const habilitado = puedeUsarAlertas(planCtx.planEfectivo);
   return [
     "🔔 *Cómo funcionan las alertas hoy*",
     "━━━━━━━━━━━━━━━━━━━━",
@@ -28,9 +26,7 @@ const responderPoliticaAlertasDeterministica = async ({
     "- Criterio temporal: hoy se evalúan por actualización/cierre de datos (no por tick intradiario en tiempo real).",
     "- Si falta una fuente puntual en ese corte, te lo informo explícito antes de confirmar señal.",
     "",
-    habilitado
-      ? `Tu plan actual (${planTxt}) permite alertas. Si querés, te dejo una cargada ahora.`
-      : "En Plan Gratis no se activan alertas de precio. Para habilitarlas: *QUIERO PLAN BASICO*.",
+    `Tu plan actual (${planTxt}) permite alertas de precio sin límites. Si querés, te dejo una cargada ahora.`,
   ].join("\n");
 };
 

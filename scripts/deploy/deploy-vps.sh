@@ -107,6 +107,8 @@ ssh "${VPS_USER}@${VPS_HOST}" << EOF
   node scripts/db/verify-precios-upsert-schema.js
   echo '==> Verificando tabla usuario_ganaderia_perfil'
   node -e "require('dotenv').config(); const { pool, query } = require('./src/config/database'); (async () => { const r = await query(\"SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='usuario_ganaderia_perfil') AS ok\"); const ok = !!r.rows?.[0]?.ok; if (!ok) { throw new Error('Falta tabla usuario_ganaderia_perfil'); } console.log('OK tabla usuario_ganaderia_perfil'); await pool.end(); })().catch(async (e) => { console.error(e.message || e); try { await pool.end(); } catch (_) {} process.exit(1); });"
+  echo '==> Limpiando procesos de Chrome residuales de la sesion'
+  pkill -9 -f 'session-agrohabilis' || true
   pm2 restart '${APP_NAME}' --update-env || pm2 start src/index.js --name '${APP_NAME}'
   pm2 save
 EOF

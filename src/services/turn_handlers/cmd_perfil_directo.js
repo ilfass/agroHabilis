@@ -51,8 +51,7 @@ const requiereUsuario = (ctx, route, extraLog) => {
   return null;
 };
 
-const calcularMaxZonas = (planEfectivo) =>
-  planEfectivo === "pro" ? 6 : planEfectivo === "basico" ? 3 : 1;
+const calcularMaxZonas = (planEfectivo) => 999;
 
 /**
  * Reemplaza zonas activas del usuario por la lista nueva (limitada por plan)
@@ -121,7 +120,7 @@ async function handlerCmdPerfilDirecto(ctx) {
     await actualizarUsuario(usuarioId, { email });
     return {
       manejado: true,
-      respuesta: `✅ Listo, guardé tu email: *${email}*.`,
+      respuesta: `✅ Listo, guardé tu email: *${email}*.\n\n💡 *Tip:* Ahora podés pedirme el plan de suscripción que desees chateando conmigo (ej: *QUIERO PLAN PRO*) y te generaré el link de pago al instante.`,
       route: "CMD_MI_EMAIL",
       extraLog: { email },
     };
@@ -135,7 +134,7 @@ async function handlerCmdPerfilDirecto(ctx) {
     await actualizarUsuario(usuarioId, { email: emailSolo });
     return {
       manejado: true,
-      respuesta: `✅ Listo, guardé tu email: *${emailSolo}*.`,
+      respuesta: `✅ Listo, guardé tu email: *${emailSolo}*.\n\n💡 *Tip:* Ahora podés pedirme el plan de suscripción que desees chateando conmigo (ej: *QUIERO PLAN PRO*) y te generaré el link de pago al instante.`,
       route: "CMD_EMAIL_SOLO_LINEA",
       extraLog: { email: emailSolo },
     };
@@ -158,7 +157,7 @@ async function handlerCmdPerfilDirecto(ctx) {
     return {
       manejado: true,
       respuesta:
-        `✅ Zonas actualizadas (${zonasLimitadas.length}/${maxZonas} por tu plan).\n` +
+        `✅ Zonas actualizadas:\n` +
         zonasLimitadas.map((z) => `- ${z.provincia}, ${z.partido}`).join("\n"),
       route: "CMD_MI_ZONA",
       extraLog: { cantidad: zonasLimitadas.length, max: maxZonas },

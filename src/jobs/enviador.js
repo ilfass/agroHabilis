@@ -1,20 +1,27 @@
 const cron = require("node-cron");
 const { query } = require("../config/database");
 const { estaListo, esperarClienteListo, sendMessage } = require("../config/whatsapp");
-const { marcarResumenEnviado } = require("../services/resumen");
-const { renderTemplate } = require("../templates");
 const {
   resolverPlanEfectivo,
-  puedeRecibirResumenDiario,
   puedeRecibirResumenSemanal,
 } = require("../services/planes");
+const { iniciarResumen } = require("../services/resumen_interactivo");
+const { invitacionResumenInteractivoHoy } = require("../services/conversacion_estado");
+const { destinoWhatsappParaEnvio } = require("../models/usuario");
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** Cron masivo L–V (`iniciarCronEnviador`). Por defecto: desactivado. Activar explícitamente: `ENVIADOR_RESUMEN_DIARIO=1|true|on`. */
+const enviadorResumenDiarioCronHabilitado = () => {
+  const v = String(process.env.ENVIADOR_RESUMEN_DIARIO || "").trim().toLowerCase();
+  if (v === "1" || v === "true" || v === "on" || v === "yes") return true;
+  return false;
+};
 
 const obtenerUsuariosObjetivo = async () => {
   const result = await query(
     `
-      SELECT id, nombre, whatsapp, provincia, partido, plan, activo, plan_activo_hasta, creado_en
+      SELECT id, nombre, whatsapp, whatsapp_jid, whatsapp_real, provincia, partido, plan, activo, plan_activo_hasta, creado_en
       FROM usuarios
       WHERE activo = true
         AND whatsapp <> 'ahbl:sistema'
@@ -30,7 +37,7 @@ const yaEnviadoHoy = async (usuarioId) => {
       SELECT 1
       FROM resumenes
       WHERE usuario_id = $1
-        AND fecha = CURRENT_DATE
+        AND fecha = (CURRENT_TIMESTAMP AT TIME ZONE 'America/Argentina/Buenos_Aires')::date
         AND enviado_wp = true
       LIMIT 1
     `,
@@ -116,6 +123,7 @@ const ejecutarEnviadorDiario = async () => {
     generados: 0,
     enviados: 0,
     omitidosYaEnviados: 0,
+    omitidosOnboardingPendiente: 0,
     abortadoPorWhatsapp: false,
     errores: [],
   };
@@ -141,12 +149,17 @@ const ejecutarEnviadorDiario = async () => {
         planActivoHasta: usuario.plan_activo_hasta,
       });
 
-      if (puedeRecibirResumenDiario(planEfectivo) && (await yaEnviadoHoy(usuario.id))) {
-        resumen.omitidosYaEnviados += 1;
-        continue;
-      }
-      if (puedeRecibirResumenSemanal(planEfectivo)) {
-        // Gratis: día siguiente del registro + lunes y jueves.
+      // Cron masivo: solo Básico (cada día hábil) y Gratis (lun/jue o día post-registro). Pro: solo MI RESUMEN / admin.
+      if (planEfectivo === "basico") {
+        if (await yaEnviadoHoy(usuario.id)) {
+          resumen.omitidosYaEnviados += 1;
+          continue;
+        }
+        if (await invitacionResumenInteractivoHoy(usuario.id)) {
+          resumen.omitidosYaEnviados += 1;
+          continue;
+        }
+      } else if (puedeRecibirResumenSemanal(planEfectivo)) {
         const tocaPorRegistro = esDiaSiguienteRegistroAR(usuario.creado_en);
         const tocaPorCalendario = esLunesOJuevesAR();
         if (!tocaPorRegistro && !tocaPorCalendario) continue;
@@ -154,16 +167,24 @@ const ejecutarEnviadorDiario = async () => {
           resumen.omitidosYaEnviados += 1;
           continue;
         }
+        if (await invitacionResumenInteractivoHoy(usuario.id)) {
+          resumen.omitidosYaEnviados += 1;
+          continue;
+        }
+      } else {
+        continue;
       }
 
-      const generado = await renderTemplate("resumen_diario", usuario);
-      resumen.generados += 1;
-
-      await sendMessage(usuario.whatsapp, generado.mensaje);
-      if (generado.meta?.resumenId) {
-        await marcarResumenEnviado(generado.meta.resumenId);
+      const destinoWp = destinoWhatsappParaEnvio(usuario);
+      const outInv = await iniciarResumen(usuario, {
+        enviar: (texto) => sendMessage(destinoWp, texto),
+      });
+      if (outInv?.omitido) {
+        resumen.omitidosOnboardingPendiente += 1;
+      } else {
+        resumen.generados += 1;
+        resumen.enviados += 1;
       }
-      resumen.enviados += 1;
 
       await sleep(2000);
     } catch (error) {
@@ -182,6 +203,12 @@ const ejecutarEnviadorDiario = async () => {
 };
 
 const iniciarCronEnviador = () => {
+  if (!enviadorResumenDiarioCronHabilitado()) {
+    console.log(
+      "[Enviador] Cron de resumen masivo desactivado por defecto. Habilitalo explícitamente seteando ENVIADOR_RESUMEN_DIARIO=1|true|on."
+    );
+    return;
+  }
   const tz = "America/Argentina/Buenos_Aires";
   cron.schedule(
     "0 8 * * 1-5",

@@ -34,18 +34,30 @@ const { actualizarUsuario } = require("../models/usuario");
 const { obtenerClima } = require("../scrapers/clima");
 const { detectarCategoriaHacienda } = require("../services/consultas/hacienda");
 
-const normalizar = (t = "") =>
-  String(t)
+const normalizar = (t = "") => {
+  let str = String(t);
+  // Limpiamos los bloques de contexto/scout inyectados por el pipeline de IA
+  const idx = str.indexOf("\n\n---");
+  if (idx !== -1) {
+    str = str.slice(0, idx);
+  } else {
+    const idx2 = str.indexOf("\n---");
+    if (idx2 !== -1) {
+      str = str.slice(0, idx2);
+    }
+  }
+  return str
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .trim();
+};
 
 /** Misma intención que `consultas.esConsultaClima` + ventanas temporales sin la palabra "clima". */
 const esConsultaMeteoPorTexto = (pregunta = "") => {
   const t = normalizar(pregunta);
   if (
-    /clima|lluvia|helada|viento|pronostico|\bel tiempo\b|humedad|temperatura/.test(t) ||
+    /clima|lluvia|llover|llueve|lloviendo|llovió|llovio|llovizn|tormenta|graniz|temporal|helada|viento|pronostico|\bel tiempo\b|humedad|temperatura/.test(t) ||
     /\bfri[oó]\b|frialdad|ola\s+de\s+fri[oó]|bajas\s+temperaturas|helar\b|heladas\b/.test(t) ||
     /fumigar|pulveriz|pulverizacion|aspersion|aplicacion\s+en\s+campo|rocio/.test(t)
   ) {
@@ -75,6 +87,14 @@ const esCharlaTiempoPlantilla = (pregunta = "") => {
       t
     );
   return tiempo && tono;
+};
+
+/** Detecta preguntas que se refieren al hilo de chat previo, correcciones, quejas o consultas meta sobre la BD. */
+const esMetaConsultaConversacional = (pregunta = "") => {
+  const t = normalizar(pregunta);
+  const esCorreccionOReferencia = /\b(anterior|anteriormente|antes|te\s+dije|me\s+dijiste|te\s+habia|te\s+había|te\s+pregunte|te\s+pregunté|hablabamos|hablábamos|conversando|hablando|te\s+equivocaste|entendiste\s+mal|no\s+el|no\s+era|no\s+te\s+pedi|no\s+te\s+pedí)\b/.test(t);
+  const esOrigenDatos = /\b(de\s+donde|de\s+dónde|sacas|sacaste|sacando|fuente|base\s+de\s+datos|bd|la\s+base|en\s+base|en\s+bd)\b/.test(t);
+  return esCorreccionOReferencia || esOrigenDatos;
 };
 
 /** Por defecto respuestas más cortas (estilo agente). Desactivar: `CONSULTA_IA_RESPUESTA_CONCISA=0`. */
@@ -116,7 +136,7 @@ const detectarCultivo = (pregunta = "") => {
   if (t.includes("girasol")) return "girasol";
   if (t.includes("sorgo")) return "sorgo";
   if (t.includes("cebada")) return "cebada";
-  if (t.includes("papa") || t.includes("patata")) return "papa";
+  if (t.includes("papa") || t.includes("patata") || t.includes("spunta") || t.includes("kennebec") || t.includes("innovator")) return "papa";
   if (/lim[oó]n|limones/.test(t)) return "limon";
   if (t.includes("naranja")) return "naranja";
   if (t.includes("mandarina")) return "mandarina";
@@ -151,7 +171,7 @@ const esConsultaMercadoHaciendaPregunta = (pregunta = "", cultivo) => {
   if (c && CULTIVOS_GRANOS_TABLERO.includes(c)) {
     if (!/(novill|terner|vaca|vaquillon|hacienda|ganad|invernada|feedlot|encierre)/.test(t)) return false;
   }
-  if (detectarCategoriaHacienda(pregunta)) return true;
+  if (detectarCategoriaHacienda(t)) return true;
   if (!/(novill|terner|vaca|vaquillon|hacienda|ganad|invernada|feedlot|encierre)/.test(t)) return false;
   if (/(soja|ma[ií]z|trigo|girasol|cebada|sorgo)\b/.test(t)) return false;
   return true;
@@ -373,9 +393,18 @@ const armarPlantillaMercadoPuntual = ({ pregunta, datos, usuario, temasLocal }) 
 
   const todas = filasUnicas();
   const lineasOut = [];
-  lineasOut.push(`*${nombre}*! Estuve revisando los precios con corte de *${fechaLarga}*, según lo que consultaste.`);
-  lineasOut.push("");
-  lineasOut.push(`Respecto al precio de *${cultivoLeg}*, esto es lo que tengo registrado en las principales referencias:`);
+  const ultimoHistorial = datos?.historial?.[0];
+  const esConversacionActiva =
+    datos?.contexto_hilo_resuelto?.es_seguimiento ||
+    (ultimoHistorial && (Date.now() - new Date(ultimoHistorial.creado_en).getTime()) < 15 * 60 * 1000);
+
+  if (esConversacionActiva) {
+    lineasOut.push(`*${cultivoLeg.charAt(0).toUpperCase() + cultivoLeg.slice(1)}* — Referencias de precios actuales:`);
+  } else {
+    lineasOut.push(`*${nombre}*! Estuve revisando los precios con corte de *${fechaLarga}*, según lo que consultaste.`);
+    lineasOut.push("");
+    lineasOut.push(`Respecto al precio de *${cultivoLeg}*, esto es lo que tengo registrado en las principales referencias:`);
+  }
   lineasOut.push("");
 
   if (!todas.length) {
@@ -455,14 +484,24 @@ const armarPlantillaHaciendaPuntual = ({ pregunta, datos, usuario, temasLocal })
   const temaLeg = etiquetaTemaHaciendaLegible(hint, rows);
 
   const lineasOut = [];
-  lineasOut.push(`*${nombre}*! Estuve revisando referencias de mercado ganadero con corte de *${fechaLarga}*, según lo que consultaste.`);
-  lineasOut.push("");
-  if (rows.length) {
-    lineasOut.push(
-      `Respecto al precio de ${temaLeg}, esto es lo que tengo registrado en base (*precios_hacienda*, en ${String(rows[0]?.unidad || "kg").toLowerCase()}):`
-    );
+  const ultimoHistorial = datos?.historial?.[0];
+  const esConversacionActiva =
+    datos?.contexto_hilo_resuelto?.es_seguimiento ||
+    (ultimoHistorial && (Date.now() - new Date(ultimoHistorial.creado_en).getTime()) < 15 * 60 * 1000);
+
+  if (esConversacionActiva) {
+    const un = rows.length ? String(rows[0]?.unidad || "kg").toLowerCase() : "kg";
+    lineasOut.push(`*${temaLeg.charAt(0).toUpperCase() + temaLeg.slice(1)}* (${un}) — Referencias actuales:`);
   } else {
-    lineasOut.push(`Respecto al precio de ${temaLeg}, consulté la tabla *precios_hacienda*:`);
+    lineasOut.push(`*${nombre}*! Estuve revisando referencias de mercado ganadero con corte de *${fechaLarga}*, según lo que consultaste.`);
+    lineasOut.push("");
+    if (rows.length) {
+      lineasOut.push(
+        `Respecto al precio de ${temaLeg}, esto es lo que tengo registrado en base (*precios_hacienda*, en ${String(rows[0]?.unidad || "kg").toLowerCase()}):`
+      );
+    } else {
+      lineasOut.push(`Respecto al precio de ${temaLeg}, consulté la tabla *precios_hacienda*:`);
+    }
   }
   lineasOut.push("");
 
@@ -992,15 +1031,26 @@ const groundingHabilitadoEnConfig = () => {
   return Boolean(process.env.GEMINI_API_KEY?.trim());
 };
 
-const contarItemsClima = (datos) => {
-  if (!datos?.clima) return 0;
-  if (Array.isArray(datos.clima.items)) return datos.clima.items.length;
-  if (Array.isArray(datos.clima)) return datos.clima.length;
-  return 0;
+/** Resuelve el array de items de clima desde el objeto `datos`,
+ *  sea cual sea la clave en uso (clima_zona_usuario o clima / clima.items).
+ */
+const resolverItemsClima = (datos) => {
+  if (!datos) return [];
+  // Clave principal emitida por contexto.js
+  if (Array.isArray(datos.clima_zona_usuario) && datos.clima_zona_usuario.length > 0)
+    return datos.clima_zona_usuario;
+  // Fallbacks por si otro módulo cambia la estructura
+  if (Array.isArray(datos.clima?.items) && datos.clima.items.length > 0)
+    return datos.clima.items;
+  if (Array.isArray(datos.clima) && datos.clima.length > 0)
+    return datos.clima;
+  return [];
 };
 
+const contarItemsClima = (datos) => resolverItemsClima(datos).length;
+
 const climaSinPronosticoVigente = (datos) => {
-  const items = Array.isArray(datos?.clima?.items) ? datos.clima.items : Array.isArray(datos?.clima) ? datos.clima : [];
+  const items = resolverItemsClima(datos);
   if (!items.length) return true;
   const hoy = String(fechaISOArgentina() || "").slice(0, 10);
   if (!hoy) return false;
@@ -1191,6 +1241,38 @@ const filtrarSnapshotSiHuecoPrecioUnico = (snapshot, datos, pregunta = "") => {
   });
   if (itemsFiltrados.length === snapshot.items.length) return snapshot;
   return { ...snapshot, items: itemsFiltrados };
+};
+
+const extraerUbicacionesMencionadas = (pregunta = "") => {
+  const t = normalizar(pregunta);
+  const locs = [];
+  if (t.includes("balcarce")) locs.push("balcarce");
+  if (t.includes("necochea")) locs.push("necochea");
+  if (t.includes("quequen") || t.includes("quequén")) locs.push("quequen");
+  if (t.includes("bahia blanca") || t.includes("bahía blanca")) locs.push("bahia blanca");
+  if (t.includes("rosario")) locs.push("rosario");
+  if (t.includes("sudeste")) locs.push("sudeste");
+  if (t.includes("mercado central")) locs.push("mercado central");
+  return locs;
+};
+
+const hayUbicacionMencionadaSinCubrir = (pregunta, datos) => {
+  const locs = extraerUbicacionesMencionadas(pregunta);
+  if (!locs.length) return false;
+  
+  if (!datos?.precio) return true;
+  
+  const todos = [datos.precio, ...(datos.referenciasMultiplesCultivo || [])];
+  
+  for (const loc of locs) {
+    const locCubierta = todos.some((r) => {
+      const merc = normalizar(r?.mercado || "");
+      const fuen = normalizar(r?.fuente || "");
+      return merc.includes(loc) || fuen.includes(loc);
+    });
+    if (!locCubierta) return true;
+  }
+  return false;
 };
 
 /**
@@ -1603,7 +1685,6 @@ const construirRespuestaBaseConDatos = async ({ pregunta, datos, usuario }) => {
     : datos?.cultivo
       ? String(datos.cultivo).toUpperCase()
       : "mercado";
-  lineas.push(`Respuesta base (${cultivoTxt})`);
 
   if (!soloMeteoSinMercado) {
     const plantillaHacienda = armarPlantillaHaciendaPuntual({ pregunta, datos, usuario, temasLocal });
@@ -1782,6 +1863,13 @@ const construirRespuestaBaseConDatos = async ({ pregunta, datos, usuario }) => {
     lineas.push(`- Web fallback futuros: ${futTxt}`);
   }
 
+  if (!soloMeteoSinMercado && Array.isArray(datos?.futuros_db) && datos.futuros_db.length) {
+    const itemsFut = datos.futuros_db.map(
+      (f) => `  · Posición: ${f.posicion} | Precio: USD ${f.precio_usd}${f.variacion ? ` (Var: ${f.variacion})` : ""} | Fuente: ${f.fuente} | Fecha Ref: ${toFecha(f.fecha)}`
+    );
+    lineas.push(`- Posiciones de Futuros (MATba-Rofex / CBOT) en base:\n${itemsFut.join("\n")}`);
+  }
+
   lineas.push(`- Consulta original: ${truncarTexto(pregunta, 180)}`);
   return lineas.join("\n");
 };
@@ -1796,10 +1884,10 @@ module.exports = {
     cultivoPrimeroEnHistorial,
   },
 
-  async obtenerDatos(usuario, pregunta) {
+  async obtenerDatos(usuario, pregunta, extra = {}) {
     const whatsappNorm = String(usuario?.whatsapp || "").replace(/\D/g, "");
-    let historialRows = [];
-    if (whatsappNorm) {
+    let historialRows = extra.historialReciente || [];
+    if (historialRows.length === 0 && whatsappNorm) {
       const hHist = horasFeedbackBroadcastMasivo();
       const filtroHist = sqlMasivoAdminRecienteOtroHistorial(2);
       const hist = await query(
@@ -1853,10 +1941,29 @@ module.exports = {
       }
       datos.referenciasMultiplesCultivo = await obtenerReferenciasMultiplesCultivo(cultivo, 14);
     }
+    if (cultivo) {
+      try {
+        const cultivoSqlLike = `%${cultivo}%`;
+        const rFut = await query(
+          `
+            SELECT posicion, precio_usd, variacion, volumen, fecha, fuente
+            FROM futuros_posiciones
+            WHERE LOWER(cultivo) LIKE LOWER($1)
+              AND fecha = (SELECT MAX(fecha) FROM futuros_posiciones WHERE LOWER(cultivo) LIKE LOWER($1))
+            ORDER BY posicion
+            LIMIT 8
+          `,
+          [cultivoSqlLike]
+        );
+        datos.futuros_db = rFut.rows || [];
+      } catch (errFut) {
+        console.warn("[consulta] Error al obtener futuros posiciones:", errFut.message || errFut);
+      }
+    }
     const quiereHaciendaPlantilla =
       (temas.includes("precio") || temas.includes("venta")) && esConsultaMercadoHaciendaPregunta(pregunta, cultivo);
     if (quiereHaciendaPlantilla) {
-      const hint = detectarCategoriaHacienda(pregunta);
+      const hint = detectarCategoriaHacienda(normalizar(pregunta));
       datos.hacienda_plantilla = await obtenerFilasPreciosHaciendaForPlantilla(hint);
       datos.hacienda_categoria_hint = hint;
     }
@@ -2023,7 +2130,7 @@ module.exports = {
       historial: historialIa,
       noticias: noticiasIa,
     });
-    const itemsClimaIA = Array.isArray(datos?.clima?.items) ? datos.clima.items : Array.isArray(datos?.clima) ? datos.clima : [];
+    const itemsClimaIA = resolverItemsClima(datos);
     const climaPronosticoResumen = itemsClimaIA.length
       ? [...itemsClimaIA]
           .sort((a, b) => String(a.fecha || "").localeCompare(String(b.fecha || "")))
@@ -2055,8 +2162,10 @@ module.exports = {
       const hayMercadoTema =
         temasFmt.includes("precio") || temasFmt.includes("venta") || temasFmt.includes("dolar");
       const tnMsgParaBd = normalizar(pregunta);
+      const esMeta = esMetaConsultaConversacional(pregunta);
       /** WhatsApp: bloque fijo con respuesta_base antes del editor y antes del complemento web. */
       const anteponerResumenBd =
+        !esMeta &&
         String(respuestaBase || "").trim().length > 0 &&
         (temasFmt.includes("precio") ||
           temasFmt.includes("venta") ||
@@ -2091,6 +2200,9 @@ module.exports = {
           "Si el usuario solo continúa un tema explícito del historial, mantené coherencia con ese tema; no cambies a otro dominio (p. ej. de fecha a mercado) sin que la pregunta lo pida. " +
           "Si el JSON trae clima_pronostico_resumen con contenido, son datos de pronóstico ya cargados: no digas que faltan en base salvo que esté vacío. " +
           "Usá fecha_hoy_ar del JSON como única fecha de 'hoy' en Argentina (no uses la fecha del servidor ni inventes el día). " +
+          (esMeta
+            ? "CASO META-CONVERSACIONAL/CORRECCIÓN: El usuario te está haciendo una pregunta sobre el hilo de la charla, corrigiendo un malentendido o preguntando por el origen de los datos. Respondé de forma 100% humana, amigable y conversacional por WhatsApp. Si aclara un malentendido (ej: no te pedí novillo, te pedí maíz), disculpate de manera breve y amigable, y respondé sobre el tema correcto (maíz) usando los datos correspondientes de la historia o del JSON. "
+            : "") +
           "La respuesta_base ya fue calculada por reglas de negocio y datos internos. " +
           (anteponerResumenBd
             ? "Presentación WhatsApp: la app antepondrá antes de tu texto un bloque *Base AgroHabilis* con respuesta_base literal. No repitas ni re-enumeres esas mismas líneas ni cifras; tu salida suma solo la capa editorial (lectura/decisión/riesgo o las reglas de hueco único) sin duplicar el bloque previo. "
@@ -2129,13 +2241,15 @@ module.exports = {
       const traceExtra = [];
       let pipeline = "base_datos + contexto_ia";
       const bloquePrioridadBd = anteponerResumenBd
-        ? ["📊 *Base AgroHabilis*", "━━━━━━━━━━━━━━━━━━━━", String(respuestaBase).trim()].join("\n")
+        ? String(respuestaBase).trim()
         : "";
       let mensajeFinal = bloquePrioridadBd
         ? textoIA
           ? [bloquePrioridadBd, textoIA].join("\n\n")
           : bloquePrioridadBd
-        : textoIA || respuestaBase;
+        : textoIA || (esMeta
+            ? `Disculpame *${nombre}*, tuvimos una pequeña demora técnica al conectar con el asistente de IA para continuar nuestra charla en WhatsApp. ¿Me podrías repetir la consulta o decirme qué grano o categoría querés cotizar?`
+            : respuestaBase);
 
       const cultivoGapPrecio = datos?.cultivo || detectarCultivo(pregunta);
       const temasGapPrecio = Array.isArray(datos?.temas) ? datos.temas : detectarTemas(pregunta);
@@ -2154,7 +2268,8 @@ module.exports = {
         (deberiaActivarGrounding(pregunta, datos, respuestaBase) ||
           (esConsultaMeteoPorTexto(pregunta) && (!String(climaPronosticoResumen || "").trim() || climaVencido)) ||
           gapPrecioCultivoSinCubrir ||
-          forzarGroundingAgro);
+          forzarGroundingAgro ||
+          hayUbicacionMencionadaSinCubrir(pregunta, datos));
 
       if (debeIntentarGrounding) {
         const maxG = getGroundingMaxChars();

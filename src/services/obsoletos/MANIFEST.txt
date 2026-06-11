@@ -1,0 +1,19 @@
+Archivo de referencia (2026-05-11). No importar nada desde esta carpeta en runtime.
+
+Eliminado de src/services/ (reemplazo):
+- agent_gate.js              -> require("./agent/ia/json_chain")
+- agent_orchestrator.js      -> require("./agent/orchestration/pasos")
+- agent_prompt_builders.js   -> require("./agent/prompts/builders")
+
+Eliminado de src/services/consultas/ (código muerto: Node resolvía siempre ../consultas.js al hacer require(".../consultas") sin subruta):
+- index.js
+- legacy.js
+
+La API pública sigue siendo src/services/consultas.js (el shim consultas/procesar_consulta.js fue archivado el 2026-05-17 ya que todos los scripts importan consultas.js directamente).
+
+Auditoría completa del repo (raíz, scripts, scrapers, jobs): docs/operacion/auditoria-repo-desde-raiz-2026-05-11.txt
+Resumen canónico consultas WhatsApp (para docs / IA): docs/operacion/arquitectura-consultas-whatsapp.md
+
+Barrel retirado (sin require en el código):
+- inventario/index.js -> copia de referencia archived-inventario-index-2026-05-11.js (require explícito a ../inventario/*; no usar en prod).
+- agent/ia/consulta_agent_openrouter.js -> copia de referencia archived-consulta-agent-openrouter-2026-06-05.js (retirado por desuso el 2026-06-05).

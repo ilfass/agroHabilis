@@ -394,6 +394,14 @@ const responderInsumos = async (
   if (t.includes("fertiliz")) keywords.push("fertiliz");
   if (t.includes("semill")) keywords.push("semilla");
   if (t.includes("herbic")) keywords.push("herbic");
+  if (t.includes("glifosato")) keywords.push("glifosato");
+  if (t.includes("urea")) keywords.push("urea");
+  if (t.includes("weedit")) keywords.push("weedit");
+  if (t.includes("weedseeker")) keywords.push("weedseeker");
+  if (t.includes("aplicacion")) keywords.push("aplicacion");
+  if (t.includes("pulveriz")) keywords.push("pulveriz");
+  if (t.includes("insectic")) keywords.push("insectic");
+  if (t.includes("fungic")) keywords.push("fungic");
 
   let filtrados = rows;
   if (keywords.length) {
@@ -401,7 +409,29 @@ const responderInsumos = async (
       const bucket = `${norm(r.categoria)} ${norm(r.producto)}`;
       return keywords.some((k) => bucket.includes(k));
     });
-    if (!filtrados.length) filtrados = rows;
+    if (!filtrados.length) {
+      const explicitKeywords = [
+        "maiz", "soja", "trigo", "girasol", "papa", "fertiliz", "semill", "herbic",
+        "glifosato", "urea", "weedit", "weedseeker", "aplicacion", "pulveriz",
+        "insectic", "fungic"
+      ];
+      const esEspecifica =
+        cultivosUsuario.some((c) => t.includes(c)) ||
+        explicitKeywords.some((k) => t.includes(k));
+
+      if (esEspecifica) {
+        const terminosBuscados = keywords.filter((k) => t.includes(k) || cultivosUsuario.includes(k)).join(", ");
+        return construirFallbackDecisionUniversal({
+          nivel,
+          tema: "insumos",
+          detalleFalta: `sin datos en base para los insumos o productos específicos solicitados (${terminosBuscados}) en el corte del ${formatearFechaEs(fecha)}.`,
+          contexto: "referencias específicas no disponibles en el corte actual de la base interna",
+          accion: "te sugiero buscar una referencia externa o consultar precios de mercado alternativos.",
+          fechaRef: String(fecha).slice(0, 10),
+        });
+      }
+      filtrados = rows;
+    }
   }
 
   const top = filtrados.slice(0, 8);

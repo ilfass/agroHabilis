@@ -1,6 +1,6 @@
 # Sistema de plantillas centralizado
 
-Este documento describe las plantillas de mensajes usadas por AgroHabilis y su punto de integración.
+Este documento describe las plantillas de mensajes usadas por AgroHabilis y su punto de integración. Para el cableado del turno conversacional hasta `renderTemplate("consulta")`, ver [arquitectura-consultas-whatsapp.md](./arquitectura-consultas-whatsapp.md).
 
 ## `bienvenida`
 - **Uso:** primer mensaje post-onboarding.
@@ -35,8 +35,8 @@ Este documento describe las plantillas de mensajes usadas por AgroHabilis y su p
 ## `consulta`
 - **Uso:** consultas libres conversacionales.
 - **Datos:** detección de temas + precio/dólar/clima/noticias frescas.
-- **IA:** respuesta conversacional en base al contexto.
-- **Integración:** `src/services/consultas.js`.
+- **IA:** `renderizar` usa **`generarConPromptLibre`** (Gemini) y complemento web opcional (grounding). El módulo `agent/ia/consulta_agent_openrouter.js` (tools) ya no se invoca desde esta plantilla.
+- **Integración:** cadena `consultas.js` → `agent/pipeline/consulta_whatsapp.js` → `router` / `rutas/*` (donde se llama `renderTemplate("consulta", …)` vía `legacy_helpers` u otras dependencias).
 
 ## Motor central
 

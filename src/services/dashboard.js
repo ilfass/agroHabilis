@@ -3,6 +3,7 @@ const { query } = require("../config/database");
 const {
   obtenerEstadoWhatsapp,
   obtenerEstadoWhatsappDetalle,
+  client,
 } = require("../config/whatsapp");
 const { obtenerEstadoFuentes } = require("./fuentes_monitor");
 const { inferCalidadDesdeFuenteTexto } = require("../utils/data_quality");
@@ -205,6 +206,7 @@ const getAdminDashboard = async () => {
     iaRateLimitHoy,
     iaRateLimit7d,
     matbaFuentesHoy,
+    iaHealthCheckResult,
   ] = await Promise.all([
     query("SELECT NOW() AS now"),
     query("SELECT MAX(creado_en) AS ts FROM precios"),
@@ -504,6 +506,15 @@ const getAdminDashboard = async () => {
         ORDER BY total DESC, fuente ASC
       `
     ),
+    query(
+      `
+        SELECT status, verificado_en, error_msg
+        FROM fuentes_estado
+        WHERE fuente_id = 'ia_health'
+        ORDER BY verificado_en DESC
+        LIMIT 1
+      `
+    ),
   ]);
 
   const iaProveedorMix7d = await getIaProveedorMixDias(7);
@@ -625,16 +636,22 @@ const getAdminDashboard = async () => {
   ].map((t) => ({ ...t, ...estadoCobertura(t) }));
   const temasOk = temas.filter((t) => t.estado === "ok").length;
   const coberturaPct = temas.length ? Math.round((temasOk / temas.length) * 100) : 0;
+  const { getGeminiApiKeyStatus } = require("./gemini_keys");
+  const iaStatus = getGeminiApiKeyStatus();
+
   const iaPorProveedorHoy = iaProveedoresHoy.rows.map((r) => ({
     proveedor: r.proveedor,
     total: Number(r.total || 0),
     sinContexto: Number(r.sin_contexto || 0),
   }));
+
   const rateLimitPorProveedorHoy = iaRateLimitHoy.rows.map((r) => ({
     proveedor: r.proveedor,
     total: Number(r.total_rate_limit || 0),
   }));
+
   const rateLimitTotalHoy = rateLimitPorProveedorHoy.reduce((acc, x) => acc + x.total, 0);
+
   const rateLimitSerie7d = iaRateLimit7d.rows.map((r) => {
     const totalConsultas = Number(r.total_consultas || 0);
     const totalRateLimit = Number(r.total_rate_limit || 0);
@@ -649,7 +666,72 @@ const getAdminDashboard = async () => {
     };
   });
 
+  // Definir las 7 IAs objetivo
+  const targetProviders = [
+    { id: "gemini_gratis", name: "Gemini gratis", quotaLimit: "15 RPM" },
+    { id: "gemini_pago", name: "Gemini pago", quotaLimit: "Ilimitado" },
+    { id: "gemini_vision", name: "Gemini vision", quotaLimit: "15 RPM" },
+    { id: "groq", name: "Groq", quotaLimit: "Ilimitado" },
+    { id: "openrouter", name: "Openroute", quotaLimit: "Ilimitado" },
+    { id: "ollama", name: "Ollama (VPS local)", quotaLimit: "Ilimitado" },
+    { id: "heuristica", name: "Heuristica", quotaLimit: "Ilimitado" }
+  ];
+
+  // Normalizar la lista de proveedores que vino de la DB para retrocompatibilidad
+  const iaPorProveedorHoyNormalizado = [];
+  iaPorProveedorHoy.forEach((r) => {
+    let provId = r.proveedor;
+    
+    if (provId === "gemini") {
+      provId = iaStatus.activeKeyType === "paga" ? "gemini_pago" : "gemini_gratis";
+    } else if (provId === "dialogo_hilo" || provId === "registrar_inventario_pendiente" || provId === "tool_first" || provId === "fallback_local") {
+      provId = "heuristica";
+    } else if (provId === "precio_agent" || provId === "agent_unified" || provId === "agent_turn" || provId === "agent_gate") {
+      provId = iaStatus.activeKeyType === "paga" ? "gemini_pago" : "gemini_gratis";
+    }
+
+    const exist = iaPorProveedorHoyNormalizado.find(x => x.proveedor === provId);
+    if (exist) {
+      exist.total += r.total;
+      exist.sinContexto += r.sinContexto;
+    } else {
+      iaPorProveedorHoyNormalizado.push({
+        proveedor: provId,
+        total: r.total,
+        sinContexto: r.sinContexto
+      });
+    }
+  });
+
+  // Compilar el breakdown completo garantizando que existan las 7 IAs
+  const breakdownIAs = targetProviders.map((p) => {
+    const provData = iaPorProveedorHoyNormalizado.find(x => x.proveedor === p.id);
+    const hasRateLimitErr = rateLimitPorProveedorHoy.some(x => {
+      const provClean = String(x.proveedor).toLowerCase();
+      if (p.id === "gemini_gratis" && provClean === "gemini") {
+        return iaStatus.activeKeyType === "paga" || x.total > 0;
+      }
+      return provClean === p.id || provClean === p.id.replace("gemini_", "");
+    });
+
+    const quotaExceeded = p.id === "gemini_gratis" 
+      ? iaStatus.activeKeyType === "paga"
+      : hasRateLimitErr;
+
+    return {
+      id: p.id,
+      nombre: p.name,
+      totalHoy: provData ? provData.total : 0,
+      sinContextoHoy: provData ? provData.sinContexto : 0,
+      limiteCuota: p.quotaLimit,
+      cuotaExcedida: quotaExceeded
+    };
+  });
+
+  const alertasCuotaActiva = breakdownIAs.some(x => x.cuotaExcedida);
+
   return {
+    iaStatus,
     estado: {
       whatsapp: obtenerEstadoWhatsapp(),
       whatsappDetalle: obtenerEstadoWhatsappDetalle(),
@@ -697,6 +779,11 @@ const getAdminDashboard = async () => {
     },
     ia: {
       ...iaConfig,
+      healthCheck: iaHealthCheckResult.rows[0] ? {
+        status: iaHealthCheckResult.rows[0].status,
+        verificadoEn: iaHealthCheckResult.rows[0].verificado_en,
+        errorMsg: iaHealthCheckResult.rows[0].error_msg
+      } : null,
       metricas: {
         consultasConIAHoy: conIAHoy,
         consultasFallbackHoy: fallbackHoy,
@@ -705,6 +792,8 @@ const getAdminDashboard = async () => {
         respuestasIASinContextoHoy: sinContextoHoy,
         respuestasIASinContexto7d: sinContexto7d,
         porProveedorHoy: iaPorProveedorHoy,
+        breakdownIAs,
+        alertasCuotaActiva,
         rateLimit: {
           totalHoy: rateLimitTotalHoy,
           porProveedorHoy: rateLimitPorProveedorHoy,
@@ -924,10 +1013,10 @@ const enviarMensajesMasivosAdmin = async ({ usuarioIds, mensaje }) => {
   }
 
   const sistemaId = await obtenerUsuarioSistemaId();
-  const delayMs = Math.min(
-    Math.max(Number(process.env.ADMIN_BROADCAST_DELAY_MS) || 650, 150),
-    8000
-  );
+  
+  // Safe default: random delay between 30 and 60 seconds (user-configurable in .env)
+  const delayMin = Number(process.env.ADMIN_BROADCAST_DELAY_MIN_MS) || 30000;
+  const delayMax = Number(process.env.ADMIN_BROADCAST_DELAY_MAX_MS) || 60000;
 
   const resultados = [];
   for (let i = 0; i < ids.length; i++) {
@@ -969,6 +1058,20 @@ const enviarMensajesMasivosAdmin = async ({ usuarioIds, mensaje }) => {
     try {
       const { sendMessage } = require("../config/whatsapp");
       const textoFinal = interpolarMensajeMasivo(texto, u);
+      
+      // Typing effect (Escribiendo...)
+      try {
+        const chat = await client.getChatById(destino);
+        if (chat) {
+          await chat.sendStateTyping();
+          // Simulate typing for a few seconds based on the message length (15ms per character), min 2s, max 7s
+          const typingMs = Math.min(7000, Math.max(2000, textoFinal.length * 15));
+          await sleep(typingMs);
+        }
+      } catch (typingErr) {
+        console.warn(`[Broadcast] No se pudo activar el estado Escribiendo para ${destino}:`, typingErr.message);
+      }
+
       await sendMessage(destino, textoFinal);
       await query(
         `
@@ -994,8 +1097,11 @@ const enviarMensajesMasivosAdmin = async ({ usuarioIds, mensaje }) => {
       );
       resultados.push({ usuarioId, ok: false, error: msg });
     }
+    
+    // Random delay between delayMin and delayMax for human-like intervals
     if (i < ids.length - 1) {
-      await sleep(delayMs);
+      const randomDelay = Math.floor(Math.random() * (delayMax - delayMin + 1)) + delayMin;
+      await sleep(randomDelay);
     }
   }
 
@@ -1243,6 +1349,8 @@ const getClienteDashboard = async ({ usuarioId }) => {
 
   const [
     cultivos,
+    lotes,
+    zonas,
     ultConsultas,
     ultResumenes,
     actividad,
@@ -1258,14 +1366,58 @@ const getClienteDashboard = async ({ usuarioId }) => {
     suscripcionMp,
     animalesIndividuales,
     animalesEventos,
+    telemetriaConexiones,
+    telemetriaLabores,
+    eventosPastura,
   ] = await Promise.all([
     query(
       `
-        SELECT cultivo, hectareas, costo_por_ha, activo
-        FROM usuario_cultivos
-        WHERE usuario_id = $1
-        ORDER BY cultivo
+        SELECT 
+          l.id,
+          l.nombre AS lote_nombre,
+          l.cliente,
+          l.firma,
+          l.provincia,
+          l.partido,
+          l.tipo,
+          l.cultivo,
+          l.hectareas,
+          l.variedad,
+          l.fecha_siembra,
+          l.densidad,
+          l.rinde_esperado,
+          l.arrendado,
+          true AS activo,
+          (
+            SELECT m.payload->>'lote_semilla'
+            FROM inventario_movimiento m
+            WHERE m.lote_id = l.id AND m.dominio = 'cultivo' AND m.estado = 'confirmado'
+            ORDER BY m.creado_en DESC LIMIT 1
+          ) AS lote_semilla,
+          (
+            SELECT (m.payload->>'humedad')::numeric
+            FROM inventario_movimiento m
+            WHERE m.lote_id = l.id AND m.dominio = 'cultivo' AND m.estado = 'confirmado'
+            ORDER BY m.creado_en DESC LIMIT 1
+          ) AS humedad,
+          (
+            SELECT (m.payload->>'costo_arrendamiento')::numeric
+            FROM inventario_movimiento m
+            WHERE m.lote_id = l.id AND m.dominio = 'cultivo' AND m.estado = 'confirmado'
+            ORDER BY m.creado_en DESC LIMIT 1
+          ) AS costo_arrendamiento
+        FROM lotes l
+        WHERE l.usuario_id = $1 AND l.cultivo IS NOT NULL AND l.cultivo <> ''
+        ORDER BY l.nombre
       `,
+      [usuario.id]
+    ),
+    query(
+      `SELECT id, nombre, hectareas, cultivo, arrendado, cliente, firma, provincia, partido, tipo FROM lotes WHERE usuario_id = $1 ORDER BY nombre`,
+      [usuario.id]
+    ),
+    query(
+      `SELECT id, provincia, partido, lat, lng, prioridad, activa FROM usuario_zonas WHERE usuario_id = $1 ORDER BY prioridad ASC`,
       [usuario.id]
     ),
     query(
@@ -1323,16 +1475,18 @@ const getClienteDashboard = async ({ usuarioId }) => {
         ORDER BY tipo
       `
     ),
-    query(
-      `
-        SELECT fecha, temp_min, temp_max, precipitacion, helada, descripcion
-        FROM clima
-        WHERE lat = $1 AND lng = $2
-        ORDER BY fecha ASC
-        LIMIT 7
-      `,
-      [usuario.lat, usuario.lng]
-    ),
+    (async () => {
+      if (usuario.lat != null && usuario.lng != null) {
+        const { obtenerClimaFresco } = require("../templates/base");
+        try {
+          const res = await obtenerClimaFresco(usuario.lat, usuario.lng);
+          return res?.items || [];
+        } catch (e) {
+          console.error("Fallo obtenerClimaFresco en dashboard cliente:", e.message);
+        }
+      }
+      return [];
+    })(),
     query(
       `
         SELECT estado, error_msg, creado_en
@@ -1355,9 +1509,27 @@ const getClienteDashboard = async ({ usuarioId }) => {
     ),
     query(
       `
-        SELECT especie, categoria, cantidad_estimada, activo
-        FROM usuario_ganaderia_perfil
-        WHERE usuario_id = $1 AND activo = true
+        SELECT 
+          s.lote_id,
+          l.nombre AS lote_nombre,
+          l.firma,
+          l.cliente,
+          l.provincia,
+          l.partido,
+          l.tipo AS lote_tipo,
+          split_part(s.item_clave, ':', 2) AS especie,
+          COALESCE(NULLIF(s.etiqueta, ''), split_part(s.item_clave, ':', 3)) AS categoria,
+          SUM(s.cantidad)::numeric AS cantidad_estimada,
+          true AS activo,
+          MAX(m.payload->>'raza') AS raza,
+          MAX((m.payload->>'peso_promedio')::numeric) AS peso_promedio,
+          MAX(m.payload->>'sanidad_tratamiento') AS sanidad_tratamiento,
+          MAX((m.payload->>'dias_carencia')::numeric) AS dias_carencia
+        FROM inventario_saldo s
+        LEFT JOIN inventario_movimiento m ON m.id = s.ultimo_movimiento_id
+        LEFT JOIN lotes l ON l.id = s.lote_id
+        WHERE s.usuario_id = $1 AND s.dominio = 'ganado'
+        GROUP BY s.lote_id, l.nombre, l.firma, l.cliente, l.provincia, l.partido, l.tipo, s.item_clave, s.etiqueta
         ORDER BY especie, categoria
       `,
       [usuario.id]
@@ -1373,10 +1545,12 @@ const getClienteDashboard = async ({ usuarioId }) => {
     ),
     query(
       `
-        SELECT id, perfil, categoria, descripcion, monto, moneda, fecha, creado_en
-        FROM gastos
-        WHERE usuario_id = $1
-        ORDER BY fecha DESC, creado_en DESC
+        SELECT g.id, g.perfil, g.categoria, g.descripcion, g.monto, g.moneda, g.fecha, g.creado_en, g.lote_id,
+               l.nombre AS lote_nombre, l.firma, l.cliente, l.provincia, l.partido, l.tipo AS lote_tipo
+        FROM gastos g
+        LEFT JOIN lotes l ON l.id = g.lote_id
+        WHERE g.usuario_id = $1
+        ORDER BY g.fecha DESC, g.creado_en DESC
         LIMIT 20
       `,
       [usuario.id]
@@ -1403,7 +1577,8 @@ const getClienteDashboard = async ({ usuarioId }) => {
     ),
     query(
       `
-        SELECT a.id, a.caravana, a.categoria, a.estado, a.peso, a.raza, a.fecha_ingreso, l.nombre AS lote_nombre
+        SELECT a.id, a.caravana, a.categoria, a.estado, a.peso, a.raza, a.fecha_ingreso, a.lote_id,
+               l.nombre AS lote_nombre, l.firma, l.cliente, l.provincia, l.partido, l.tipo AS lote_tipo
         FROM animales_individuales a
         LEFT JOIN lotes l ON l.id = a.lote_id
         WHERE a.usuario_id = $1
@@ -1414,24 +1589,75 @@ const getClienteDashboard = async ({ usuarioId }) => {
     ),
     query(
       `
-        SELECT e.id, e.animal_id, a.caravana, e.tipo_evento, e.fecha, e.valor_numerico, e.valor_texto, e.observaciones
+        SELECT e.id, e.animal_id, a.caravana, e.tipo_evento, e.fecha, e.valor_numerico, e.valor_texto, e.observaciones,
+               a.lote_id, l.nombre AS lote_nombre, l.firma, l.cliente, l.provincia, l.partido, l.tipo AS lote_tipo
         FROM animales_eventos e
         JOIN animales_individuales a ON a.id = e.animal_id
+        LEFT JOIN lotes l ON l.id = a.lote_id
         WHERE e.usuario_id = $1
         ORDER BY e.fecha DESC, e.creado_en DESC
         LIMIT 50
       `,
       [usuario.id]
     ),
+    query(
+      `
+        SELECT id, proveedor, estado, creado_en, actualizado_en
+        FROM telemetria_conexiones
+        WHERE usuario_id = $1
+      `,
+      [usuario.id]
+    ),
+    query(
+      `
+        SELECT 
+          id, 
+          tipo_labor, 
+          creado_en AS fecha_inicio, 
+          creado_en AS fecha_fin, 
+          hectareas_reales, 
+          0.0 AS velocidad_promedio,
+          producto_insumo AS insumo_nombre, 
+          dosis_promedio,
+          CASE 
+            WHEN tipo_labor = 'SIEMBRA' THEN 'sem/ha'
+            WHEN tipo_labor = 'PULVERIZACION' THEN 'l/ha'
+            ELSE 'tn/ha'
+          END AS unidad_dosis,
+          'Visión Asistente' AS marca_maquinaria,
+          'WhatsApp OCR' AS modelo_maquinaria,
+          lote_nombre
+        FROM registro_labores_maquinaria
+        WHERE usuario_id = $1
+        ORDER BY creado_en DESC
+        LIMIT 50
+      `,
+      [usuario.id]
+    ),
+    (async () => {
+      try {
+        const { obtenerUltimosEventosPastura } = require("./rutas/pasturas");
+        const res = await obtenerUltimosEventosPastura(usuario.id);
+        return res || [];
+      } catch (e) {
+        return [];
+      }
+    })(),
   ]);
+
+  const { getGeminiApiKeyStatus } = require("./gemini_keys");
+  const iaStatus = getGeminiApiKeyStatus();
 
   return {
     usuario,
+    iaStatus,
     actividad: actividad.rows[0] || {},
     cultivos: cultivos.rows,
+    lotes: lotes.rows,
+    zonas: zonas.rows,
     precios: preciosHoy.rows,
     tipoCambio: tipoCambio.rows,
-    clima: climaZona.rows,
+    clima: climaZona,
     historialConsultas: ultConsultas.rows,
     resumenes: ultResumenes.rows,
     enviosWhatsapp: enviosWhatsapp.rows,
@@ -1443,6 +1669,9 @@ const getClienteDashboard = async ({ usuarioId }) => {
     suscripcionMp: suscripcionMp.rows[0] || null,
     animalesIndividuales: animalesIndividuales.rows,
     animalesEventos: animalesEventos.rows,
+    telemetriaConexiones: telemetriaConexiones.rows,
+    telemetriaLabores: telemetriaLabores.rows,
+    eventosPastura: eventosPastura,
     ia: {
       estado: [
         process.env.OPENROUTER_API_KEY?.trim(),

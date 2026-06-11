@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-30T17:26:08.336Z",
+  "generatedAt": "2026-05-18T12:58:56.257Z",
   "results": [
     {
       "id": "alias-mi-perfil",
@@ -52,7 +52,7 @@
       "kind": "suggestion",
       "input": "quiero una alerta de precio de soja",
       "expected": "ALERTA",
-      "got": "Detecté una intención de comando.\n👉 Probá con: *ALERTA ... / AVISAME ...*\nSi querés ver todos los comandos, escribí: *VER COMANDOS*",
+      "got": "Para eso usá *ALERTA ... / AVISAME ...*. (También entiendo lenguaje natural — si no estás seguro, escribime cómo lo dirías.)",
       "ok": true
     },
     {

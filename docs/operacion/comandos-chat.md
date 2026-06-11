@@ -2,6 +2,8 @@
 
 Este documento resume los comandos que hoy reconoce el bot en WhatsApp.
 
+**Consultas libres** (no listadas acá) siguen el pipeline descrito en [arquitectura-consultas-whatsapp.md](./arquitectura-consultas-whatsapp.md).
+
 ## Notas importantes
 
 - Los comandos se interpretan en mayúsculas/minúsculas indistintamente.

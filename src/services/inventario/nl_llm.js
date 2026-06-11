@@ -56,6 +56,11 @@ function mapearJsonARegistroBorrador(j, textoUsuario) {
     const especie = String(j.especie || "").trim() || inferirEspecieDesdeEtiqueta(catRaw);
     const ind = Array.isArray(j.animales_individuales) && j.animales_individuales.length > 0 ? j.animales_individuales : undefined;
     
+    const pesoPromedio = Number(j.peso_promedio);
+    const raza = j.raza ? String(j.raza).trim() : undefined;
+    const sanidadTratamiento = j.sanidad_tratamiento ? String(j.sanidad_tratamiento).trim() : undefined;
+    const diasCarencia = Number(j.dias_carencia);
+
     if (efectoLlm === "delta") {
       const d = Number(j.delta_cabezas);
       if (!Number.isFinite(d) || !Number.isInteger(Math.round(d))) return null;
@@ -63,7 +68,16 @@ function mapearJsonARegistroBorrador(j, textoUsuario) {
         tipo: "registro",
         dominio: "ganado",
         efecto: "delta",
-        payload: { especie, categoria: catRaw.slice(0, 80), delta: Math.round(d), animales_individuales: ind },
+        payload: { 
+          especie, 
+          categoria: catRaw.slice(0, 80), 
+          delta: Math.round(d), 
+          animales_individuales: ind,
+          peso_promedio: Number.isFinite(pesoPromedio) ? pesoPromedio : undefined,
+          raza: raza || undefined,
+          sanidad_tratamiento: sanidadTratamiento || undefined,
+          dias_carencia: Number.isFinite(diasCarencia) ? diasCarencia : undefined
+        },
         lote_nombre_fragmento: j.lote_nombre_libre ? String(j.lote_nombre_libre).trim().slice(0, 80) || null : null,
         campana_nombre_fragmento: j.campana_nombre_libre
           ? String(j.campana_nombre_libre).trim().slice(0, 80) || null
@@ -79,7 +93,16 @@ function mapearJsonARegistroBorrador(j, textoUsuario) {
       tipo: "registro",
       dominio: "ganado",
       efecto: "replace",
-      payload: { especie, categoria: catRaw.slice(0, 80), cantidad: Math.round(n), animales_individuales: ind },
+      payload: { 
+        especie, 
+        categoria: catRaw.slice(0, 80), 
+        cantidad: Math.round(n), 
+        animales_individuales: ind,
+        peso_promedio: Number.isFinite(pesoPromedio) ? pesoPromedio : undefined,
+        raza: raza || undefined,
+        sanidad_tratamiento: sanidadTratamiento || undefined,
+        dias_carencia: Number.isFinite(diasCarencia) ? diasCarencia : undefined
+      },
       lote_nombre_fragmento: j.lote_nombre_libre ? String(j.lote_nombre_libre).trim().slice(0, 80) || null : null,
       campana_nombre_fragmento: j.campana_nombre_libre
         ? String(j.campana_nombre_libre).trim().slice(0, 80) || null
@@ -130,6 +153,30 @@ function mapearJsonARegistroBorrador(j, textoUsuario) {
   if (dom === "cultivo") {
     const cultivo = String(j.cultivo || "").trim();
     if (!cultivo) return null;
+
+    const loteSemilla = j.lote_semilla ? String(j.lote_semilla).trim() : undefined;
+    const humedad = Number(j.humedad);
+    const arrendado = j.arrendado !== undefined ? Boolean(j.arrendado) : undefined;
+    const costoArrendamiento = Number(j.costo_arrendamiento);
+
+    // Datos granulares de agricultura
+    const agro = {
+      variedad: j.variedad ? String(j.variedad).trim().slice(0, 150) : null,
+      fecha_siembra: j.fecha_siembra || null,
+      densidad: Number.isFinite(Number(j.densidad)) ? Number(j.densidad) : null,
+      rinde_esperado: Number.isFinite(Number(j.rinde_esperado)) ? Number(j.rinde_esperado) : null,
+      siembra_tipo: j.siembra_tipo ? String(j.siembra_tipo).trim().slice(0, 50) : null,
+      densidad_por_metro: Number.isFinite(Number(j.densidad_por_metro)) ? Number(j.densidad_por_metro) : null,
+      distancia_surcos: Number.isFinite(Number(j.distancia_surcos)) ? Number(j.distancia_surcos) : null,
+      fertilizante: j.fertilizante ? String(j.fertilizante).trim().slice(0, 150) : null,
+      fertilizante_dosis: Number.isFinite(Number(j.fertilizante_dosis)) ? Number(j.fertilizante_dosis) : null,
+      monitoreo: j.monitoreo || null,
+      lote_semilla: loteSemilla || undefined,
+      humedad: Number.isFinite(humedad) ? humedad : undefined,
+      arrendado: arrendado,
+      costo_arrendamiento: Number.isFinite(costoArrendamiento) ? costoArrendamiento : undefined
+    };
+
     if (efectoLlm === "delta") {
       const dh = Number(j.delta_hectareas);
       if (!Number.isFinite(dh)) return null;
@@ -137,7 +184,7 @@ function mapearJsonARegistroBorrador(j, textoUsuario) {
         tipo: "registro",
         dominio: "cultivo",
         efecto: "delta",
-        payload: { cultivo: cultivo.slice(0, 80), delta: dh },
+        payload: { cultivo: cultivo.slice(0, 80), delta: dh, ...agro },
         lote_nombre_fragmento: j.lote_nombre_libre ? String(j.lote_nombre_libre).trim().slice(0, 80) || null : null,
         campana_nombre_fragmento: j.campana_nombre_libre
           ? String(j.campana_nombre_libre).trim().slice(0, 80) || null
@@ -153,7 +200,7 @@ function mapearJsonARegistroBorrador(j, textoUsuario) {
       tipo: "registro",
       dominio: "cultivo",
       efecto: "replace",
-      payload: { cultivo: cultivo.slice(0, 80), hectareas: ha },
+      payload: { cultivo: cultivo.slice(0, 80), hectareas: ha, ...agro },
       lote_nombre_fragmento: j.lote_nombre_libre ? String(j.lote_nombre_libre).trim().slice(0, 80) || null : null,
       campana_nombre_fragmento: j.campana_nombre_libre
         ? String(j.campana_nombre_libre).trim().slice(0, 80) || null
@@ -224,14 +271,24 @@ async function borradorRegistroDesdeLlm(textoUsuario, { lotes = [], campanas = [
     '"toneladas_grano": number|null,"delta_toneladas": number|null,',
     '"producto_insumo": string|null,"unidad_insumo": string|null,"cantidad_insumo": number|null,"delta_insumo": number|null,',
     '"categoria_ganado": string|null,"cultivo": string|null,"especie": string|null,',
-    '"animales_individuales": [{"caravana": string|null, "categoria": string, "estado": "sano"|"enfermo"|"vacunado"|"muerto"|"otro", "observaciones": string|null}]|null,',
+    '"animales_individuales": [{"caravana": string|null, "categoria": string, "estado": string, "peso": number|null, "sexo": "macho"|"hembra"|null, "raza": string|null, "observaciones": string|null}]|null,',
+    '"variedad": string|null, "fecha_siembra": "YYYY-MM-DD"|null, "densidad": number|null, "rinde_esperado": number|null, "siembra_tipo": string|null, "densidad_por_metro": number|null, "distancia_surcos": number|null, "fertilizante": string|null, "fertilizante_dosis": number|null,',
+    '"monitoreo": {"estado_fenologico": string, "humedad_suelo": string|null, "incidencia_sanitaria": string|null, "observaciones": string|null}|null,',
     '"lote_nombre_libre": string|null,"campana_nombre_libre": string|null,',
+    '"peso_promedio": number|null,"raza": string|null,"sanidad_tratamiento": string|null,"dias_carencia": number|null,',
+    '"lote_semilla": string|null,"humedad": number|null,"arrendado": boolean|null,"costo_arrendamiento": number|null,',
     '"fecha_referencia": "YYYY-MM-DD"|null}',
     "",
     "Reglas:",
     "- ganado replace: cantidad_cabezas entero positivo; delta: delta_cabezas entero (negativo si salida/consumo).",
-    "- animales_individuales: SOLO si el productor detalla uno a uno o pide registrar el estado de animales específicos (enfermos, con caravana, vacunados, etc.).",
-    "- cultivo replace: hectareas > 0; delta: delta_hectareas número (podés usar negativo).",
+    "- animales_individuales: SOLO si el productor detalla uno a uno o pide registrar el estado o agregar observaciones de animales específicos (ej: caravanas, raza, peso, sexo, observaciones, sanidad). Deberás poblar este array de forma detallada, y establecer 'cantidad_cabezas' en 1 (o el número de animales detallados) con intencion: 'registro_inventario'.",
+    "- cultivo: si menciona siembra o datos de monitoreo, incluí variedad, fecha_siembra, densidad, siembra_tipo, densidad_por_metro, distancia_surcos, fertilizante, fertilizante_dosis, etc. Si es monitoreo de un cultivo ya existente, usá monitoreo.",
+    "- siembra_tipo: tipo o modalidad de siembra si se menciona (ej. '1ra', '2da', 'directa', 'convencional').",
+    "- densidad_por_metro: cantidad de semillas por metro lineal (ej. 73 semillas/mt -> 73).",
+    "- distancia_surcos: distancia en centímetros entre surcos (ej. 21 cm -> 21).",
+    "- fertilizante: nombre/tipo de fertilizante aplicado (ej. 'Microstar').",
+    "- fertilizante_dosis: dosis del fertilizante en kg/ha (ej. 40 kg/ha -> 40).",
+    "- rinde_esperado: en tn/ha (toneladas por hectárea).",
     "- grano: stock en TN (toneladas) de un cultivo (soja, maíz, trigo…). NO confundir con hectáreas. replace: toneladas_grano; delta: delta_toneladas (negativo si venta/salida).",
     "- insumo: producto_insumo y unidad_insumo (ej kg, lt, bolsa); replace usa cantidad_insumo; delta usa delta_insumo.",
     "- lote_nombre_libre y campana_nombre_libre cuando existan.",
@@ -243,7 +300,7 @@ async function borradorRegistroDesdeLlm(textoUsuario, { lotes = [], campanas = [
     `fecha_hoy_ar: ${fechaHoy}`,
     `lotes_catalogo_json: ${JSON.stringify(lotesBrief)}`,
     `campanas_catalogo_json: ${JSON.stringify(campBrief)}`,
-    `mensaje_productor: """${String(textoUsuario || "").slice(0, 900)}"""`,
+    `mensaje_productor: """${String(textoUsuario || "").slice(0, 20000)}"""`,
     "Devolvé el JSON:",
   ].join("\n");
 
@@ -281,23 +338,34 @@ async function interpretarInventarioAgenteWhatsApp(
     "Respondé SOLO un JSON válido (un objeto raíz), sin markdown ni texto fuera del JSON.",
     "",
     "Campo obligatorio raíz:",
-    '"accion": "registro" | "consulta" | "conversacion" | "no_inventario"',
+    '"accion": "registro" | "consulta" | "conversacion" | "no_inventario" | "multi_lote"',
     "",
-    "— accion = no_inventario: el mensaje no va por este módulo (precio de mercado, clima, saludo, u otro tema). mensaje null.",
-    "— accion = conversacion: explicá en español rioplatense qué entendiste y qué podés hacer o qué falta (ej. planilla de muchos lotes, datos incompletos, mezcla consulta+alta). Campo obligatorio: mensaje (string, tono WhatsApp, *negritas* opcionales).",
+    "— accion = no_inventario: el mensaje no va por este módulo (precio de mercado, clima, saludo, u otro tema, o si el productor pide CREAR, AGREGAR, REGISTRAR o DAR DE ALTA NUEVOS CAMPOS o LOTES). mensaje null.",
+    "— accion = conversacion: explicá en español rioplatense qué entendiste y qué podés hacer o qué falta (ej. planilla de muchos lotes, datos incompletos, mezcla consulta+alta). IMPORTANTE: NUNCA devuelvas esto si el usuario pide crear o agregar nuevos lotes (eso es no_inventario). Campo obligatorio: mensaje (string, tono WhatsApp, *negritas* opcionales).",
     "— accion = consulta: el productor quiere ver stock/inventario cargado. consulta_filtro_lote: nombre o fragmento de lote si lo menciona, o null para ver todo. mensaje: opcional, 1–2 líneas de intro antes de los datos (o null).",
+    "— accion = multi_lote: el productor provee múltiples registros para diferentes lotes (ej. una tabla, planilla OCR delimitada por pipes, o un listado en texto de varios lotes).",
+    "  Campos obligatorios cuando accion = multi_lote:",
+    "  - bloques: array de objetos con las cargas detectadas: [{\"lote_nombre\": string, \"fragmento\": string, \"resumen\": string}]",
+    "    * lote_nombre: SIEMPRE incluí tanto el campo como el número/nombre de lote separados por ' - ' (ej. 'La Manga - Lote 3', 'Don Federico - Lote 1'). NUNCA uses solo el nombre del campo (ej. 'La Manga' solo NO es aceptable).",
+    "    * fragmento: frase en lenguaje natural auto-contenida que describa la carga del lote. IMPORTANTE: en tablas pipe-separated con columnas Campo|Lote|Campaña|HaEfectiva|Siembra|Cultivo, la columna HaEfectiva contiene las hectáreas y Siembra contiene '1ra'/'2da' (NO es cantidad). Ej: 'Registrar siembra de 63 ha de Cebada variedad Montoya en lote 3 de La Manga para la campaña 26/27'. El fragmento DEBE incluir el número de hectáreas numérico.",
+    "    * resumen: frase muy corta con número y cultivo (ej. '63 ha de Cebada')",
+    "  - bloques_sin_carga: SOLO lotes/líneas que genuinamente NO tienen cantidad asignada. Si la tabla tiene HaEfectiva para TODAS las filas, este array DEBE estar vacío []. NUNCA repitas en bloques_sin_carga las mismas filas que ya pusiste en bloques.",
     "— accion = registro: una sola operación de alta o delta de ganado (cabezas), cultivo (ha), grano (tn) o insumo. Objeto obligatorio registro con el MISMO schema interno:",
     '{"dominio":"ganado"|"cultivo"|"grano"|"insumo","efecto":"replace"|"delta",',
     '"cantidad_cabezas": number|null,"delta_cabezas": number|null,"hectareas": number|null,"delta_hectareas": number|null,',
     '"toneladas_grano": number|null,"delta_toneladas": number|null,',
     '"producto_insumo": string|null,"unidad_insumo": string|null,"cantidad_insumo": number|null,"delta_insumo": number|null,',
     '"categoria_ganado": string|null,"cultivo": string|null,"especie": string|null,',
-    '"animales_individuales": [{"caravana": string|null, "categoria": string, "estado": string, "observaciones": string|null}]|null,',
-    '"lote_nombre_libre": string|null,"campana_nombre_libre": string|null,"fecha_referencia":"YYYY-MM-DD"|null}',
+    '"animales_individuales": [{"caravana": string|null, "categoria": string, "estado": string, "peso": number|null, "sexo": "macho"|"hembra"|null, "raza": string|null, "observaciones": string|null}]|null,',
+    '"lote_nombre_libre": string|null,"campana_nombre_libre": string|null,',
+    '"peso_promedio": number|null,"raza": string|null,"sanidad_tratamiento": string|null,"dias_carencia": number|null,',
+    '"lote_semilla": string|null,"humedad": number|null,"arrendado": boolean|null,"costo_arrendamiento": number|null,"siembra_tipo": string|null,"densidad_por_metro": number|null,"distancia_surcos": number|null,"fertilizante": string|null,"fertilizante_dosis": number|null,',
+    '"fecha_referencia":"YYYY-MM-DD"|null}',
     "Si no podés armar un registro válido sin inventar cifras, usá accion conversacion con mensaje claro (no uses registro vacío).",
     "",
     "Reglas de negocio:",
-    "- Listados tipo remate con muchos «Lote 1.», «Lote 2a.» y varias categorías: accion conversacion (no registro único, no no_inventario salvo que sea claramente otro tema).",
+    "- El registro de animales individuales (trazabilidad, caravana, raza, peso, sexo, observaciones, sanidad) es una funcionalidad core totalmente soportada. Si el productor detalla caravana, raza, peso, sexo o una observación de un animal (ej: 'quiero registrar 1 ternero caravana AR-105...', 'tengo 1 vaca caravana AR-106 Hereford...', 'registrale una observacion a la caravana AR-105...'), debés interpretarlo como accion: registro con dominio: ganado, completando el array animales_individuales en el schema con todos los detalles provistos, y seteando la cantidad_cabezas correspondiente (usualmente 1 por cada animal detallado) and el lote_nombre_libre si se menciona.",
+    "- Listados tipo remate o planillas con múltiples lotes y categorías: usá accion: \"multi_lote\" y separalos en el array de bloques.",
     "- Si mezclás consulta de «qué tengo» y «guardá X» en el mismo mensaje: conversacion pidiendo separar en dos mensajes.",
     "- Compará lote_nombre_libre con lotes_catalogo_json (nombres); si no coincide, igual podés devolver registro con el nombre libre (el sistema resuelve o pregunta).",
     "- No inventes números; no sumes cabezas de toda una planilla en un solo registro.",
@@ -309,22 +377,31 @@ async function interpretarInventarioAgenteWhatsApp(
   ].join("\n");
 
   const user = [
-    `fecha_hoy_ar: ${fechaHoy}`,
-    `modo_forzado: ${modoForzado == null ? "null" : JSON.stringify(modoForzado)}`,
-    `lotes_catalogo_json: ${JSON.stringify(lotesBrief)}`,
-    `campanas_catalogo_json: ${JSON.stringify(campBrief)}`,
-    `mensaje_productor: """${String(textoUsuario || "").slice(0, 900)}"""`,
-    "Devolvé solo el JSON raíz con accion y los campos que correspondan.",
+    "Por favor, clasifica e interpreta el siguiente mensaje del productor según las instrucciones de inventario.",
+    "",
+    `Mensaje del productor: """${String(textoUsuario || "").slice(0, 20000)}"""`,
+    `Fecha actual (Argentina): ${fechaHoy}`,
+    `Lotes disponibles en catálogo: ${JSON.stringify(lotesBrief)}`,
+    `Campañas disponibles en catálogo: ${JSON.stringify(campBrief)}`,
+    `Modo forzado de intención: ${modoForzado == null ? "Ninguno (libre)" : JSON.stringify(modoForzado)}`,
+    "",
+    "Generá la respuesta en formato JSON puro. No agregues explicaciones, notas ni marcas de markdown. Iniciá directamente con {.",
   ].join("\n");
 
   let raw;
   try {
     ({ texto: raw } = await generarClasificacionIntencion({ system, user }));
   } catch (_e) {
+    console.error("[nl_llm] Error in generarClasificacionIntencion:", _e);
     return null;
   }
+  console.log("[nl_llm] RAW FROM GEMINI:", raw);
   const u = extraerJson(raw || "");
-  if (!u || typeof u.accion !== "string") return null;
+  console.log("[nl_llm] PARSED JSON:", u);
+  if (!u || typeof u.accion !== "string") {
+    console.warn("[nl_llm] Invalid JSON or accion is not string");
+    return null;
+  }
 
   const acc = String(u.accion)
     .trim()
@@ -347,6 +424,28 @@ async function interpretarInventarioAgenteWhatsApp(
         : null;
     const mensaje = u.mensaje != null && String(u.mensaje).trim() ? String(u.mensaje).trim() : null;
     return { accion: "consulta", consulta_filtro_lote: lot, mensaje_preludio: mensaje };
+  }
+
+  if (acc === "multi_lote") {
+    const bloques = Array.isArray(u.bloques) ? u.bloques : [];
+    const sinCarga = Array.isArray(u.bloques_sin_carga) ? u.bloques_sin_carga : [];
+    if (bloques.length < 2) {
+      return {
+        accion: "conversacion",
+        respuesta: String(u.mensaje || "Detecté varios lotes pero no pude extraer las cargas de forma individual. Por favor, mandámelos uno por uno."),
+      };
+    }
+    return {
+      accion: "multi_lote",
+      bloques: bloques.map(b => ({
+        lote_nombre: String(b.lote_nombre || "").trim(),
+        fragmento: String(b.fragmento || "").trim(),
+        resumen: String(b.resumen || "").trim(),
+      })),
+      bloques_sin_carga: sinCarga.map(b => ({
+        lote_nombre: String(b.lote_nombre || "").trim(),
+      })),
+    };
   }
 
   if (acc === "registro") {

@@ -160,7 +160,7 @@
         <h2>¿Te la mandan por WhatsApp?</h2>
         <p>
           <strong style="color: var(--text)">Sí, la contraseña inicial llega por WhatsApp:</strong>
-          cuando Mercado Pago <strong>autoriza</strong> tu suscripción a Plan Básico o Pro, el sistema te envía un mensaje con
+          cuando Mercado Pago <strong>autoriza</strong> tu suscripción a Plan Básico, Pro o Pro Max, el sistema te envía un mensaje con
           el enlace al panel y una <strong>contraseña temporal</strong> (no se muestra en esta página: solo en ese chat).
         </p>
         <ul>
@@ -189,6 +189,11 @@
       const next = params.get("next") || "/dashboard/cliente";
       const telefonoPrefill = params.get("telefono") || "";
       if (telefonoPrefill) $("telefono").value = telefonoPrefill;
+
+      const errorParam = params.get("error");
+      if (errorParam === "plan_restricted") {
+        $("errorBox").innerHTML = "🔒 <b>Establecimiento en Plan Gratis:</b> El acceso al Panel Web está reservado para Plan Básico o superior. Podés actualizar tu plan desde WhatsApp.";
+      }
 
       async function checkSession() {
         const r = await fetch("/api/auth/cliente/session");

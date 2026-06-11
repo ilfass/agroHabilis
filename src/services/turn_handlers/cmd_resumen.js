@@ -31,7 +31,7 @@ async function handlerCmdResumen(ctx) {
     return { manejado: false };
   }
 
-  const usuario = await buscarPorWhatsapp(ctx.jid);
+  const usuario = ctx.planCtx?.usuario || await buscarPorWhatsapp(ctx.jid);
   if (!usuario) {
     return {
       manejado: true,

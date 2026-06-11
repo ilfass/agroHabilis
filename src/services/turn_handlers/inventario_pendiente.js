@@ -27,6 +27,7 @@ const { normalizarWhatsapp } = require("../../models/usuario");
 const { guardarConsulta } = require("../../models/consulta");
 const { obtenerPendiente } = require("../inventario/core");
 const { manejarInventarioWhatsapp } = require("../inventario/whatsapp_flow");
+const { generarClasificacionIntencion } = require("../gemini");
 
 /**
  * Si el texto del usuario es claramente de OTRO dominio (precio/clima/etc.),
@@ -57,6 +58,10 @@ const esConsultaOtroDominioExplicita = (texto = "") => {
   }
   /** Meta sobre la app (no inventario). */
   if (/\b(sos\s+(un\s+)?(agente|bot)|qu[eé]\s+(es|hace|sos))\b/.test(t)) return true;
+  /** Creación de lotes explícita (e.g., "crear lote", "dar de alta el campo", "registrar tres campos", "dame de alta un campo"). */
+  const tieneVerboCreacion = /\b(crear|crea|cree|dar\s+de\s+alta|dame\s+de\s+alta|registra|registrar|nuevo|sumar|suma|agregar|agrega|alta)\b/.test(t);
+  const tieneSustantivoCampo = /\b(lote|lotes|campo|campos|potrero|potreros|firma|firmas|establecimiento|establecimientos)\b/.test(t);
+  if (tieneVerboCreacion && tieneSustantivoCampo) return true;
   return false;
 };
 
@@ -90,6 +95,71 @@ const construirRecordatorioPendiente = (pend) => {
   ].join("\n");
 };
 
+const obtenerDescripcionBorrador = (pend) => {
+  const pp = (() => {
+    try {
+      return typeof pend?.payload === "string" ? JSON.parse(pend.payload) : pend?.payload || {};
+    } catch (_e) {
+      return {};
+    }
+  })();
+  const desc = (() => {
+    if (pp?.cabezas) return `${pp.cabezas} cabezas${pp?.categoria ? ` de ${pp.categoria}` : ""}`;
+    if (pp?.hectareas) return `${pp.hectareas} ha${pp?.cultivo ? ` de ${pp.cultivo}` : ""}`;
+    if (pp?.cantidad && pp?.unidad) return `${pp.cantidad} ${pp.unidad}${pp?.item ? ` de ${pp.item}` : ""}`;
+    return "registro de inventario";
+  })();
+  const lote = pend?.lote_nombre ? `lote ${pend.lote_nombre}` : "establecimiento";
+  return `${desc} en ${lote}`;
+};
+
+/**
+ * Clasifica la intención del usuario con respecto al borrador de inventario pendiente.
+ * @param {string} textoUsuario 
+ * @param {string} descBorrador 
+ * @returns {Promise<string>} 'confirmar' | 'cancelar' | 'completar_datos' | 'comentario_adicional' | 'cambiar_tema' | null
+ */
+async function clasificarIntencionBorradorPendiente(textoUsuario, descBorrador) {
+  try {
+    const system = [
+      "Clasificá la intención del usuario de un bot de WhatsApp agropecuario con respecto a un borrador de inventario que está esperando confirmación.",
+      "Responder SOLO con un objeto JSON válido con la clave 'intencion' (sin markdown, sin bloques ```json).",
+      "",
+      "Las opciones válidas de 'intencion' son:",
+      "- \"confirmar\": El usuario explícitamente acepta, confirma o valida el borrador para guardarlo (ej: \"si\", \"dale\", \"guardalo\", \"de una\", \"confirmar\", \"correcto\", \"metele\", \"está bien\").",
+      "- \"cancelar\": El usuario explícitamente cancela, aborta, descarta o pide borrar el borrador (ej: \"no\", \"cancelar\", \"borralo\", \"no lo guardes\", \"olvidalo\", \"dejalo\", \"cancelemos\").",
+      "- \"completar_datos\": El usuario proporciona información faltante que el bot le estaba pidiendo para poder registrar el borrador (ej: si le pide las hectáreas y el usuario responde \"80 ha\" o \"son 150 hectáreas\", o si le pide la categoría y responde \"novillos\").",
+      "- \"comentario_adicional\": El usuario añade una nota, observación o aclaración sobre el borrador (ej: \"dos están enfermas\", \"hay una preñada\", \"pesan 320kg promedio\", \"lote seco\").",
+      "- \"cambiar_tema\": El usuario claramente cambió de tema, pide realizar otra consulta o acción ajena al borrador pendiente (ej: \"cuánto está la soja\", \"crear el campo Daedaz\", \"clima en Tandil\", \"ver comandos\", \"hola\", \"buenas\").",
+      "",
+      "Ejemplo de formato de respuesta:",
+      '{"intencion": "confirmar"}'
+    ].join("\n");
+
+    const user = [
+      `Borrador pendiente: "${descBorrador}"`,
+      `Mensaje del usuario: "${textoUsuario}"`
+    ].join("\n");
+
+    const response = await generarClasificacionIntencion({ system, user });
+    const raw = String(response?.texto || "").trim();
+    
+    // Extraer JSON
+    const match = raw.match(/\{[\s\S]*\}/);
+    if (match) {
+      const parsed = JSON.parse(match[0]);
+      const intencion = String(parsed?.intencion || "").trim().toLowerCase();
+      const validas = ["confirmar", "cancelar", "completar_datos", "comentario_adicional", "cambiar_tema"];
+      if (validas.includes(intencion)) {
+        return intencion;
+      }
+    }
+  } catch (err) {
+    console.error("[inventario_pendiente] Error en clasificación por IA:", err.message);
+  }
+  return null;
+}
+
 /**
  * @param {import("../agent/turn_controller").TurnContext} ctx
  */
@@ -101,20 +171,37 @@ async function handlerInventarioPendiente(ctx) {
   if (!pend) return { manejado: false };
 
   const consultaRaw = String(ctx.consulta || "");
+  const descBorrador = obtenerDescripcionBorrador(pend);
 
-  /** Cancelación explícita: dejamos que el flow legacy procese SI/NO/cancelar. */
-  if (!esPedidoCancelarPendiente(consultaRaw) && esConsultaOtroDominioExplicita(consultaRaw)) {
-    /**
-     * Otro dominio (precio/clima/etc.): cedemos el turno al pipeline
-     * general. El recordatorio podría ser molesto si el productor
-     * cambió de tema; mejor dejarlo resolver y que el borrador siga
-     * vivo (expira por TTL).
-     */
+  // 1. Clasificación por IA
+  let intencion = await clasificarIntencionBorradorPendiente(consultaRaw, descBorrador);
+
+  // 2. Fallback a heurísticas/regex en caso de que la clasificación por IA falle
+  if (!intencion) {
+    console.log("[inventario_pendiente] Fallback a heurísticas viejas por falta de clasificación");
+    if (!esPedidoCancelarPendiente(consultaRaw) && esConsultaOtroDominioExplicita(consultaRaw)) {
+      return { manejado: false };
+    }
+    intencion = esPedidoCancelarPendiente(consultaRaw) ? "cancelar" : "completar_datos";
+  }
+
+  console.log(`[inventario_pendiente] Intención clasificada: ${intencion}`);
+
+  // 3. Si la intención es cambiar de tema, ceder turno
+  if (intencion === "cambiar_tema") {
     return { manejado: false };
   }
 
+  // 4. Mapear textos para el flujo legacy de inventario
+  let textoParaFlow = consultaRaw;
+  if (intencion === "confirmar") {
+    textoParaFlow = "si";
+  } else if (intencion === "cancelar") {
+    textoParaFlow = "no";
+  }
+
   const inv = await manejarInventarioWhatsapp({
-    texto: consultaRaw,
+    texto: textoParaFlow,
     usuarioId,
     numeroWhatsapp: normalizarWhatsapp(ctx.jid),
   });
@@ -124,23 +211,10 @@ async function handlerInventarioPendiente(ctx) {
   if (inv?.manejado && inv.respuesta != null) {
     respuesta = inv.respuesta;
   } else {
-    /**
-     * Hay borrador pendiente pero el mensaje no es SI/NO ni encaja en
-     * ningún branch del flow. En vez de dejar que el pipeline general
-     * lo interprete (caso 2026-05-13: "Dos estaban enfermas" terminó
-     * en "personas enfermas"), devolvemos recordatorio explícito del
-     * borrador y le ofrecemos al productor un camino claro.
-     */
     respuesta = construirRecordatorioPendiente(pend);
     routeFinal = "inventario_pendiente_recordatorio";
   }
 
-  /**
-   * Persistencia del turno en `historial_consultas`, exactamente como
-   * lo hacía el pipeline viejo. Es importante que esto quede acá: el
-   * resumen del productor y el cupo mensual de consultas lo leen
-   * desde esa tabla.
-   */
   try {
     await guardarConsulta({
       usuarioId,
@@ -161,4 +235,8 @@ async function handlerInventarioPendiente(ctx) {
   };
 }
 
-module.exports = { handlerInventarioPendiente };
+module.exports = {
+  handlerInventarioPendiente,
+  clasificarIntencionBorradorPendiente,
+  obtenerDescripcionBorrador,
+};

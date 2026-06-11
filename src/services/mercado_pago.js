@@ -1,9 +1,8 @@
 const crypto = require("crypto");
 const axios = require("axios");
 const { query } = require("../config/database");
-const { normalizarPlan, actualizarPlanPorWhatsapp } = require("./planes");
+const { normalizarPlan, actualizarPlanPorWhatsapp, obtenerConfigPlan } = require("./planes");
 const { buscarPorWhatsapp } = require("../models/usuario");
-const { sendMessage } = require("../config/whatsapp");
 const {
   generarPasswordTemporalCliente,
   persistirPasswordTemporalCliente,
@@ -19,11 +18,15 @@ const FRECUENCIA_TIPO_DEFAULT = process.env.MP_SUB_FREQUENCY_TYPE || "months";
 const PLANES = {
   basico: {
     nombre: "Plan Básico",
-    monto: Number(process.env.PLAN_BASICO_MONTO || 9000),
+    monto: 22000,
   },
   pro: {
     nombre: "Plan Pro",
-    monto: Number(process.env.PLAN_PRO_MONTO || 18000),
+    monto: 29000,
+  },
+  pro_max: {
+    nombre: "Plan Pro Max",
+    monto: 50000,
   },
 };
 
@@ -133,25 +136,29 @@ const registrarWebhookSuscripcion = async ({ mpTopic, mpPreapprovalId, payload }
 
 const crearLinkSuscripcionParaUsuario = async ({ whatsapp, planObjetivo }) => {
   const plan = normalizarPlan(planObjetivo);
-  if (!["basico", "pro"].includes(plan)) {
-    throw new Error("Solo se puede generar suscripción para plan basico o pro");
+  if (!["basico", "pro", "pro_max"].includes(plan)) {
+    throw new Error("Solo se puede generar suscripción para plan basico, pro o pro_max");
   }
   const usuario = await buscarPorWhatsapp(whatsapp);
   if (!usuario?.id) throw new Error("Usuario no encontrado");
 
-  const planCfg = PLANES[plan];
-  if (!planCfg || !Number.isFinite(planCfg.monto) || planCfg.monto <= 0) {
+  // Obtener config de plan desde DB dinámicamente
+  const planCfg = await obtenerConfigPlan(plan);
+  const nombrePlan = plan === "basico" ? "Plan Básico" : plan === "pro" ? "Plan Pro" : "Plan Pro Max";
+  const monto = Number(planCfg.precio);
+
+  if (!Number.isFinite(monto) || monto <= 0) {
     throw new Error(`Monto inválido para plan ${plan}`);
   }
 
   const externalReference = armarExternalReference({ usuarioId: usuario.id, plan });
   const body = {
-    reason: `${planCfg.nombre} AgroHabilis`,
+    reason: `${nombrePlan} AgroHabilis`,
     external_reference: externalReference,
     auto_recurring: {
       frequency: FRECUENCIA_DEFAULT,
       frequency_type: FRECUENCIA_TIPO_DEFAULT,
-      transaction_amount: planCfg.monto,
+      transaction_amount: monto,
       currency_id: MONEDA_DEFAULT,
     },
     status: "pending",
@@ -191,7 +198,7 @@ const crearLinkSuscripcionParaUsuario = async ({ whatsapp, planObjetivo }) => {
 
   return {
     plan,
-    planNombre: planCfg.nombre,
+    planNombre: nombrePlan,
     initPoint: initParaUsuario,
     preapprovalId: data?.id || null,
   };
@@ -216,7 +223,7 @@ const obtenerPreapprovalDesdeMP = async (preapprovalId) => {
 
 const extraerPlanDesdeExternalReference = (externalReference = "") => {
   const ref = String(externalReference || "");
-  const hit = ref.match(/:plan:(gratis|basico|pro)(?::|$)/i);
+  const hit = ref.match(/:plan:(gratis|basico|pro|pro_max)(?::|$)/i);
   return normalizarPlan(hit?.[1] || "gratis");
 };
 
@@ -309,7 +316,7 @@ const procesarPreapprovalId = async ({
       `,
       [sub.usuario_id, preapprovalId, preapproval?.payer_id || null]
     );
-    if (["basico", "pro"].includes(planObjetivo) && String(subPrev?.mp_status || "").toLowerCase() !== "authorized") {
+    if (["basico", "pro", "pro_max"].includes(planObjetivo) && String(subPrev?.mp_status || "").toLowerCase() !== "authorized") {
       try {
         const usuario = await buscarPorWhatsapp(whatsapp);
         const telefono = normalizarTelefono(usuario?.whatsapp_real || usuario?.whatsapp || whatsapp || "");
@@ -324,6 +331,7 @@ const procesarPreapprovalId = async ({
             passwordTemporal: plain,
             variant: "suscripcion",
           });
+          const { sendMessage } = require("../config/whatsapp");
           await sendMessage(telefono, msg);
           await persistirPasswordTemporalCliente({
             usuarioId: usuario.id,
@@ -350,6 +358,7 @@ const procesarPreapprovalId = async ({
             "Ya quedaste en *Plan GRATIS*.",
             "Podés verificarlo en Mercado Pago > Suscripciones.",
           ].join("\n");
+          const { sendMessage } = require("../config/whatsapp");
           await sendMessage(telefono, msg);
         }
       } catch (error) {

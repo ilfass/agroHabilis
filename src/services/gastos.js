@@ -120,20 +120,28 @@ const parsearConIA = async ({ texto, tipo }) => {
   return extraerJson(ia.texto);
 };
 
-const registrarGasto = async (whatsapp, texto) => {
-  const usuario = await buscarPorWhatsapp(whatsapp);
+const registrarGasto = async (whatsapp, texto, preExtractedData = null) => {
+  const usuario = typeof whatsapp === "object" && whatsapp !== null
+    ? whatsapp
+    : await buscarPorWhatsapp(whatsapp);
   if (!usuario) return "No encontré tu usuario. Completá onboarding primero.";
 
-  let data = null;
-  try {
-    data = await parsearConIA({ texto, tipo: "gasto" });
-  } catch (_e) {
-    data = null;
+  let data = preExtractedData;
+  if (!data) {
+    try {
+      data = await parsearConIA({ texto, tipo: "gasto" });
+    } catch (_e) {
+      data = null;
+    }
+    if (!data) data = parseoFallbackGasto(texto);
   }
-  if (!data) data = parseoFallbackGasto(texto);
   if (!data || !Number.isFinite(Number(data.monto))) {
     return "No pude interpretar el gasto. Probá con: 'gasté 250000 en semilla'.";
   }
+
+  const descripcionGasto = usuario.es_delegado
+    ? `${data.descripcion || texto.slice(0, 220)} (Registrado por ${usuario.nombre_operario})`
+    : (data.descripcion || texto.slice(0, 220));
 
   await query(
     `
@@ -144,7 +152,7 @@ const registrarGasto = async (whatsapp, texto) => {
       usuario.id,
       normalizarPerfil(data.perfil),
       String(data.categoria || "otro").slice(0, 50),
-      data.descripcion || texto.slice(0, 220),
+      descripcionGasto,
       Number(data.monto),
       data.moneda || "ARS",
       data.fecha || hoy(),
@@ -157,20 +165,28 @@ const registrarGasto = async (whatsapp, texto) => {
   )} (${perfilNormalizado}).`;
 };
 
-const registrarVenta = async (whatsapp, texto) => {
-  const usuario = await buscarPorWhatsapp(whatsapp);
+const registrarVenta = async (whatsapp, texto, preExtractedData = null) => {
+  const usuario = typeof whatsapp === "object" && whatsapp !== null
+    ? whatsapp
+    : await buscarPorWhatsapp(whatsapp);
   if (!usuario) return "No encontré tu usuario. Completá onboarding primero.";
 
-  let data = null;
-  try {
-    data = await parsearConIA({ texto, tipo: "venta" });
-  } catch (_e) {
-    data = null;
+  let data = preExtractedData;
+  if (!data) {
+    try {
+      data = await parsearConIA({ texto, tipo: "venta" });
+    } catch (_e) {
+      data = null;
+    }
+    if (!data) data = parseoFallbackVenta(texto);
   }
-  if (!data) data = parseoFallbackVenta(texto);
   if (!data || !Number.isFinite(Number(data.monto_total))) {
     return "No pude interpretar la venta. Probá con: 'vendí 100 toneladas de soja a 430000'.";
   }
+
+  const productoVenta = usuario.es_delegado
+    ? String(`${data.producto || "producto"} [Reg: ${usuario.nombre_operario}]`).slice(0, 50)
+    : String(data.producto || "producto").slice(0, 50);
 
   await query(
     `
@@ -181,7 +197,7 @@ const registrarVenta = async (whatsapp, texto) => {
     [
       usuario.id,
       normalizarPerfil(data.perfil),
-      String(data.producto || "producto").slice(0, 50),
+      productoVenta,
       data.cantidad || null,
       String(data.unidad || "kg").slice(0, 20),
       data.precio_unitario || null,
@@ -264,7 +280,9 @@ const obtenerResumenFinanciero = async (usuarioId) => {
 };
 
 const obtenerTextoMisGastos = async (whatsapp) => {
-  const usuario = await buscarPorWhatsapp(whatsapp);
+  const usuario = typeof whatsapp === "object" && whatsapp !== null
+    ? whatsapp
+    : await buscarPorWhatsapp(whatsapp);
   if (!usuario) return "No encontré tu usuario.";
   const result = await query(
     `
@@ -290,7 +308,9 @@ const obtenerTextoMisGastos = async (whatsapp) => {
 };
 
 const obtenerTextoMisVentas = async (whatsapp) => {
-  const usuario = await buscarPorWhatsapp(whatsapp);
+  const usuario = typeof whatsapp === "object" && whatsapp !== null
+    ? whatsapp
+    : await buscarPorWhatsapp(whatsapp);
   if (!usuario) return "No encontré tu usuario.";
   const result = await query(
     `
@@ -316,7 +336,9 @@ const obtenerTextoMisVentas = async (whatsapp) => {
 };
 
 const obtenerTextoMiMargen = async (whatsapp) => {
-  const usuario = await buscarPorWhatsapp(whatsapp);
+  const usuario = typeof whatsapp === "object" && whatsapp !== null
+    ? whatsapp
+    : await buscarPorWhatsapp(whatsapp);
   if (!usuario) return "No encontré tu usuario.";
   const r = await obtenerResumenFinanciero(usuario.id);
   return [

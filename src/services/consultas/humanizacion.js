@@ -52,12 +52,35 @@ const humanizarRespuestaPrecioConIA = async ({
 } = {}) => {
   const base = String(textoBase || "").trim();
   if (!base) return "";
+
+  let esConversacionActiva = false;
+  if (usuario?.id) {
+    try {
+      const { query } = require("../../config/database");
+      const rHist = await query(
+        `SELECT creado_en FROM historial_consultas 
+         WHERE usuario_id = $1 
+         ORDER BY creado_en DESC LIMIT 1`,
+        [usuario.id]
+      );
+      const ult = rHist.rows[0]?.creado_en;
+      if (ult && (Date.now() - new Date(ult).getTime()) < 15 * 60 * 1000) {
+        esConversacionActiva = true;
+      }
+    } catch (_err) {
+      /* ignoramos */
+    }
+  }
+
   const system = [
     "Sos AgroHabilis, asesor agro para WhatsApp.",
     "Reescribí la respuesta en tono humano y accionable.",
     "Obligatorio: preservar intactos todos los números, precios, fechas, fuentes y mercados presentes.",
     "No inventes datos nuevos.",
-    "Máximo 7 líneas, español rioplatense.",
+    "Máximo 7 líneas, español rioplatense (voseo obligatorio: querés, podés, tenés, etc.).",
+    esConversacionActiva
+      ? "Conversación activa: Ya venís chateando con el productor. NO saludes ni digas '¡Hola!' ni uses introducciones repetitivas. Empezá directamente con la respuesta de forma natural y fluida."
+      : "Podés abrir con un saludo breve y cordial."
   ].join("\n");
   const user = JSON.stringify(
     {
@@ -184,10 +207,34 @@ const humanizarComandoConIA = async (
     typeof generarConPromptLibreFn === "function" ? generarConPromptLibreFn : async () => ({ texto: "" });
   const humanizarComandoLocalImpl =
     typeof humanizarComandoLocalFn === "function" ? humanizarComandoLocalFn : humanizarComandoLocal;
+
+  let esConversacionActiva = false;
+  if (usuario?.id) {
+    try {
+      const { query } = require("../../config/database");
+      const rHist = await query(
+        `SELECT creado_en FROM historial_consultas 
+         WHERE usuario_id = $1 
+         ORDER BY creado_en DESC LIMIT 1`,
+        [usuario.id]
+      );
+      const ult = rHist.rows[0]?.creado_en;
+      if (ult && (Date.now() - new Date(ult).getTime()) < 15 * 60 * 1000) {
+        esConversacionActiva = true;
+      }
+    } catch (_err) {
+      /* ignoramos */
+    }
+  }
+
   const system = [
     "Sos AgroHabilis.",
     "Humanizá una salida de comando para WhatsApp.",
     "Reglas: no inventar datos, no agregar números no presentes, tono natural, máximo 5 líneas salvo listado de alertas.",
+    "Usá español rioplatense con voseo obligatorio (querés, podés, tenés, etc.).",
+    esConversacionActiva
+      ? "Conversación activa: Ya venís chateando con el productor. NO saludes ni digas '¡Hola!' ni uses introducciones repetitivas. Respondé directamente sobre la información del comando."
+      : "Podés abrir con un saludo breve y cálido."
   ].join("\n");
   const user = JSON.stringify(
     {

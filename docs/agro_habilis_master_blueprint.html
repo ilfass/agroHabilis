@@ -1,0 +1,1075 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AgroHabilis — Master Blueprint & Arquitectura Técnica</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --primary: #15803d;
+      --primary-light: #f0fdf4;
+      --primary-dark: #166534;
+      --accent: #d97706;
+      --accent-light: #fef3c7;
+      --dark: #0f172a;
+      --text: #334155;
+      --light-bg: #f8fafc;
+      --border: #e2e8f0;
+      --card: #ffffff;
+      --muted: #64748b;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      color: var(--text);
+      background-color: var(--light-bg);
+      line-height: 1.6;
+      padding: 40px 20px;
+    }
+
+    .container {
+      max-width: 850px;
+      margin: 0 auto;
+      background: var(--card);
+      padding: 60px 80px;
+      border-radius: 16px;
+      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.04);
+      border: 1px solid var(--border);
+    }
+
+    /* Cover Styling */
+    .cover {
+      text-align: center;
+      padding: 60px 0 80px 0;
+      border-bottom: 2px solid var(--primary);
+      margin-bottom: 60px;
+      page-break-after: always;
+    }
+
+    .cover-logo {
+      font-size: 48px;
+      margin-bottom: 20px;
+    }
+
+    .cover-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 38px;
+      font-weight: 800;
+      color: var(--dark);
+      line-height: 1.2;
+      margin-bottom: 10px;
+    }
+
+    .cover-subtitle {
+      font-family: 'Outfit', sans-serif;
+      font-size: 22px;
+      color: var(--primary);
+      font-weight: 500;
+      margin-bottom: 40px;
+    }
+
+    .confidential-badge {
+      display: inline-block;
+      padding: 8px 16px;
+      background-color: #fef2f2;
+      color: #ef4444;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      border: 1px solid #fca5a5;
+      border-radius: 6px;
+      margin-bottom: 40px;
+      letter-spacing: 1px;
+    }
+
+    .cover-meta {
+      font-size: 13px;
+      color: #64748b;
+      margin-top: 60px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+      text-align: left;
+      border-top: 1px solid var(--border);
+      padding-top: 30px;
+    }
+
+    /* General Typography */
+    h1, h2, h3, h4 {
+      font-family: 'Outfit', sans-serif;
+      color: var(--dark);
+      margin-top: 40px;
+      margin-bottom: 15px;
+      page-break-after: avoid;
+    }
+
+    h1 {
+      font-size: 28px;
+      border-bottom: 2px solid #e2e8f0;
+      padding-bottom: 10px;
+      margin-top: 50px;
+      color: var(--primary);
+    }
+
+    h2 {
+      font-size: 20px;
+      margin-top: 30px;
+      color: var(--dark);
+      border-left: 4px solid var(--primary);
+      padding-left: 12px;
+    }
+
+    h3 {
+      font-size: 16px;
+      color: var(--accent);
+    }
+
+    h4 {
+      font-size: 14px;
+      color: var(--dark);
+      margin-top: 20px;
+      font-weight: 700;
+    }
+
+    p {
+      margin-bottom: 20px;
+      text-align: justify;
+      font-size: 15px;
+    }
+
+    ul, ol {
+      margin-bottom: 20px;
+      margin-left: 24px;
+      font-size: 15px;
+    }
+
+    li {
+      margin-bottom: 8px;
+    }
+
+    strong {
+      color: var(--dark);
+      font-weight: 600;
+    }
+
+    /* Table of Contents */
+    .toc-card {
+      background-color: var(--light-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 30px;
+      margin-bottom: 40px;
+    }
+
+    .toc-card h3 {
+      color: var(--dark);
+      margin-top: 0;
+      margin-bottom: 15px;
+      font-weight: 700;
+    }
+
+    .toc-list {
+      list-style-type: none;
+      margin-left: 0;
+    }
+
+    .toc-list li {
+      margin-bottom: 10px;
+      font-size: 14px;
+    }
+
+    .toc-list a {
+      color: var(--text);
+      text-decoration: none;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+
+    .toc-list a:hover {
+      color: var(--primary);
+    }
+
+    /* Callouts */
+    .callout {
+      background-color: var(--primary-light);
+      border-left: 4px solid var(--primary);
+      border-radius: 0 8px 8px 0;
+      padding: 20px 24px;
+      margin: 25px 0;
+      font-size: 14.5px;
+    }
+
+    /* Vector Step Flowcharts */
+    .flowchart-grid {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      margin: 30px 0;
+      page-break-inside: avoid;
+    }
+
+    .flow-card {
+      flex: 1;
+      background: var(--light-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px 14px;
+      text-align: center;
+      position: relative;
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.01);
+    }
+
+    .flow-card-icon {
+      font-size: 24px;
+      margin-bottom: 8px;
+    }
+
+    .flow-card h4 {
+      margin-top: 0;
+      font-size: 13px;
+      color: var(--primary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+
+    .flow-card p {
+      font-size: 11px;
+      margin-bottom: 0;
+      text-align: center;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+
+    .flow-arrow {
+      font-size: 22px;
+      color: var(--primary);
+      font-weight: 700;
+      user-select: none;
+    }
+
+    /* IA Decision Hub Grid */
+    .decision-hub {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 15px;
+      margin: 30px 0;
+      page-break-inside: avoid;
+    }
+
+    .hub-box {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      background-color: var(--card);
+      box-shadow: 0 4px 6px rgba(0,0,0,0.01);
+    }
+
+    .hub-box.active {
+      border-color: var(--primary);
+      background-color: var(--primary-light);
+    }
+
+    .hub-box h4 {
+      margin-top: 0;
+      color: var(--dark);
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .hub-box p {
+      font-size: 12px;
+      line-height: 1.5;
+      color: var(--text);
+      text-align: left;
+      margin-bottom: 0;
+    }
+
+    .hub-badge {
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      padding: 2px 6px;
+      border-radius: 4px;
+      display: inline-block;
+      margin-top: 8px;
+    }
+
+    .badge-fast { background-color: #dbeafe; color: #1e40af; }
+    .badge-deep { background-color: #f3e8ff; color: #6b21a8; }
+    .badge-live { background-color: #fef3c7; color: #92400e; }
+
+    /* Vector Web Dashboard Simulation */
+    .dashboard-preview {
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background-color: #0b1320;
+      color: #f1f5f9;
+      padding: 20px;
+      margin: 35px 0;
+      font-size: 12px;
+      page-break-inside: avoid;
+      box-shadow: 0 15px 35px rgba(15, 23, 42, 0.15);
+    }
+
+    .dash-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #1e293b;
+      padding-bottom: 12px;
+      margin-bottom: 15px;
+    }
+
+    .dash-title {
+      font-weight: 700;
+      color: #10b981;
+      font-size: 13px;
+    }
+
+    .dash-menu {
+      display: flex;
+      gap: 15px;
+      color: #94a3b8;
+    }
+
+    .dash-menu span.active {
+      color: #ffffff;
+      font-weight: 600;
+      border-bottom: 2px solid #10b981;
+      padding-bottom: 2px;
+    }
+
+    .dash-grid {
+      display: grid;
+      grid-template-columns: 1.5fr 1fr 1fr;
+      gap: 15px;
+    }
+
+    .dash-card {
+      background-color: #111827;
+      border: 1px solid #1e293b;
+      border-radius: 10px;
+      padding: 15px;
+    }
+
+    .dash-card h5 {
+      color: #94a3b8;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 10px;
+    }
+
+    .dash-value {
+      font-size: 20px;
+      font-weight: 700;
+      color: #ffffff;
+    }
+
+    .dash-subvalue {
+      font-size: 10px;
+      color: #10b981;
+      margin-top: 4px;
+    }
+
+    .pasture-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .pill {
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 9px;
+      font-weight: 700;
+    }
+
+    .pill-green { background-color: rgba(16, 185, 129, 0.2); color: #34d399; }
+    .pill-yellow { background-color: rgba(245, 158, 11, 0.2); color: #fbbf24; }
+    .pill-red { background-color: rgba(239, 68, 68, 0.2); color: #fca5a5; }
+
+    /* Chat bubble simulator */
+    .chat-box {
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background-color: #fafbfc;
+      padding: 25px;
+      margin: 25px 0;
+      font-family: system-ui, -apple-system, sans-serif;
+      box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.01);
+      page-break-inside: avoid;
+    }
+
+    .chat-bubble {
+      margin-bottom: 15px;
+      max-width: 85%;
+      padding: 12px 16px;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .bubble-user {
+      background-color: #dcf8c6;
+      color: #303030;
+      border-radius: 12px 12px 0 12px;
+      margin-left: auto;
+      text-align: left;
+      box-shadow: 0 1px 1px rgba(0, 0, 0, 0.05);
+    }
+
+    .bubble-bot {
+      background-color: #ffffff;
+      color: #303030;
+      border-radius: 12px 12px 12px 0;
+      margin-right: auto;
+      border: 1px solid #e2e8f0;
+      white-space: pre-line;
+      box-shadow: 0 1px 1px rgba(0, 0, 0, 0.03);
+    }
+
+    .bubble-bot blockquote {
+      border-left: 3px solid var(--primary);
+      padding-left: 10px;
+      margin: 8px 0;
+      color: #64748b;
+      font-style: italic;
+    }
+
+    .bubble-audio {
+      background-color: #e3f2fd;
+      color: #1e88e5;
+      border-radius: 12px 12px 12px 0;
+      margin-right: auto;
+      border: 1px solid #bbdefb;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    /* Custom Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 30px 0;
+      font-size: 14px;
+      page-break-inside: avoid;
+    }
+
+    th, td {
+      padding: 12px 16px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+
+    th {
+      background-color: #f1f5f9;
+      color: var(--dark);
+      font-weight: 700;
+      text-transform: uppercase;
+      font-size: 12px;
+      letter-spacing: 0.5px;
+    }
+
+    tr:hover {
+      background-color: #f8fafc;
+    }
+
+    /* Code boxes */
+    pre {
+      background-color: var(--dark);
+      color: #e2e8f0;
+      padding: 20px;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-family: monospace;
+      font-size: 13.5px;
+      margin: 25px 0;
+      page-break-inside: avoid;
+    }
+
+    code {
+      font-family: monospace;
+      background-color: #f1f5f9;
+      color: #0f172a;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+
+    pre code {
+      background-color: transparent;
+      color: inherit;
+      padding: 0;
+    }
+
+    /* Page Breaks for Printing */
+    .page-break {
+      page-break-before: always;
+    }
+
+    /* Print Styles */
+    @media print {
+      body {
+        background-color: #ffffff;
+        padding: 0;
+        color: #000000;
+      }
+
+      .container {
+        border: none;
+        box-shadow: none;
+        padding: 0;
+        max-width: 100%;
+      }
+
+      h1, h2, h3 {
+        page-break-after: avoid;
+      }
+
+      pre, blockquote, table, .chat-box, .dashboard-preview, .flowchart-grid, .decision-hub {
+        page-break-inside: avoid;
+      }
+
+      a {
+        color: #000000;
+        text-decoration: underline;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    
+    <!-- PORTADA -->
+    <div class="cover">
+      <div class="cover-logo">🧠🌾</div>
+      <div class="confidential-badge">Confidencial — Exclusivo Socios</div>
+      <div class="cover-title">AGROHABILIS</div>
+      <div class="cover-subtitle">El Cerebro del Lote</div>
+      <div style="font-size: 16px; font-weight: 500; color: var(--text); margin-bottom: 10px;">
+        Manual de Alcance y Arquitectura Técnica (Master Blueprint)
+      </div>
+      <div style="font-size: 14px; color: #64748b;">
+        Para uso de presentación y validación comercial
+      </div>
+      
+      <div class="cover-meta">
+        <div>
+          <strong>Documento:</strong> Blueprint Corporativo v2.4.0<br>
+          <strong>Fecha:</strong> 22 de Mayo de 2026<br>
+          <strong>Creadores:</strong> Equipo de Ingeniería AgroHabilis
+        </div>
+        <div>
+          <strong>Clasificación:</strong> Socios Estratégicos<br>
+          <strong>Estado:</strong> Aprobado y Homologado<br>
+          <strong>Contacto:</strong> fabian@habilispro.com
+        </div>
+      </div>
+    </div>
+
+    <!-- TABLA DE CONTENIDOS -->
+    <div class="toc-card">
+      <h3>🗺️ Estructura del Blueprint</h3>
+      <ul class="toc-list">
+        <li>👉 <strong>1.</strong> Portada e Introducción Comercial</li>
+        <li>👉 <strong>2.</strong> Arquitectura Técnica y Monitoreo ("El Fierrerío")</li>
+        <li>👉 <strong>3.</strong> Módulos Funcionales y Casos de Uso (9 Módulos Core en Lote)</li>
+        <li>👉 <strong>4.</strong> Modelo de Negocio y Monetización</li>
+        <li>👉 <strong>5.</strong> Roadmap y Escalabilidad a API de Meta</li>
+      </ul>
+    </div>
+
+    <!-- SECCIÓN 1 -->
+    <h1>1. PORTADA E INTRODUCCIÓN COMERCIAL</h1>
+    <p>
+      AgroHabilis es una plataforma de inteligencia artificial diseñada específicamente para el sector agropecuario. A diferencia de los complejos sistemas de gestión tradicionales que requieren capacitaciones prolongadas y la carga manual de planillas frías en computadoras de escritorio, AgroHabilis actúa como un <strong>consultor agropecuario premium y ubicuo que reside en el WhatsApp del productor</strong>.
+    </p>
+    <p>
+      Opera 100% mediante procesamiento de lenguaje natural (tanto en texto como en <strong>audios de voz</strong> y <strong>fotos de cámaras de campo</strong>) y cuenta con un <strong>portal web interactivo en tiempo real</strong> donde los usuarios con suscripción de pago pueden visualizar de forma analítica sus lotes, movimientos sanitarios, balances de stock y márgenes consolidados.
+    </p>
+
+    <!-- CUADRO DE FUNCIONAMIENTO 1: CICLO DE DATOS -->
+    <div style="margin-top: 30px;">
+      <h4 style="color: var(--primary); text-transform: uppercase; font-size: 11px; letter-spacing: 1px; text-align: center; margin-bottom: 10px;">📉 Flujo de Operación: El Ciclo de Datos en el Campo</h4>
+      <div class="flowchart-grid">
+        <div class="flow-card">
+          <div class="flow-card-icon">🎤</div>
+          <h4>1. Entrada</h4>
+          <p>El productor envía audio de voz, fotos o texto desde el tractor.</p>
+        </div>
+        <div class="flow-arrow">➔</div>
+        <div class="flow-card">
+          <div class="flow-card-icon">⚙️</div>
+          <h4>2. Procesamiento</h4>
+          <p>AI Engine parsea intenciones y calcula retiros (SENASA/Dosis).</p>
+        </div>
+        <div class="flow-arrow">➔</div>
+        <div class="flow-card">
+          <div class="flow-card-icon">💾</div>
+          <h4>3. Persistencia</h4>
+          <p>Los datos se estructuran e indexan en la base PostgreSQL.</p>
+        </div>
+        <div class="flow-arrow">➔</div>
+        <div class="flow-card">
+          <div class="flow-card-icon">📊</div>
+          <h4>4. Visualización</h4>
+          <p>La web y el WhatsApp muestran informes y márgenes.</p>
+        </div>
+      </div>
+    </div>
+
+    <h2>Filosofía de Diseño: Tool-First, Inmediatez y Calidez Campera</h2>
+    <p>La experiencia de usuario de AgroHabilis está guiada por tres pilares inquebrantables:</p>
+    <ul>
+      <li><strong>Inmediatez Extrema ("Regla del Tractor"):</strong> El productor toma decisiones rápidas arriba del tractor, al lado de la tolva o metido en la manga con el ganado. No tiene tiempo para abrir una aplicación pesada, iniciar sesión, lidiar con la baja señal celular o navegar por menús complejos. AgroHabilis le resuelve el problema en <strong>2 segundos</strong> con un simple mensaje de WhatsApp enviado con un solo pulgar.</li>
+      <li><strong>El Paradigma Tool-First:</strong> Cuando un mensaje ingresa, la arquitectura prioriza la activación directa de herramientas de backend (ejecución de queries locales, cotizaciones de mercados, cálculos de dosis de fertilizantes). Si la consulta contiene datos que pueden estructurarse inmediatamente para actuar en el inventario o la base, se ejecuta la acción sin rodeos intelectuales, ahorrando latencia y consumo de API.</li>
+      <li><strong>Calidez Campera:</strong> AgroHabilis no es un bot frío ni corporativo. Saluda con cercanía, conoce la provincia y localidad del usuario (ej. <em>"Tandil, Buenos Aires"</em>), comprende los modismos del campo argentino (<em>"che", "lote", "caravana", "manga", "rinde"</em>) y responde con una estructura limpia, clara y visualmente descansada (usando negritas y listas en lugar de párrafos densos).</li>
+    </ul>
+
+    <!-- SECCIÓN 2 -->
+    <div class="page-break"></div>
+    <h1>2. ARQUITECTURA TÉCNICA Y MONITOREO ("El Fierrerío" del Backend)</h1>
+    <p>
+      El backend de AgroHabilis está diseñado con una arquitectura robusta orientada a servicios, optimizada para responder con baja latencia y alta concurrencia.
+    </p>
+
+    <h2>Tech Stack y Componentes del Sistema</h2>
+    <ul>
+      <li><strong>Entorno de Ejecución:</strong> <code>Node.js (v20+)</code> en configuración asíncrona no bloqueante para gestionar solicitudes I/O de alta frecuencia.</li>
+      <li><strong>Motor de Base de Datos:</strong> <code>PostgreSQL (v16)</code> para almacenamiento relacional estructurado. La base cuenta con indexación geográfica y temporal avanzada en tablas críticas como <code>whatsapp_interaccion_log</code>, <code>historial_consultas</code>, <code>animales_individuales</code> y <code>stock_ganadero</code>.</li>
+      <li><strong>Emulación y Conectividad WhatsApp:</strong> <code>whatsapp-web.js</code> operando sobre un navegador headless <code>Puppeteer</code> aislado. Este motor emula la conexión de la aplicación de escritorio y encapsula el manejo de eventos a través de un pool de sockets de red.</li>
+      <li><strong>Monitoreo de Procesos:</strong> Servidor administrado en vivo mediante <code>PM2</code> con políticas de reinicio automático ante fugas de memoria o fallos fatales de conexión a socket.</li>
+    </ul>
+
+    <h2>Modelos de IA e Inteligencia Híbrida (Hybrid Intelligence)</h2>
+    <p>La inteligencia de AgroHabilis no depende de un solo modelo lingüístico, sino de una <strong>red de orquestación híbrida de IA</strong>:</p>
+
+    <!-- CUADRO DE FUNCIONAMIENTO 2: HUB INTELIGENCIA HIBRIDA -->
+    <div class="decision-hub">
+      <div class="hub-box">
+        <h4>⚡ Groq Llama 8B</h4>
+        <p><strong>Clasificador de Alta Velocidad:</strong> Enrutamiento de turnos e intenciones conversacionales y extracción de entidades numéricas locales.</p>
+        <span class="hub-badge badge-fast">Latencia &lt; 400ms</span>
+      </div>
+      <div class="hub-box active">
+        <h4>🧠 Gemini 1.5</h4>
+        <p><strong>Razonamiento Fitosanitario:</strong> Análisis clínico de fotos, formulación matemática de mixers y generación de recomendaciones.</p>
+        <span class="hub-badge badge-deep">Profundidad Lógica</span>
+      </div>
+      <div class="hub-box">
+        <h4>🔍 Google Search</h4>
+        <p><strong>Grounding de Pizarras:</strong> Recuperación asincrónica en vivo de noticias agropecuarias y valores de mercado físico del grano.</p>
+        <span class="hub-badge badge-live">Tiempo Real Real</span>
+      </div>
+    </div>
+
+    <h2>Pipeline de Turnos (Unified Turn Loop)</h2>
+    <p>Esquema simplificado del procesamiento asíncrono de un mensaje:</p>
+    <div class="diagram-container">
+[Productor (WhatsApp)] ──► [whatsappService.js] ──► [Pipeline (consulta_whatsapp)]
+                                                          │
+                                            ┌─────────────┴─────────────┐
+                                            ▼ (Intento Directo)         ▼ (Consulta Abierta)
+                                     [Tool-First Agent]          [Clasificador Inteligente]
+                                            │                           │
+                                     [Escribe en DB]             [IA Gemini / Groq + Web]
+                                            │                           │
+                                            └─────────────┬─────────────┘
+                                                          ▼
+                                              [Humanizador de Salida]
+                                                          │
+[Productor (WhatsApp)] ◄── [whatsappService.js] ◄─────────┘
+    </div>
+
+    <h2>Sistema de Seguridad Multinivel y Control de Cuotas</h2>
+    <p>
+      <strong>Seguridad de Datos:</strong> Aislamiento lógico de registros a nivel de consultas SQL usando identificadores únicos indexed (<code>usuario_id</code>). Ninguna interacción de IA puede acceder a información de otros establecimientos.
+    </p>
+    <p>
+      <strong>Control de Mensajería en Tiempo Real:</strong> Interceptor en el inicio del pipeline que consulta los contadores semanales de mensajes del usuario contra el plan contratado. Si se excede la cuota de su suscripción, se redirecciona la respuesta automáticamente a una pasarela amable indicando la necesidad de realizar un Upgrade.
+    </p>
+
+    <!-- SECCIÓN 3 -->
+    <div class="page-break"></div>
+    <h1>3. MÓDULOS FUNCIONALES Y CASOS DE USO (La IA en el Lote)</h1>
+    <p>
+      Se detallan a continuación los **9 módulos funcionales core** que componen la propuesta de valor definitiva de la suite inteligente de AgroHabilis, acompañados de simulaciones de diálogos reales.
+    </p>
+
+    <!-- MODULO 1 -->
+    <h2>1. 🎤 Notas de Audio Activas</h2>
+    <p>
+      <strong>Descripción:</strong> Mandá un audio mientras recorrés el lote o manejás el tractor. Nuestro Agente procesará tus novedades y registrará tratamientos, clima o siembras en tiempo real sin obligarte a escribir.
+    </p>
+    <div class="chat-box">
+      <div class="chat-bubble bubble-audio">
+        <span>🎤</span>
+        <span><em>Audio de voz (0:12) — "Hola bot, anotame que empezamos a sembrar el lote 3 de trigo a 140 kilos por hectárea..."</em></span>
+      </div>
+      <div class="chat-bubble bubble-bot">🎙️ *Audio procesado con éxito:*
+━━━━━━━━━━━━━━━━━━━━
+📍 *Lote:* Lote 3
+🌱 *Labor:* Siembra
+🌾 *Cultivo:* Trigo
+⚖️ *Densidad:* 140 kg/ha
+
+¿Confirmás el registro de este inicio de siembra en el historial?</div>
+      <div class="chat-bubble bubble-user">SI</div>
+      <div class="chat-bubble bubble-bot">✅ *Listo, labor registrada en el historial del Lote 3.*
+_Siembra Trigo: 140 kg/ha_
+_📅 22/05/2026_</div>
+    </div>
+
+    <!-- MODULO 2 -->
+    <h2>2. 📸 Análisis de Fotos en Vivo (Visión Artificial)</h2>
+    <p>
+      <strong>Descripción:</strong> Sacale una foto a una maleza desconocida, a un animal con síntomas o a una caravana. AgroHabilis la analizará con inteligencia artificial de visión computacional para darte diagnósticos en segundos.
+    </p>
+    <div class="chat-box">
+      <div class="chat-bubble bubble-audio">
+        <span>📸</span>
+        <span><em>[Foto adjunta de hoja con manchas necróticas] - "Qué tiene este cultivo de trigo en el lote 2?"</em></span>
+      </div>
+      <div class="chat-bubble bubble-bot">👁️‍🗨️ *Análisis de Foto en Vivo:*
+Identifico con un **87% de probabilidad** síntomas de **Mancha Amarilla del Trigo (Drechslera tritici-repentis)** en el tercio medio foliar.
+
+⚠️ *Recomendación:*
+1. Monitorear nivel de incidencia: si supera el 20-30% de hojas activas, evaluar aplicación.
+2. Fungicidas recomendados: Mezclas de Estrobirulinas + Triazoles para frenar la infección.
+
+¿Querés registrar esta alerta en la bitácora fitosanitaria del Lote 2?</div>
+    </div>
+
+    <!-- MODULO 3 -->
+    <div class="page-break"></div>
+    <h2>3. 🩺 Clínica y Carencia Sanitaria</h2>
+    <p>
+      <strong>Descripción:</strong> Llevá la trazabilidad sanitaria individual por caravana. Registrá vacunas, síntomas y fármacos aplicados. **AgroHabilis calcula y te alerta automáticamente sobre el Período de Carencia (SENASA) de drogas aplicadas antes de la faena o venta.**
+    </p>
+    <div class="chat-box">
+      <div class="chat-bubble bubble-user">tengo 1 ternero caravana AR-105 de raza Aberdeen Angus tratado con antibiotico por neumonia en el lote Bajo Grande</div>
+      <div class="chat-bubble bubble-bot">✅ *Observación registrada para la caravana **AR-105**:*
+<blockquote>“Tratado con antibiótico por neumonía”</blockquote>
+
+🛡️ **Período de Carencia (SENASA):**
+• **Caravana AR-105:** ⚠️ **Retiro/Carencia activo hasta 20/06/2026** (30 días de carencia obligatoria según normativas de SENASA para terapia antimicrobiana estándar).
+❌ _Prohibida su venta a faena o salida de establecimiento hasta cumplir el plazo de seguridad._
+
+¿Confirmás el guardado sanitario en el historial de tu establecimiento?</div>
+      <div class="chat-bubble bubble-user">SI</div>
+      <div class="chat-bubble bubble-bot">✅ *Listo, guardado en inventario veterinario.*
+_caravana AR-105: en tratamiento_
+_📅 22/05/2026_</div>
+    </div>
+
+    <!-- MODULO 4 -->
+    <h2>4. 🌱 Monitoreo de Lotes y Siembras</h2>
+    <p>
+      <strong>Descripción:</strong> Registrá variedades, fechas de siembra, fertilización y expectativas de rinde de cada lote. AgroHabilis guardará todo el historial fenológico del cultivo y mantendrá el inventario actualizado.
+    </p>
+    <div class="chat-box">
+      <div class="chat-bubble bubble-user">registra aplicacion de 120 kg/ha de urea en el Lote Norte para el trigo</div>
+      <div class="chat-bubble bubble-bot">✅ *Aplicación de Fertilizante detectada:*
+━━━━━━━━━━━━━━━━━━━━
+📍 *Lote:* Lote Norte
+🌱 *Labor:* Fertilización
+🧪 *Insumo:* Urea
+⚖️ *Dosis:* 120 kg/ha
+
+¿Confirmás el registro de este insumo en el historial?</div>
+      <div class="chat-bubble bubble-user">SI</div>
+      <div class="chat-bubble bubble-bot">✅ *Listo, labor registrada en el historial del Lote Norte.*
+_Urea: -120 kg/ha_
+_📅 22/05/2026_</div>
+    </div>
+
+    <!-- MODULO 5 -->
+    <div class="page-break"></div>
+    <h2>5. 🔄 Rotación de Pasturas</h2>
+    <p>
+      <strong>Descripción:</strong> Monitoreá pasturas y lotes con semáforos inteligentes (🟢 Óptimo, 🟡 Rebrote, 🔴 Ocupado). Evitá el sobrepastoreo calculando días de descanso y carga animal óptima para el establecimiento.
+    </p>
+    <div class="chat-box">
+      <div class="chat-bubble bubble-user">cómo viene la rotación del lote Bajo Grande?</div>
+      <div class="chat-bubble bubble-bot">🔄 **Monitoreo de Pasturas - Lote: Bajo Grande**
+━━━━━━━━━━━━━━━━━━━━
+📊 *Estado actual:* 🔴 **Ocupado (Sobrepastoreo leve)**
+• *Días de ocupación:* 9 días (límite recomendado: 7 días).
+• *Carga animal:* 180 novillos.
+• *Semáforo de lotes linderos:*
+   - **Corral 2:** 🟢 **Óptimo** (38 días de descanso acumulados, listo para pastoreo).
+   - **Corral 3:** 🟡 **Rebrote** (14 días de descanso, no ingresar).
+
+👉 *Recomendación:* Rotar los animales del lote **Bajo Grande** al lote **Corral 2** hoy mismo para asegurar el correcto descanso de la pastura.</div>
+    </div>
+
+    <!-- MODULO 6 -->
+    <h2>6. 🧮 Formulación de Mixer</h2>
+    <p>
+      <strong>Descripción:</strong> Calculá raciones de materia seca (MS) y ración húmeda diaria en segundos. Seleccioná el tipo de dieta (Feedlot, Suplementación, Pastura) e ingresá peso vivo y cantidad de cabezas para obtener la mezcla justa.
+    </p>
+    <div class="chat-box">
+      <div class="chat-bubble bubble-user">calculame la racion para 150 novillos en feedlot de 320 kg</div>
+      <div class="chat-bubble bubble-bot">🧮 **Formulación de Mixer (Feedlot - Terminación)**
+━━━━━━━━━━━━━━━━━━━━
+👥 *Cabezas:* 150 novillos | ⚖️ *Peso promedio:* 320 kg
+🌿 *Consumo diario total:* 1.344 kg de Materia Seca (MS) / día (2.8% PV).
+
+📊 *Ración húmeda por mezcla para cargar al Mixer:*
+1. 🌽 **Silo de maíz (50% MS):** 1.493 kg húmedos.
+2. 🌾 **Maíz quebrado (30% MS):** 448 kg húmedos.
+3. 🧪 **Harina de soja (15% MS):** 244 kg húmedos.
+4. 🧂 **Premix / Núcleo (5% MS):** 71 kg húmedos.
+
+🚚 *Total mezcla mixer:* **2.256 kg húmedos** por día para el rodeo.</div>
+    </div>
+
+    <!-- MODULO 7 -->
+    <div class="page-break"></div>
+    <h2>7. 📄 Planillas PDF Oficiales</h2>
+    <p>
+      <strong>Descripción:</strong> Exportá fichas de trazabilidad de caravanas e historiales clínicos con formato profesional y firmas homologadas para manga de veterinarios y productores con un solo click.
+    </p>
+    <div class="chat-box">
+      <div class="chat-bubble bubble-user">necesito la planilla de trazabilidad de los terneros para el veterinario</div>
+      <div class="chat-bubble bubble-bot">📄 *AGROHABILIS - EXPORTACIÓN DE PLANILLAS PDF*
+━━━━━━━━━━━━━━━━━━━━
+He preparado el reporte oficial homologado de **Trazabilidad de Caravanas** para tu establecimiento en *Tandil*.
+
+Este documento está certificado con firma de manga autorizada y grilla para anotaciones del SENASA.
+
+🔗 *Descargalo al instante haciendo click acá:*
+[https://agro.habilispro.com/cliente.html](https://agro.habilispro.com/cliente.html)
+
+_(Entrá al portal, andá a la pestaña "Hacienda" y presioná "Exportar Planilla PDF" al lado de la hacienda registrada)._</div>
+    </div>
+
+    <!-- MODULO 8 -->
+    <h2>8. 💹 Precios, Fletes y Arbitraje</h2>
+    <p>
+      <strong>Descripción:</strong> Precios del mercado físico (disponible) y futuros (MATBA/ROFEX). **Calculá fletes en tiempo real ajustados por gasoil y peajes, y compará ofertas locales contra el puerto con nuestra calculadora inteligente de arbitraje.**
+    </p>
+    <div class="chat-box">
+      <div class="chat-bubble bubble-user">tengo 120 tn de soja en silo en Tandil, me conviene vender en Necochea o Bahía Blanca?</div>
+      <div class="chat-bubble bubble-bot">💹 **Calculadora de Arbitraje y Logística Inteligente:**
+━━━━━━━━━━━━━━━━━━━━
+🌾 *Plazas de Destino Analizadas (22-05-2026):*
+
+• **Puerto Bahía Blanca:**
+   - *Precio spot:* $477.972 ARS/tn.
+   - *Costo de flete:* $30.940 ARS/tn (CATAC, peaje incluido).
+   - *Neto en origen:* **$447.032 ARS/tn**.
+
+• **Puerto Necochea (Quequén):**
+   - *Precio spot:* $465.000 ARS/tn.
+   - *Costo de flete:* $18.500 ARS/tn.
+   - *Neto en origen:* **$446.500 ARS/tn**.
+
+👉 *Conclusión:*
+Te conviene despachar a **Bahía Blanca**. A pesar de estar más lejos, la brecha de precio compensa el costo del flete, otorgándote una **ganancia neta extra de +$532/tn** (+$63.840 adicionales netos por las 120 toneladas totales).</div>
+    </div>
+
+    <!-- MODULO 9 -->
+    <div class="page-break"></div>
+    <h2>9. 🌤️ Pronóstico de Precisión</h2>
+    <p>
+      <strong>Descripción:</strong> Clima local ultra-preciso para tu establecimiento. Recibí alertas tempranas de heladas, tormentas o condiciones ideales (viento y humedad) para la aplicación de agroquímicos agrícolas.
+    </p>
+    <div class="chat-box">
+      <div class="chat-bubble bubble-user">se puede fumigar mañana temprano en el lote 5?</div>
+      <div class="chat-bubble bubble-bot">🌤️ **Condiciones de Aplicación Agrícola - Lote 5**
+━━━━━━━━━━━━━━━━━━━━
+📅 *Mañana Temprano (07:00 a 10:00 AM):*
+
+• 🌡️ *Temperatura:* 9°C a 12°C (🟢 Excelente).
+• 💧 *Humedad Relativa:* 72% (🟢 Óptimo, evita evaporación rápida).
+• 💨 *Viento:* Sudoeste a 6 km/h (🟢 Muy bueno, bajo riesgo de deriva).
+
+👉 *Veredicto:* **VENTANA DE APLICACIÓN ÓPTIMA.** Las condiciones meteorológicas son perfectas para pulverización hidráulica de contacto. Se sugiere concretar la labor antes del mediodía, ya que por la tarde se prevén ráfagas superiores a 18 km/h.</div>
+    </div>
+
+    <!-- SECCIÓN 4 -->
+    <div class="page-break"></div>
+    <h1>4. MODELO DE NEGOCIO Y MONETIZACIÓN</h1>
+    
+    <h2>Filosofía Comercial: Unbundled Features (Funciones sin Barreras)</h2>
+    <p>
+      AgroHabilis ha roto con el obsoleto esquema de cobrar "módulos adicionales" (donde la visión artificial o la trazabilidad veterinaria se pagan aparte). Creemos en la <strong>tracción masiva por valor de uso</strong>.
+    </p>
+    
+    <div class="callout">
+      <strong>Métrica de Valor Real:</strong> El <strong>100% de las funciones avanzadas</strong> (clima geolocalizado, trazabilidad SENASA, análisis de fotos de malezas y calculadora financiera de margen) están <strong>desbloqueadas para todos los planes desde el primer día</strong>. El crecimiento y monetización se escalan orgánicamente según la frecuencia de uso del productor, medida en <strong>mensajes semanales procesados</strong>.
+    </div>
+
+    <h2>Portal Web de Clientes Premium</h2>
+    <p>
+      Aquel productor suscrito a planes de pago (Básico en adelante) obtiene acceso exclusivo al <strong>Portal Web de Clientes (<code>cliente.html</code>)</strong>. Este panel de control se sincroniza de forma inmediata con lo que el productor le reporta al bot en el tractor.
+    </p>
+
+    <!-- CUADRO DE FUNCIONAMIENTO 3: MOCK VECTORIAL WEB PANEL -->
+    <div>
+      <h4 style="color: var(--primary); text-transform: uppercase; font-size: 11px; letter-spacing: 1.5px; text-align: center; margin-bottom: 10px;">💻 Vista Previa del Portal de Control Web Premium (cliente.html)</h4>
+      <div class="dashboard-preview">
+        <div class="dash-header">
+          <div class="dash-title">🌾 AgroHabilis — Panel de Campo Profesional</div>
+          <div class="dash-menu">
+            <span class="active">Hacienda</span>
+            <span>Lotes</span>
+            <span>Finanzas</span>
+            <span>Clima &amp; Alertas</span>
+          </div>
+        </div>
+        
+        <div class="dash-grid">
+          <div class="dash-card">
+            <h5>Ganadería (Trazabilidad)</h5>
+            <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px;">
+              <div class="pasture-item">
+                <span>🐂 Caravana **AR-105** (Aberdeen Angus)</span>
+                <span class="pill pill-red">⚠️ Retiro (Hasta 20/06)</span>
+              </div>
+              <div class="pasture-item">
+                <span>🐂 Caravana **AR-108** (Hereford)</span>
+                <span class="pill pill-green">🟢 Liberado (Apto Faena)</span>
+              </div>
+              <div class="pasture-item">
+                <span>🐂 Caravana **AR-112** (Brangus)</span>
+                <span class="pill pill-green">🟢 Liberado (Apto Faena)</span>
+              </div>
+            </div>
+          </div>
+          
+          <div class="dash-card">
+            <h5>Rotación de Pasturas</h5>
+            <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px;">
+              <div class="pasture-item">
+                <span>Lote Corral 2</span>
+                <span class="pill pill-green">🟢 ÓPTIMO</span>
+              </div>
+              <div class="pasture-item">
+                <span>Lote Bajo Grande</span>
+                <span class="pill pill-red">🔴 OCUPADO</span>
+              </div>
+              <div class="pasture-item">
+                <span>Lote Norte (Trigo)</span>
+                <span class="pill pill-yellow">🟡 REBROTE</span>
+              </div>
+            </div>
+          </div>
+          
+          <div class="dash-card">
+            <h5>Márgenes Financieros</h5>
+            <div class="dash-value">$4.890.000 <span style="font-size: 10px; color:#94a3b8;">ARS</span></div>
+            <div class="dash-subvalue">▲ +14.5% Campaña Soja</div>
+            <div style="margin-top: 15px; border-top: 1px solid #1e293b; padding-top: 8px; font-size: 10px; color:#94a3b8;">
+              Gastos Lote Norte: $890.000 ARS
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <h2>Tabla Comparativa de Planes Vigentes</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Característica</th>
+          <th>🆓 PLAN GRATIS</th>
+          <th>🟢 PLAN BÁSICO</th>
+          <th>🟡 PLAN PRO</th>
+          <th>🔥 PLAN PRO MAX</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Precio Mensual</strong></td>
+          <td>$0 ARS</td>
+          <td>$9.000 ARS</td>
+          <td>$18.000 ARS</td>
+          <td>$50.000 ARS</td>
+        </tr>
+        <tr>
+          <td><strong>Cupo de Mensajes</strong></td>
+          <td>15 msjs / sem</td>
+          <td>50 msjs / sem</td>
+          <td>150 msjs / sem</td>
+          <td><strong>Ilimitado</strong></td>
+        </tr>
+        <tr>
+          <td><strong>Establecimientos / Zonas</strong></td>
+          <td>Hasta 1 zona</td>
+          <td>Hasta 3 zonas</td>
+          <td>Hasta 6 zonas</td>
+          <td><strong>Ilimitadas</strong></td>
+        </tr>
+        <tr>
+          <td><strong>Portal Web Premium</strong></td>
+          <td>No disponible</td>
+          <td><strong>Acceso Completo</strong></td>
+          <td><strong>Acceso Completo</strong></td>
+          <td><strong>Acceso Completo</strong></td>
+        </tr>
+        <tr>
+          <td><strong>Exportación PDF/Excel</strong></td>
+          <td>No disponible</td>
+          <td>No disponible</td>
+          <td><strong>Incluido</strong></td>
+          <td><strong>Incluido</strong></td>
+        </tr>
+        <tr>
+          <td><strong>Soporte Técnico</strong></td>
+          <td>Por comunidad</td>
+          <td>Estándar</td>
+          <td>Estándar</td>
+          <td><strong>Prioritario 24/7</strong></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- SECCIÓN 5 -->
+    <div class="page-break"></div>
+    <h1>5. ROADMAP Y ESCALABILIDAD (Hacia dónde vamos)</h1>
+    
+    <h2>Migración Nativa a la API Oficial de Meta</h2>
+    <p>
+      AgroHabilis fue concebido desde sus bases arquitectónicas para transicionar suavemente a la escala corporativa masiva. Toda la lógica del backend y los enrutadores de chat están <strong>completamente aislados y desacoplados del canal físico de mensajería</strong> gracias a una robusta capa de abstracción contenida en <code>whatsappService.js</code>.
+    </p>
+    <p>
+      Actualmente, el sistema interactúa mediante la emulación de socket en <code>whatsapp-web.js</code> para acelerar el desarrollo rápido de funcionalidades complejas y validar el modelo de negocios sin trabas burocráticas de Meta. Cuando la base de usuarios crezca, cambiar a la API Oficial será inmediato y no requerirá tocar una sola línea de código del pipeline central.
+    </p>
+
+    <h2>Beneficios Corporativos de la WhatsApp Business API Oficial:</h2>
+    <ul>
+      <li><strong>Riesgo Cero de Baneo:</strong> Operación certificada con servidores dedicados homologados por Meta, garantizando una disponibilidad del sistema del <strong>99.9%</strong>.</li>
+      <li><strong>Identidad de Marca Confiable (Display Name):</strong> Desaparición del número de teléfono suelto en el celular del productor. La pantalla de WhatsApp mostrará directamente el nombre de la empresa <strong>"AgroHabilis"</strong> acompañado de la <strong>insignia verde de verificación</strong>.</li>
+      <li><strong>Interacciones Premium con Botones:</strong> Implementación nativa de listas interactivas desplegables, botones de acción rápida ("Confirmar", "Registrar Gasto", "Ver Clima") y flujos integrados de selección de lotes directamente en la UI del chat de WhatsApp.</li>
+      <li><strong>Notificaciones Masivas Automatizadas (Webhooks):</strong> Envío masivo automatizado y de bajísimo costo de reportes matutinos personalizados con el pronóstico del clima y precios de apertura de mercados a las 06:30 AM a todos los suscriptores activos.</li>
+    </ul>
+
+    <hr style="border: none; border-top: 1px solid #cbd5e1; margin: 50px 0 20px 0;">
+    <div style="text-align: center; font-size: 12px; color: #64748b;">
+      AgroHabilis — El Cerebro del Lote. Todos los derechos reservados. 2026.
+    </div>
+
+  </div>
+
+</body>
+</html>

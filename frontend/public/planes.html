@@ -1,0 +1,530 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AgroHabilis - Planes & Límites Admin</title>
+    <style>
+      :root {
+        --bg: #07090e;
+        --bg-soft: #0d121f;
+        --panel: #111726;
+        --panel-soft: #192239;
+        --text: #f1f5f9;
+        --muted: #64748b;
+        --accent: #10b981;
+        --accent-soft: rgba(16, 185, 129, 0.12);
+        --line: rgba(255, 255, 255, 0.06);
+        --shadow: 0 20px 40px rgba(0, 0, 0, 0.55);
+        --success: #10b981;
+        --success-bg: rgba(16, 185, 129, 0.12);
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: Inter, Segoe UI, Arial, sans-serif;
+        font-size: 15px;
+        background: radial-gradient(1000px 500px at 15% 0%, rgba(16, 185, 129, 0.08), transparent 50%), var(--bg);
+        color: var(--text);
+        padding: 24px 24px 24px 276px;
+      }
+      .topbar {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        margin-bottom: 16px;
+        flex-wrap: wrap;
+      }
+      .nav {
+        position: fixed;
+        left: 18px;
+        top: 18px;
+        width: 230px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 16px;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background: var(--bg-soft);
+        box-shadow: var(--shadow);
+        margin-bottom: 14px;
+      }
+      .nav .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 10px 16px;
+        border-bottom: 1px solid var(--line);
+        margin-bottom: 8px;
+        font-weight: 800;
+        color: var(--text);
+      }
+      .brand-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        background: var(--accent);
+        box-shadow: 0 0 10px var(--accent);
+      }
+      .nav a {
+        text-decoration: none;
+        padding: 9px 12px;
+        border-radius: 10px;
+        border: 1px solid transparent;
+        color: var(--muted);
+        background: transparent;
+        font-size: 13px;
+        font-weight: 600;
+        width: 100%;
+        transition: all 0.2s ease;
+      }
+      .nav a.active {
+        background: var(--accent-soft);
+        border-color: rgba(16, 185, 129, 0.25);
+        color: var(--accent);
+        font-weight: 700;
+      }
+      .nav a:hover:not(.active) {
+        background: var(--panel-soft);
+        color: var(--text);
+        transform: translateX(3px);
+      }
+      .card {
+        background: linear-gradient(170deg, var(--panel) 0%, rgba(17, 23, 38, 0.8) 100%);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 20px;
+        margin-bottom: 16px;
+        box-shadow: var(--shadow);
+        position: relative;
+      }
+      .kpis {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+      .kpi {
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 16px;
+        background: var(--panel-soft);
+        transition: all 0.3s ease;
+      }
+      .kpi:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow);
+      }
+      .kpi.active-kpi {
+        border-left: 5px solid var(--accent);
+      }
+      .kpi .v {
+        font-size: 26px;
+        font-weight: 800;
+        margin-top: 6px;
+        color: var(--text);
+      }
+      .kpi .limit-tag {
+        font-size: 11px;
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 99px;
+        background: var(--bg-soft);
+        color: var(--accent);
+        font-weight: 700;
+        margin-top: 6px;
+        border: 1px solid var(--line);
+      }
+      .kpi .limit-title {
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 600;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 8px;
+      }
+      th, td {
+        border-bottom: 1px solid var(--line);
+        padding: 12px 10px;
+        text-align: left;
+        font-size: 14px;
+      }
+      th {
+        color: var(--muted);
+        font-weight: 700;
+        background: rgba(15, 21, 36, 0.9);
+      }
+      .chip {
+        display: inline-block;
+        padding: 3px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: var(--panel-soft);
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--text);
+      }
+      .chip.gratis { border-color: #64748b; background: rgba(100, 116, 139, 0.15); color: #94a3b8; }
+      .chip.basico { border-color: #3b82f6; background: rgba(59, 130, 246, 0.15); color: #93c5fd; }
+      .chip.pro { border-color: #10b981; background: rgba(16, 185, 129, 0.15); color: #34d399; }
+      .chip.pro_max { border-color: #f43f5e; background: rgba(244, 63, 94, 0.15); color: #fda4af; }
+
+      .btn {
+        text-decoration: none;
+        padding: 10px 18px;
+        border-radius: 10px;
+        font-weight: 700;
+        border: none;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        font-size: 13px;
+      }
+      .btn.primary {
+        background: linear-gradient(180deg, var(--accent), #1f66c9);
+        color: #fff;
+        box-shadow: 0 4px 12px rgba(47, 139, 255, 0.2);
+      }
+      .btn.primary:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 16px rgba(47, 139, 255, 0.3);
+      }
+      .btn.secondary {
+        background: #fff;
+        border: 1px solid #cfddfa;
+        color: #38507b;
+      }
+      .btn.secondary:hover {
+        background: var(--bg-soft);
+      }
+      
+      .edit-box {
+        display: none;
+        border: 1px solid var(--accent);
+        border-radius: 16px;
+        padding: 20px;
+        background: linear-gradient(180deg, #fff, #f8faff);
+        box-shadow: 0 8px 30px rgba(47, 139, 255, 0.08);
+        margin-top: 16px;
+        animation: slideDown 0.3s ease-out;
+      }
+      @keyframes slideDown {
+        from { opacity: 0; transform: translateY(-10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .form-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 12px;
+        margin-bottom: 14px;
+      }
+      .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .form-group label {
+        font-size: 12px;
+        font-weight: 700;
+        color: #1e3b6e;
+      }
+      input, select {
+        padding: 11px 13px;
+        border-radius: 10px;
+        border: 1px solid #cfddfa;
+        background: #fff;
+        color: #24395f;
+        font-size: 14px;
+        transition: all 0.2s ease;
+      }
+      input:focus {
+        border-color: var(--accent);
+        outline: none;
+        box-shadow: 0 0 0 3px var(--accent-soft);
+      }
+      .toast {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background: var(--success-bg);
+        border: 1px solid #a7f3d0;
+        color: var(--success);
+        padding: 12px 20px;
+        border-radius: 12px;
+        box-shadow: var(--shadow);
+        font-weight: 700;
+        display: none;
+        animation: popUp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        z-index: 9999;
+      }
+      @keyframes popUp {
+        from { transform: scale(0.8) translateY(20px); opacity: 0; }
+        to { transform: scale(1) translateY(0); opacity: 1; }
+      }
+      .page-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 14px;
+      }
+      .crumb { color: var(--muted); font-size: 13px; }
+
+      @media (max-width: 1100px) {
+        body { padding: 16px; }
+        .nav { position: static; width: auto; flex-direction: row; flex-wrap: wrap; }
+      }
+      @media (max-width: 760px) {
+        body { padding: 12px; font-size: 14px; }
+        .card { padding: 12px; border-radius: 12px; }
+        .topbar > * { width: 100%; }
+        .nav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; padding: 10px; border-radius: 12px; }
+        .nav .brand { grid-column: 1 / -1; }
+        .nav a { width: 100%; text-align: center; padding: 8px 10px; font-size: 12px; }
+        .form-grid { grid-template-columns: 1fr; }
+        table { display: block; overflow-x: auto; white-space: nowrap; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="topbar">
+      <h1 style="margin:0;">Límites de Planes</h1>
+      <button id="btnReload" class="btn primary">Actualizar Datos</button>
+    </div>
+    
+    <div class="nav">
+      <div class="brand"><span class="brand-dot"></span><span>AgroHabilis Admin</span></div>
+      <a href="/dashboard/admin">🏠 Dashboard</a>
+      <a href="/dashboard/metricas">📊 Métricas</a>
+      <a href="/dashboard/precios">💹 Precios</a>
+      <a href="/dashboard/usuarios">👥 Usuarios</a>
+      <a href="/dashboard/campanas">🚀 Campañas</a>
+      <a href="/dashboard/planes" class="active">🤖 Planes</a>
+      <a href="/dashboard/ia">🧠 IA & Gemini</a>
+      <a href="/dashboard/comandos">⌨️ Comandos</a>
+      <a href="/dashboard/templates">🧩 Templates</a>
+      <a href="/dashboard/cliente">🙍 Cliente</a>
+    </div>
+
+    <div class="page-head">
+      <div>
+        <div class="crumb">Administración / Planes & Límites</div>
+        <h3 style="margin:2px 0 0;">Configuración de Precios y Límites Semanales</h3>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin:0 0 6px 0; color: #1e3b6e;">¿Qué cambió en la versión 2.0?</h3>
+      <p style="margin:0 0 14px 0; font-size:14px; color: var(--muted); line-height: 1.6;">
+        Ahora todos los planes acceden a **exactamente lo mismo** (módulos de Alertas, Finanzas, Resúmenes Diarios/Semanales, etc.). 
+        Lo que diferencia a cada plan es el límite semanal de mensajes de audio, fotos e interacciones generales con el Agente IA.
+      </p>
+      
+      <div class="kpis" id="planKpis">
+        <!-- Rendered dynamically -->
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin:0 0 10px 0; color: #1e3b6e;">Gestión de Planes</h3>
+      <p class="muted" style="margin:0 0 14px 0; font-size:13px;">
+        Hacé clic en cualquier plan para editar sus precios y capacidades máximas semanales. Ingresá -1 para límites ilimitados.
+      </p>
+      
+      <table>
+        <thead>
+          <tr>
+            <th>Plan</th>
+            <th>Precio (ARS)</th>
+            <th>Límite Audios / Sem.</th>
+            <th>Límite Fotos / Sem.</th>
+            <th>Límite Consultas / Sem.</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="planesTableBody">
+          <tr>
+            <td colspan="6" class="muted">Cargando datos...</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- Edit Section -->
+      <div class="edit-box" id="editBox">
+        <h4 id="editTitle" style="margin: 0 0 14px 0; color: var(--accent); font-size: 16px; font-weight: 800;">Editar Plan</h4>
+        <form id="editForm">
+          <input type="hidden" id="planNombreInput" />
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="precioInput">Precio Mensual (ARS)</label>
+              <input type="number" id="precioInput" min="0" required />
+            </div>
+            <div class="form-group">
+              <label for="audiosInput">Audios Semanales (-1 = Ilimitado)</label>
+              <input type="number" id="audiosInput" min="-1" required />
+            </div>
+            <div class="form-group">
+              <label for="fotosInput">Fotos Semanales (-1 = Ilimitado)</label>
+              <input type="number" id="fotosInput" min="-1" required />
+            </div>
+            <div class="form-group">
+              <label for="consultasInput">Consultas Agente Semanales (-1 = Ilimitado)</label>
+              <input type="number" id="consultasInput" min="-1" required />
+            </div>
+          </div>
+          <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px;">
+            <button type="button" class="btn secondary" onclick="closeEdit()">Cancelar</button>
+            <button type="submit" class="btn primary">Guardar Cambios</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Success Toast -->
+    <div class="toast" id="toast">
+      ¡Límites actualizados correctamente!
+    </div>
+
+    <script>
+      const state = { planes: [] };
+      const $ = (id) => document.getElementById(id);
+      
+      const planLabels = {
+        gratis: "Gratis",
+        basico: "Básico",
+        pro: "Pro",
+        pro_max: "Pro Max"
+      };
+
+      const planChips = {
+        gratis: "chip gratis",
+        basico: "chip basico",
+        pro: "chip pro",
+        pro_max: "chip pro_max"
+      };
+
+      function formatLimit(val) {
+        return val === -1 ? "∞ Ilimitado" : `${val} / semana`;
+      }
+
+      function formatPrice(val) {
+        return val === 0 ? "Gratis" : `$ ${Number(val).toLocaleString("es-AR")}`;
+      }
+
+      async function fetchPlanes() {
+        try {
+          const r = await fetch("/api/dashboard/admin/planes", { credentials: "same-origin" });
+          const d = await r.json();
+          if (!d.ok) throw new Error(d.error || "Fallo consulta");
+          state.planes = d.data || [];
+          render();
+        } catch (err) {
+          alert("Error cargando planes: " + err.message);
+        }
+      }
+
+      function render() {
+        // Render KPIs
+        const kpisHtml = state.planes.map(p => {
+          const label = planLabels[p.plan_nombre] || p.plan_nombre;
+          return `
+            <div class="kpi active-kpi">
+              <div class="limit-title">${label.toUpperCase()}</div>
+              <div class="v">${formatPrice(p.precio)}</div>
+              <div class="limit-tag">Audios: ${p.limite_audios_semanal === -1 ? "∞" : p.limite_audios_semanal}</div>
+              <div class="limit-tag">Fotos: ${p.limite_fotos_semanal === -1 ? "∞" : p.limite_fotos_semanal}</div>
+              <div class="limit-tag">Agente: ${p.limite_consultas_semanal === -1 ? "∞" : p.limite_consultas_semanal}</div>
+            </div>
+          `;
+        }).join("");
+        $("planKpis").innerHTML = kpisHtml || `<div class="muted">Sin planes configurados.</div>`;
+
+        // Render Table Body
+        const tableHtml = state.planes.map(p => {
+          const chipClass = planChips[p.plan_nombre] || "chip";
+          const label = planLabels[p.plan_nombre] || p.plan_nombre;
+          return `
+            <tr style="cursor: pointer;" onclick="openEdit('${p.plan_nombre}')">
+              <td><span class="${chipClass}">${label}</span></td>
+              <td><strong>${formatPrice(p.precio)}</strong></td>
+              <td>${formatLimit(p.limite_audios_semanal)}</td>
+              <td>${formatLimit(p.limite_fotos_semanal)}</td>
+              <td>${formatLimit(p.limite_consultas_semanal)}</td>
+              <td>
+                <button class="btn secondary" style="padding: 6px 12px; font-size: 12px;" onclick="event.stopPropagation(); openEdit('${p.plan_nombre}')">Editar</button>
+              </td>
+            </tr>
+          `;
+        }).join("");
+        $("planesTableBody").innerHTML = tableHtml || `<tr><td colspan="6" class="muted">Sin datos.</td></tr>`;
+      }
+
+      function openEdit(planNombre) {
+        const p = state.planes.find(x => x.plan_nombre === planNombre);
+        if (!p) return;
+        
+        $("planNombreInput").value = p.plan_nombre;
+        $("precioInput").value = p.precio;
+        $("audiosInput").value = p.limite_audios_semanal;
+        $("fotosInput").value = p.limite_fotos_semanal;
+        $("consultasInput").value = p.limite_consultas_semanal;
+        
+        const label = planLabels[p.plan_nombre] || p.plan_nombre;
+        $("editTitle").textContent = `Editar Plan ${label}`;
+        $("editBox").style.display = "block";
+        $("editBox").scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+
+      function closeEdit() {
+        $("editBox").style.display = "none";
+      }
+
+      $("editForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const plan_nombre = $("planNombreInput").value;
+        const precio = Number($("precioInput").value);
+        const limite_audios_semanal = Number($("audiosInput").value);
+        const limite_fotos_semanal = Number($("fotosInput").value);
+        const limite_consultas_semanal = Number($("consultasInput").value);
+
+        try {
+          const r = await fetch("/api/dashboard/admin/planes/update", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              plan_nombre,
+              precio,
+              limite_audios_semanal,
+              limite_fotos_semanal,
+              limite_consultas_semanal
+            }),
+            credentials: "same-origin"
+          });
+          const d = await r.json();
+          if (!d.ok) throw new Error(d.error || "Fallo guardado");
+          
+          closeEdit();
+          showToast();
+          await fetchPlanes();
+        } catch (err) {
+          alert("Error al guardar cambios: " + err.message);
+        }
+      });
+
+      function showToast() {
+        const t = $("toast");
+        t.style.display = "block";
+        setTimeout(() => {
+          t.style.display = "none";
+        }, 3000);
+      }
+
+      $("btnReload").addEventListener("click", fetchPlanes);
+
+      // Initial load
+      fetchPlanes().catch(console.error);
+    </script>
+  </body>
+</html>

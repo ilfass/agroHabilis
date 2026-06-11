@@ -1,0 +1,1080 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Playbook de AgroHabilis | Guía Completa de Herramientas Inteligentes</title>
+    <meta
+      name="description"
+      content="Explorá todas las herramientas de AgroHabilis con ejemplos interactivos de WhatsApp. Calculá fletes, raciones y rotación de pasturas en vivo."
+    />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    
+    <style>
+      :root {
+        --primary: #15803d; /* Emerald 700 */
+        --primary-hover: #166534; /* Emerald 800 */
+        --primary-light: #f0fdf4; /* Emerald 50 */
+        --accent: #d97706; /* Amber 600 */
+        --accent-light: #fef3c7; /* Amber 100 */
+        --whatsapp: #25d366;
+        --dark: #0f172a; /* Slate 900 */
+        --text: #334155; /* Slate 700 */
+        --muted: #64748b; /* Slate 500 */
+        --bg: #f8fafc; /* Slate 50 */
+        --card: #ffffff;
+        --line: #e2e8f0; /* Slate 200 */
+        --shadow: 0 20px 40px -15px rgba(15, 23, 42, 0.06);
+        --radius-lg: 24px;
+        --radius-md: 16px;
+      }
+      
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      
+      body {
+        font-family: "Plus Jakarta Sans", sans-serif;
+        background-color: var(--bg);
+        color: var(--text);
+        line-height: 1.6;
+        overflow-x: hidden;
+      }
+
+      h1, h2, h3, h4 {
+        font-family: "Outfit", sans-serif;
+        color: var(--dark);
+        font-weight: 800;
+        line-height: 1.15;
+      }
+      
+      .container {
+        width: min(1200px, 92%);
+        margin: 0 auto;
+      }
+
+      /* Navbar */
+      header {
+        background: rgba(255, 255, 255, 0.8);
+        backdrop-filter: blur(12px);
+        border-bottom: 1px solid var(--line);
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        padding: 16px 0;
+      }
+
+      .nav-container {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .logo {
+        font-size: 22px;
+        font-weight: 900;
+        color: var(--primary);
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .nav-links {
+        display: flex;
+        gap: 24px;
+        align-items: center;
+      }
+
+      .nav-link {
+        color: var(--text);
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 14px;
+        transition: color 0.2s;
+      }
+
+      .nav-link:hover {
+        color: var(--primary);
+      }
+
+      .btn-nav {
+        background-color: var(--primary);
+        color: white;
+        padding: 10px 20px;
+        border-radius: 999px;
+        font-weight: 700;
+        text-decoration: none;
+        font-size: 14px;
+        transition: background-color 0.2s;
+      }
+
+      .btn-nav:hover {
+        background-color: var(--primary-hover);
+      }
+
+      /* Hero Section */
+      .hero {
+        background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
+        padding: 80px 0 60px 0;
+        border-bottom: 1px solid var(--line);
+        text-align: center;
+      }
+
+      .hero h1 {
+        font-size: clamp(32px, 5vw, 48px);
+        margin-bottom: 16px;
+      }
+
+      .hero p {
+        font-size: clamp(16px, 2vw, 18px);
+        color: var(--muted);
+        max-width: 700px;
+        margin: 0 auto 30px auto;
+      }
+
+      /* Category Tab Switcher */
+      .tabs {
+        display: flex;
+        justify-content: center;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin: -25px auto 40px auto;
+        position: relative;
+        z-index: 10;
+        max-width: 900px;
+      }
+
+      .tab-btn {
+        background: white;
+        border: 1px solid var(--line);
+        padding: 12px 24px;
+        border-radius: 999px;
+        font-family: "Outfit", sans-serif;
+        font-weight: 700;
+        color: var(--text);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      .tab-btn:hover {
+        border-color: var(--primary);
+        color: var(--primary);
+        transform: translateY(-2px);
+      }
+
+      .tab-btn.active {
+        background-color: var(--primary);
+        color: white;
+        border-color: var(--primary);
+        box-shadow: 0 10px 15px -3px rgba(21, 128, 61, 0.25);
+      }
+
+      /* Feature Section Layout */
+      .feature-section {
+        display: none;
+        animation: fadeIn 0.4s ease forwards;
+      }
+
+      .feature-section.active {
+        display: block;
+      }
+
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(15px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+
+      /* Split Layout (Chat vs Interactive Widget) */
+      .split-layout {
+        display: grid;
+        grid-template-columns: 1.1fr 0.9fr;
+        gap: 40px;
+        margin-bottom: 60px;
+      }
+
+      @media (max-width: 900px) {
+        .split-layout {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .card-info {
+        background: white;
+        border-radius: var(--radius-lg);
+        padding: 36px;
+        border: 1px solid var(--line);
+        box-shadow: var(--shadow);
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+      }
+
+      .feature-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+        color: var(--accent);
+        background: rgba(217, 119, 6, 0.1);
+        padding: 6px 14px;
+        border-radius: 999px;
+        align-self: flex-start;
+        margin-bottom: 16px;
+      }
+
+      .card-info h2 {
+        font-size: 28px;
+        margin-bottom: 12px;
+      }
+
+      .card-info p {
+        color: var(--text);
+        margin-bottom: 24px;
+      }
+
+      /* WhatsApp Chat Box Simulator */
+      .chat-box {
+        background-color: #efeae2; /* Official WA light background */
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--line);
+        padding: 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        box-shadow: var(--shadow);
+        max-height: 550px;
+        overflow-y: auto;
+      }
+
+      .chat-bubble {
+        max-width: 85%;
+        padding: 12px 16px;
+        border-radius: 12px;
+        font-size: 14px;
+        position: relative;
+        line-height: 1.5;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+      }
+
+      .bubble-user {
+        background-color: #d9fdd3; /* Official green user bubble */
+        align-self: flex-end;
+        border-top-right-radius: 0;
+      }
+
+      .bubble-bot {
+        background-color: white;
+        align-self: flex-start;
+        border-top-left-radius: 0;
+        font-family: 'Courier New', Courier, monospace;
+        white-space: pre-wrap;
+      }
+
+      .bubble-audio {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        background-color: #d9fdd3;
+        align-self: flex-end;
+        border-top-right-radius: 0;
+        padding: 14px 18px;
+      }
+
+      .audio-icon {
+        font-size: 22px;
+        animation: pulse 1.5s infinite;
+      }
+
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+      }
+
+      /* Copy Button */
+      .copy-btn {
+        background-color: var(--primary-light);
+        border: 1px dashed var(--primary);
+        color: var(--primary);
+        padding: 8px 16px;
+        border-radius: 8px;
+        font-family: "Outfit", sans-serif;
+        font-weight: 700;
+        font-size: 13px;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 10px;
+        align-self: flex-end;
+      }
+
+      .copy-btn:hover {
+        background-color: var(--primary);
+        color: white;
+      }
+
+      /* Interactive Play Ground Widgets */
+      .interactive-widget {
+        background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); /* Sleek premium dark card */
+        border-radius: var(--radius-lg);
+        padding: 32px;
+        color: white;
+        box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.4);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .interactive-widget h3 {
+        color: white;
+        margin-bottom: 8px;
+        font-size: 20px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .interactive-widget p.subtitle {
+        color: rgba(255,255,255,0.6);
+        font-size: 13px;
+        margin-bottom: 24px;
+      }
+
+      .form-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+        margin-bottom: 20px;
+      }
+
+      @media (max-width: 480px) {
+        .form-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .form-group label {
+        font-size: 12px;
+        font-weight: 700;
+        color: rgba(255,255,255,0.8);
+        text-transform: uppercase;
+      }
+
+      .form-group input, .form-group select {
+        background: rgba(255,255,255,0.07);
+        border: 1px solid rgba(255,255,255,0.15);
+        border-radius: 8px;
+        padding: 10px 14px;
+        color: white;
+        font-family: inherit;
+        font-size: 14px;
+        outline: none;
+        transition: border-color 0.2s;
+      }
+
+      .form-group input:focus, .form-group select:focus {
+        border-color: var(--primary);
+      }
+
+      .form-group select option {
+        background-color: #0f172a;
+        color: white;
+      }
+
+      .widget-btn {
+        width: 100%;
+        background-color: var(--primary);
+        color: white;
+        border: none;
+        padding: 12px;
+        border-radius: 8px;
+        font-family: "Outfit", sans-serif;
+        font-weight: 700;
+        cursor: pointer;
+        font-size: 14px;
+        transition: background-color 0.2s;
+        margin-bottom: 20px;
+      }
+
+      .widget-btn:hover {
+        background-color: var(--primary-hover);
+      }
+
+      .result-box {
+        background: rgba(255,255,255,0.05);
+        border-radius: 12px;
+        padding: 18px;
+        border: 1px solid rgba(255,255,255,0.1);
+        font-size: 13px;
+        line-height: 1.5;
+      }
+
+      /* Pasture Rotator Semáforos */
+      .pasture-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .pasture-bar {
+        background: rgba(255,255,255,0.05);
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 10px;
+        padding: 12px 16px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        transition: transform 0.2s;
+      }
+
+      .pasture-bar:hover {
+        transform: translateX(4px);
+      }
+
+      .pasture-info {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .pasture-name {
+        font-weight: 700;
+        font-size: 14px;
+      }
+
+      .pasture-spec {
+        font-size: 11px;
+        color: rgba(255,255,255,0.5);
+      }
+
+      .pasture-status {
+        font-size: 12px;
+        font-weight: 700;
+        padding: 4px 10px;
+        border-radius: 999px;
+      }
+
+      .status-green { background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); }
+      .status-yellow { background: rgba(234, 179, 8, 0.2); color: #facc15; border: 1px solid rgba(234, 179, 8, 0.3); }
+      .status-red { background: rgba(239, 68, 68, 0.2); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.3); }
+
+      /* Footer */
+      footer {
+        background-color: var(--dark);
+        color: white;
+        padding: 60px 0 30px 0;
+        margin-top: 80px;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .footer-container {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 30px;
+        margin-bottom: 40px;
+      }
+
+      @media (max-width: 600px) {
+        .footer-container {
+          flex-direction: column;
+          text-align: center;
+        }
+      }
+
+      .footer-logo {
+        font-size: 24px;
+        font-weight: 900;
+        color: white;
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .footer-copy {
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.4);
+        text-align: center;
+        border-top: 1px solid rgba(255, 255, 255, 0.05);
+        padding-top: 30px;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Navbar -->
+    <header>
+      <div class="container nav-container">
+        <a href="index.html" class="logo">
+          🌾 AgroHabilis
+        </a>
+        <nav class="nav-links">
+          <a href="index.html" class="nav-link">Inicio</a>
+          <a href="cliente.html" class="nav-link">Panel Cliente</a>
+          <a href="cliente-login.html" class="btn-nav">Acceso Socio</a>
+        </nav>
+      </div>
+    </header>
+
+    <!-- Hero -->
+    <section class="hero">
+      <div class="container">
+        <h1>Playbook de AgroHabilis</h1>
+        <p>Conocé todas las herramientas premium del consultor conversacional número uno del campo argentino con simuladores y calculadoras interactivas en tiempo real.</p>
+      </div>
+    </    <!-- Interactive Tab Switcher -->
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="sanidad" onclick="switchTab('sanidad')">🩺 Sanidad y Carencia</button>
+      <button class="tab-btn" data-tab="labores" onclick="switchTab('labores')">🚜 Agricultura y Labores</button>
+      <button class="tab-btn" data-tab="fletes" onclick="switchTab('fletes')">🚚 Logística y Fletes</button>
+      <button class="tab-btn" data-tab="raciones" onclick="switchTab('raciones')">🧮 Dieta y Raciones</button>
+      <button class="tab-btn" data-tab="pasturas" onclick="switchTab('pasturas')">🌿 Rotación de Pasturas</button>
+      <button class="tab-btn" data-tab="mercados" onclick="switchTab('mercados')">📊 Precios y Alertas</button>
+    </div>
+
+    <!-- Multimodal Alert Banner -->
+    <div class="container" style="margin-top: 10px; margin-bottom: 40px;">
+      <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: var(--radius-md); padding: 24px; color: white; display: flex; align-items: center; gap: 20px; box-shadow: var(--shadow); position: relative; overflow: hidden;">
+        <div style="font-size: 40px; line-height: 1;">🎙️</div>
+        <div>
+          <h3 style="color: white; font-size: 18px; margin-bottom: 4px;">🚀 ¡AgroHabilis es 100% Multimodal!</h3>
+          <p style="color: rgba(255,255,255,0.9); font-size: 14px; line-height: 1.4;">
+            No pierdas tiempo escribiendo en la cabina. Podés mandarle <b>mensajes de audio</b> directamente desde el tractor o la manga, <b>fotos</b> de tus planillas de remates, animales con síntomas o silo-bolsas, e incluso <b>videos</b> recorriendo lotes para diagnósticos por imagen en segundos.
+          </p>
+        </div>
+        <div style="position: absolute; right: -20px; bottom: -20px; font-size: 120px; opacity: 0.1; pointer-events: none;">📱</div>
+      </div>
+    </div>
+
+    <!-- MAIN SECTIONS -->
+    <main class="container">
+
+      <!-- 1. SANIDAD Y CARENCIA -->
+      <section id="sec-sanidad" class="feature-section active">
+        <div class="split-layout">
+          <div class="card-info">
+            <div>
+              <span class="feature-badge">Sanidad Animal</span>
+              <h2>Trazabilidad Veterinaria y Períodos de Carencia</h2>
+              <p>Evitá multas del SENASA y protegé tus ventas ganaderas. AgroHabilis detecta automáticamente la aplicación de fármacos clínicos, calcula el período de carencia reglamentario (cómputo de retiro de faena) y te alerta de inmediato en WhatsApp.</p>
+              
+              <h4 style="margin-bottom: 8px;">🔑 Conceptos clave a probar:</h4>
+              <ul style="margin-left: 20px; margin-bottom: 24px; font-size: 14px; display: flex; flex-direction: column; gap: 6px;">
+                <li>Registro individual por caravana visual o RFID.</li>
+                <li>Detección inteligente de antibióticos, antiparasitarios y vacunas.</li>
+                <li>Generación de alertas del periodo de resguardo antes del despacho.</li>
+              </ul>
+            </div>
+            
+            <div style="display: flex; flex-direction: column;">
+              <span style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Copiar atajo para el chat:</span>
+              <button class="copy-btn" onclick="copyPrompt('tengo 1 ternero caravana AR-105 de raza Aberdeen Angus tratado con antibiotico por neumonia')">
+                📋 Copiar prompt de ejemplo
+              </button>
+            </div>
+          </div>
+
+          <div class="chat-box">
+            <div class="chat-bubble bubble-audio">
+              <span class="audio-icon">🎤</span>
+              <span><i>Mensaje de audio (0:15) - "Registrame una neumonía para el ternero caravana AR-105 y que le apliqué un antibiótico de retiro..."</i></span>
+            </div>
+            <div class="chat-bubble bubble-bot">✅ *Observación registrada* para la caravana **AR‑105**:
+> “Tratado con antibiótico por neumonía”
+
+Si confirmás, guardo el movimiento sanitario en el inventario.</div>
+            <div class="chat-bubble bubble-user">SI</div>
+            <div class="chat-bubble bubble-bot">✅ *Listo, guardado en inventario.*
+_cabezas: Δ 0 cab_
+_📍 Corral Central_
+_📅 21/05/2026_
+
+🛡️ *Período de Carencia (SENASA):*
+• *Caravana AR-105*: ⚠️ *Retiro/Carencia hasta 20/06/2026* (Antibiótico / Terapia antimicrobiana estándar (30 días de carencia obligatoria según SENASA)).
+❌ _Prohibida su venta a faena hasta cumplir el plazo._</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 1.5. AGRICULTURA Y LABORES -->
+      <section id="sec-labores" class="feature-section">
+        <div class="split-layout">
+          <div class="card-info">
+            <div>
+              <span class="feature-badge">Agricultura de Precisión</span>
+              <h2>Siembras, Aplicaciones de Fertilizantes y Cosechas</h2>
+              <p>Llevá un registro integral de las labores agrícolas en cada lote. AgroHabilis procesa tus reportes de siembra, pulverizaciones, dosificación de nutrientes (fertilización) y pesajes de cosecha en tiempo real directamente desde tu celular.</p>
+              
+              <h4 style="margin-bottom: 8px;">🔑 Conceptos clave a probar:</h4>
+              <ul style="margin-left: 20px; margin-bottom: 24px; font-size: 14px; display: flex; flex-direction: column; gap: 6px;">
+                <li>Registro de siembras con densidad de plantas y rinde esperado.</li>
+                <li>Aplicación de insumos y dosis (ej. Urea, Superfosfato, Glifosato).</li>
+                <li>Reporte de cosecha con toneladas y porcentajes de humedad.</li>
+              </ul>
+            </div>
+            
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+              <span style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Copiar atajos para el chat:</span>
+              <button class="copy-btn" onclick="copyPrompt('registra aplicacion de 120 kg/ha de urea en el Lote Norte para el trigo')">
+                📋 Copiar ejemplo: Fertilización
+              </button>
+              <button class="copy-btn" onclick="copyPrompt('registra cosecha de 150 toneladas de soja a 13.5% de humedad en el Lote 5')">
+                📋 Copiar ejemplo: Cosecha
+              </button>
+            </div>
+          </div>
+
+          <div class="chat-box">
+            <div class="chat-bubble bubble-audio">
+              <span class="audio-icon">🎤</span>
+              <span><i>Audio de voz (0:12) - "Hola bot, terminamos de fertilizar el Lote Norte de trigo, le pasamos 120 kilos por hectárea de urea..."</i></span>
+            </div>
+            <div class="chat-bubble bubble-bot">✅ *Aplicación de Fertilizante detectada:*
+━━━━━━━━━━━━━━━━━━━━
+📍 *Lote:* Lote Norte (Trigo)
+🌱 *Labor:* Fertilización
+🧪 *Insumo:* Urea
+⚖️ *Dosis:* 120 kg/ha
+
+¿Confirmás el registro de este insumo en el historial?</div>
+            <div class="chat-bubble bubble-user">SI</div>
+            <div class="chat-bubble bubble-bot">✅ *Listo, labor registrada en el historial del Lote Norte.*
+_Urea: -120 kg/ha_
+_📅 21/05/2026_
+
+---
+
+*Otro ejemplo (Cosecha):*
+</div>
+            <div class="chat-bubble bubble-user">tengo 120 tn de soja cosechada en el Lote 5 a 14% de humedad</div>
+            <div class="chat-bubble bubble-bot">✅ *Cosecha de soja registrada con éxito:*
+━━━━━━━━━━━━━━━━━━━━
+📍 *Lote:* Lote 5
+🌱 *Cultivo:* Soja
+🌾 *Rendimiento:* 120 toneladas
+💧 *Humedad:* 14% (dentro del estándar de recibo)
+
+El stock se ha sumado a tu silo virtual. ¿Querés cotizar el flete a puerto o fijar una alerta de precio?</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. FLETES Y ARBITRAJE -->
+      <section id="sec-fletes" class="feature-section">
+        <div class="split-layout">
+          <div class="card-info">
+            <div>
+              <span class="feature-badge">Logística Inteligente</span>
+              <h2>Cotizador de Fletes y Calculadora de Arbitraje</h2>
+              <p>Calculá en segundos el costo exacto del flete para tus granos ajustado a los cuadros de tarifas nacionales de CATAC (incluyendo peajes e IVA). Con la herramienta de arbitraje, compará si te conviene entregar localmente o despachar al puerto marítimo contemplando la diferencia logística.</p>
+              
+              <h4 style="margin-bottom: 8px;">🔑 Conceptos clave a probar:</h4>
+              <ul style="margin-left: 20px; margin-bottom: 24px; font-size: 14px; display: flex; flex-direction: column; gap: 6px;">
+                <li>Costo por kilómetro y tonelada transportada.</li>
+                <li>Diferencial de precios neto (Rosario vs. Necochea/Quequén).</li>
+                <li>Toma de decisión de transporte integrada.</li>
+              </ul>
+            </div>
+            
+            <div style="display: flex; flex-direction: column;">
+              <span style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Copiar atajo para el chat:</span>
+              <button class="copy-btn" onclick="copyPrompt('tengo 30 toneladas de soja en Tandil, me conviene vender en Necochea a USD 295 o Rosario a USD 302?')">
+                📋 Copiar prompt de ejemplo
+              </button>
+            </div>
+          </div>
+
+          <!-- Interactive Widget: Live Flete Calculator -->
+          <div class="interactive-widget">
+            <h3>🚚 Calculadora de Fletes y Arbitraje</h3>
+            <p class="subtitle">Calculá la brecha de rentabilidad neta descontando logística.</p>
+            
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="fleteTn">Toneladas de Grano</label>
+                <input id="fleteTn" type="number" value="30" min="1" oninput="calcFletesLive()" />
+              </div>
+              <div class="form-group">
+                <label for="fleteKm">Distancia al Puerto (km)</label>
+                <input id="fleteKm" type="number" value="320" min="1" oninput="calcFletesLive()" />
+              </div>
+            </div>
+
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="fletePrecioLocal">Precio Local (USD/tn)</label>
+                <input id="fletePrecioLocal" type="number" value="285" min="1" oninput="calcFletesLive()" />
+              </div>
+              <div class="form-group">
+                <label for="fletePrecioPuerto">Precio Puerto (USD/tn)</label>
+                <input id="fletePrecioPuerto" type="number" value="302" min="1" oninput="calcFletesLive()" />
+              </div>
+            </div>
+
+            <button class="widget-btn" onclick="calcFletesLive()">⚡ Calcular Margen de Arbitraje</button>
+
+            <div class="result-box" id="fleteResultBox">
+              <b>Formulación del Viaje:</b><br>
+              • Tarifa Flete Base: <span id="resFleteTarifa">ARS 24.300 / tn</span><br>
+              • Costo Flete Total: <span id="resFleteTotal">USD 730</span><br>
+              • Brecha de Arbitraje Neta: <b id="resArbitrajeNeto" style="color:#4ade80;">Ganancia + USD 425</b>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. DIETA Y RACIONES -->
+      <section id="sec-raciones" class="feature-section">
+        <div class="split-layout">
+          <div class="card-info">
+            <div>
+              <span class="feature-badge">Nutrición de Precisión</span>
+              <h2>Calculadora de Manga, Mixer y Materia Seca (MS)</h2>
+              <p>Maximizá la conversión de alimento. AgroHabilis calcula raciones equilibradas diarias sobre Materia Seca (MS) y ración húmeda en kilogramos por insumo (maíz, silaje, núcleos proteicos) según el tipo de hacienda y dieta seleccionada.</p>
+              
+              <h4 style="margin-bottom: 8px;">🔑 Conceptos clave a probar:</h4>
+              <ul style="margin-left: 20px; margin-bottom: 24px; font-size: 14px; display: flex; flex-direction: column; gap: 6px;">
+                <li>Consumo en base al 2.8% del Peso Vivo Promedio.</li>
+                <li>Dietas predefinidas del INTA: Feedlot, Suplementación, Pasturas.</li>
+                <li>Kilogramos exactos por tolva de Mixer a cargar hoy.</li>
+              </ul>
+            </div>
+            
+            <div style="display: flex; flex-direction: column;">
+              <span style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Copiar atajo para el chat:</span>
+              <button class="copy-btn" onclick="copyPrompt('dieta feedlot para 150 novillos de 320 kg promedio')">
+                📋 Copiar prompt de ejemplo
+              </button>
+            </div>
+          </div>
+
+          <!-- Interactive Widget: Live Mixer Calculator -->
+          <div class="interactive-widget">
+            <h3>🧮 Planificador de Raciones y Mixer</h3>
+            <p class="subtitle">Ingresá tu rodeo y obtené la tolva de carga exacta en húmedo.</p>
+            
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="racCabezas">Cantidad de Cabezas</label>
+                <input id="racCabezas" type="number" value="120" min="1" oninput="calcRacionesLive()" />
+              </div>
+              <div class="form-group">
+                <label for="racPeso">Peso Promedio (kg)</label>
+                <input id="racPeso" type="number" value="350" min="50" oninput="calcRacionesLive()" />
+              </div>
+            </div>
+
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="racConsumo">% Consumo PV (MS)</label>
+                <select id="racConsumo" onchange="calcRacionesLive()">
+                  <option value="2.5">2.5% (Mantenimiento)</option>
+                  <option value="2.8" selected>2.8% (Engorde Moderado)</option>
+                  <option value="3.2">3.2% (Feedlot / Intensivo)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="racDieta">Tipo de Dieta</label>
+                <select id="racDieta" onchange="calcRacionesLive()">
+                  <option value="suplementacion">Suplementación (70/25/5)</option>
+                  <option value="feedlot">Feedlot Completo (60/35/5)</option>
+                  <option value="pastura">Pastura Base (100% Forraje)</option>
+                </select>
+              </div>
+            </div>
+
+            <button class="widget-btn" onclick="calcRacionesLive()">⚡ Calcular Carga de Mixer</button>
+
+            <div class="result-box" id="racResultBox">
+              <b>Tolva de Carga Diaria:</b><br>
+              • Consumo MS Total: <span id="resRacMs">1.176 kg MS/día</span><br>
+              • Peso Húmedo Total Mixer: <b id="resRacMixer" style="color: #4ade80;">2.763 kg</b><br>
+              <div id="resRacDetalle" style="font-size: 11px; margin-top: 8px; border-top: 1px dashed rgba(255,255,255,0.2); padding-top: 8px; color: rgba(255,255,255,0.7);">
+                - Silaje de Maíz (35% MS): 2.352 kg<br>
+                - Maíz Molido (85% MS): 346 kg<br>
+                - Concentrado Proteico (90% MS): 65 kg
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. ROTACIÓN DE PASTURAS -->
+      <section id="sec-pasturas" class="feature-section">
+        <div class="split-layout">
+          <div class="card-info">
+            <div>
+              <span class="feature-badge">Manejo de Suelos</span>
+              <h2>Rotación de Pasturas y Semáforos de Ocupación</h2>
+              <p>Evitá la degradación de tus potreros. AgroHabilis analiza el cruzamiento de la carga ganadera actual y las hectáreas de forraje implantado para determinar el nivel de presión y asignarle un color de semáforo visual directo (Listo, En Rebrote, Ocupado).</p>
+              
+              <h4 style="margin-bottom: 8px;">🔑 Conceptos clave a probar:</h4>
+              <ul style="margin-left: 20px; margin-bottom: 24px; font-size: 14px; display: flex; flex-direction: column; gap: 6px;">
+                <li>Cálculo dinámico de días de descanso vegetal sugerido.</li>
+                <li>Monitoreo de verdeos y pasturas perennes (Alfalfa, Festuca).</li>
+                <li>Control de sobrepastoreo preventivo por chat.</li>
+              </ul>
+            </div>
+            
+            <div style="display: flex; flex-direction: column;">
+              <span style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Copiar atajo para el chat:</span>
+              <button class="copy-btn" onclick="copyPrompt('como viene la rotacion de mis pasturas?')">
+                📋 Copiar prompt de ejemplo
+              </button>
+            </div>
+          </div>
+
+          <!-- Interactive Widget: Live Pasture Status -->
+          <div class="interactive-widget">
+            <h3>🌿 Semáforo de Pasturas y Rotación</h3>
+            <p class="subtitle">Estado actual de lotes según hacienda activa.</p>
+            
+            <div class="pasture-grid">
+              <div class="pasture-bar">
+                <div class="pasture-info">
+                  <span class="pasture-name">Lote Bajo Chico (30 ha)</span>
+                  <span class="pasture-spec">Festuca perenne · Descanso: 42 días</span>
+                </div>
+                <span class="pasture-status status-green">🟢 Excelente (Listo)</span>
+              </div>
+
+              <div class="pasture-bar">
+                <div class="pasture-info">
+                  <span class="pasture-name">Lote Bajo Grande (50 ha)</span>
+                  <span class="pasture-spec">Alfalfa implantada · Hacienda: 150 cab</span>
+                </div>
+                <span class="pasture-status status-red">🔴 Ocupado / Consumo</span>
+              </div>
+
+              <div class="pasture-bar">
+                <div class="pasture-info">
+                  <span class="pasture-name">Lote Lomas (40 ha)</span>
+                  <span class="pasture-spec">Verdeo Avena · Rebrote: restan 12 días</span>
+                </div>
+                <span class="pasture-status status-yellow">🟡 Descanso / Rebrote</span>
+              </div>
+            </div>
+            
+            <div style="font-size: 11px; color: rgba(255,255,255,0.4); margin-top: 20px; text-align: center;">
+              💡 <i>El estado cambia automáticamente al rotar tus caravanas a un lote libre.</i>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 5. MERCADOS Y ALERTAS -->
+      <section id="sec-mercados" class="feature-section">
+        <div class="split-layout">
+          <div class="card-info">
+            <div>
+              <span class="feature-badge">Finanzas y Mercado</span>
+              <h2>Pizarra de Granos, Cañuelas y Toma de Decisiones</h2>
+              <p>Mantenete al tanto de los precios de Rosario (BCR), hacienda de Cañuelas (MAG), cotización del dólar y consultale directamente al bot si te conviene vender o retener tus cultivos. Configurá alertas para recibir avisos automáticos al instante en WhatsApp.</p>
+              
+              <h4 style="margin-bottom: 8px;">🔑 Conceptos clave a probar:</h4>
+              <ul style="margin-left: 20px; margin-bottom: 24px; font-size: 14px; display: flex; flex-direction: column; gap: 6px;">
+                <li>Consulta de cotizaciones locales e internacionales en tiempo real.</li>
+                <li>Consejería financiera inteligente ("¿Me conviene vender o esperar?").</li>
+                <li>Configuración de alertas automatizadas de mercado en WhatsApp.</li>
+              </ul>
+            </div>
+            
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+              <span style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Copiar atajos para el chat:</span>
+              <button class="copy-btn" onclick="copyPrompt('avisame cuando la soja Rosario supere los USD 310')">
+                📋 Copiar ejemplo: Alerta de precio
+              </button>
+              <button class="copy-btn" onclick="copyPrompt('tengo soja en silo, me conviene vender ahora en mayo o esperar a julio?')">
+                📋 Copiar ejemplo: Decisión de Venta
+              </button>
+            </div>
+          </div>
+
+          <div class="chat-box">
+            <div class="chat-bubble bubble-user">tengo soja en silo, me conviene vender ahora en mayo o esperar a julio?</div>
+            <div class="chat-bubble bubble-bot">📊 *Análisis de Mercado — Soja (Mayo vs. Julio 2026)*
+
+💡 *Recomendación:* **Esperar / Vender en Julio con coberturas.**
+
+*Factores clave analizados:*
+• *Precio Disponible (Mayo):* **USD 285/tn** (Mercado Físico Rosario).
+• *Futuro (Julio MATBA):* **USD 302/tn** (Tasa implícita de carry interesante de ≈ 6.5%).
+• *Costo de Almacenamiento (Silo-bolsa):* Mínimo (aprox. USD 2.50/tn incluyendo bolsa y contratista).
+
+👉 *Conclusión:*
+La brecha neta descontando almacenamiento y costo financiero te otorga una **ganancia extra de ≈ USD 14.50 por tonelada** si aguantás hasta Julio. 
+
+¿Querés que configure una alerta de precios cuando el futuro Julio alcance los USD 305?</div>
+            <div class="chat-bubble bubble-user">SI, configurala</div>
+            <div class="chat-bubble bubble-bot">🔔 *ALERTA DE PRECIO CONFIGURADA*
+━━━━━━━━━━━━━━━━━━━━
+🌱 *Cultivo:* Soja Julio MATBA
+📈 *Condición:* Superar USD 305
+📱 *Notificación:* Automática a tu WhatsApp</div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer>
+      <div class="container footer-container">
+        <a href="index.html" class="footer-logo">
+          🌾 AgroHabilis
+        </a>
+        <div style="display: flex; gap: 20px; font-size: 13px;">
+          <a href="index.html" style="color: rgba(255,255,255,0.7); text-decoration: none;">Inicio</a>
+          <a href="cliente.html" style="color: rgba(255,255,255,0.7); text-decoration: none;">Panel Cliente</a>
+          <a href="cliente-login.html" style="color: rgba(255,255,255,0.7); text-decoration: none;">Acceso</a>
+        </div>
+      </div>
+      <div class="footer-copy">
+        &copy; 2026 AgroHabilis. Desarrollado con Inteligencia Artificial para el campo argentino. Todos los derechos reservados.
+      </div>
+    </footer>
+
+    <!-- Interactive Scripting -->
+    <script>
+      function switchTab(tabId) {
+        // Toggle tab active button
+        const buttons = Array.from(document.querySelectorAll('.tab-btn'));
+        buttons.forEach(btn => {
+          btn.classList.toggle('active', btn.dataset.tab === tabId);
+        });
+
+        // Toggle feature active section
+        const sections = Array.from(document.querySelectorAll('.feature-section'));
+        sections.forEach(sec => {
+          sec.classList.toggle('active', sec.id === `sec-${tabId}`);
+        });
+      }
+
+      function copyPrompt(text) {
+        navigator.clipboard.writeText(text).then(() => {
+          alert("¡Copiado al portapapeles! Pegalo en el chat de WhatsApp de AgroHabilis.");
+        }).catch(err => {
+          console.error("Error al copiar:", err);
+        });
+      }
+
+      // 1. Live Fletes & Arbitraje calculation widget
+      function calcFletesLive() {
+        const tn = Number(document.getElementById('fleteTn').value || 30);
+        const km = Number(document.getElementById('fleteKm').value || 320);
+        const pLocal = Number(document.getElementById('fletePrecioLocal').value || 285);
+        const pPuerto = Number(document.getElementById('fletePrecioPuerto').value || 302);
+
+        // Simple mock CATAC tarifa formula: base flat + per km rate
+        const tarifaTnArs = Math.max(12000, 8500 + km * 55);
+        const totalFleteArs = tarifaTnArs * tn;
+        
+        // Convert to USD (mock 1000 ARS/USD)
+        const totalFleteUsd = Math.round(totalFleteArs / 1000);
+
+        // Arbitraje calculation
+        const ingresoLocal = tn * pLocal;
+        const ingresoPuerto = tn * pPuerto;
+        const gananciaBrutaPuerto = ingresoPuerto - ingresoLocal;
+        const brechaNeto = Math.round(gananciaBrutaPuerto - totalFleteUsd);
+
+        document.getElementById('resFleteTarifa').textContent = `ARS ${tarifaTnArs.toLocaleString('es-AR')} / tn`;
+        document.getElementById('resFleteTotal').textContent = `USD ${totalFleteUsd.toLocaleString('es-AR')}`;
+
+        const rBox = document.getElementById('resArbitrajeNeto');
+        if (brechaNeto > 0) {
+          rBox.textContent = `Rentabilidad Extra + USD ${brechaNeto.toLocaleString('es-AR')}`;
+          rBox.style.color = '#4ade80';
+        } else {
+          rBox.textContent = `Pérdida - USD ${Math.abs(brechaNeto).toLocaleString('es-AR')} (Conviene Local)`;
+          rBox.style.color = '#f87171';
+        }
+      }
+
+      // 2. Live Mixer & Racionamiento calculation widget
+      function calcRacionesLive() {
+        const cabezas = Number(document.getElementById('racCabezas').value || 120);
+        const peso = Number(document.getElementById('racPeso').value || 350);
+        const consumoPorc = Number(document.getElementById('racConsumo').value || 2.8);
+        const dieta = document.getElementById('racDieta').value;
+
+        const msPorCab = (peso * (consumoPorc / 100)).toFixed(2);
+        const msTotal = Math.round(msPorCab * cabezas);
+
+        let mixerTotal = 0;
+        let breakdownHtml = "";
+
+        if (dieta === "suplementacion") {
+          const silajeMs = msTotal * 0.70;
+          const maizMs = msTotal * 0.25;
+          const concMs = msTotal * 0.05;
+
+          const silajeHum = Math.round(silajeMs / 0.35); // 35% MS
+          const maizHum = Math.round(maizMs / 0.85); // 85% MS
+          const concHum = Math.round(concMs / 0.90); // 90% MS
+          mixerTotal = silajeHum + maizHum + concHum;
+
+          breakdownHtml = `
+            - Silaje de Maíz (35% MS): <b>${silajeHum.toLocaleString('es-AR')} kg</b> (${(silajeHum/cabezas).toFixed(1)} kg/cab)<br>
+            - Maíz Molido (85% MS): <b>${maizHum.toLocaleString('es-AR')} kg</b> (${(maizHum/cabezas).toFixed(1)} kg/cab)<br>
+            - Concentrado Proteico (90% MS): <b>${concHum.toLocaleString('es-AR')} kg</b> (${(concHum/cabezas).toFixed(1)} kg/cab)
+          `;
+        } else if (dieta === "feedlot") {
+          const maizMs = msTotal * 0.60;
+          const silajeMs = msTotal * 0.35;
+          const concMs = msTotal * 0.05;
+
+          const maizHum = Math.round(maizMs / 0.85); // 85% MS
+          const silajeHum = Math.round(silajeMs / 0.35); // 35% MS
+          const concHum = Math.round(concMs / 0.90); // 90% MS
+          mixerTotal = maizHum + silajeHum + concHum;
+
+          breakdownHtml = `
+            - Maíz Molido (85% MS): <b>${maizHum.toLocaleString('es-AR')} kg</b> (${(maizHum/cabezas).toFixed(1)} kg/cab)<br>
+            - Silaje de Maíz (35% MS): <b>${silajeHum.toLocaleString('es-AR')} kg</b> (${(silajeHum/cabezas).toFixed(1)} kg/cab)<br>
+            - Núcleo Feedlot (90% MS): <b>${concHum.toLocaleString('es-AR')} kg</b> (${(concHum/cabezas).toFixed(1)} kg/cab)
+          `;
+        } else {
+          // Pastura Base 100%
+          const forrajeHum = Math.round(msTotal / 0.20); // 20% MS
+          mixerTotal = forrajeHum;
+
+          breakdownHtml = `
+            - Forraje Verde de Pastura (20% MS): <b>${forrajeHum.toLocaleString('es-AR')} kg</b> (${(forrajeHum/cabezas).toFixed(1)} kg/cab)
+          `;
+        }
+
+        document.getElementById('resRacMs').textContent = `${msTotal.toLocaleString('es-AR')} kg MS/día (Consumo por cabeza: ${msPorCab} kg)`;
+        document.getElementById('resRacMixer').textContent = `${mixerTotal.toLocaleString('es-AR')} kg/día`;
+        document.getElementById('resRacDetalle').innerHTML = breakdownHtml;
+      }
+
+      // Initialize calculations
+      window.onload = function() {
+        calcFletesLive();
+        calcRacionesLive();
+      };
+    </script>
+  </body>
+</html>

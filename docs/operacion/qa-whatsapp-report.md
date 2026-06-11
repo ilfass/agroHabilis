@@ -1,6 +1,6 @@
 # QA WhatsApp Report
 
-- Fecha: 2026-04-30T17:26:08.336Z
+- Fecha: 2026-05-18T12:58:56.257Z
 - Total: 9
 - PASS: 9
 - FAIL: 0
@@ -41,7 +41,7 @@
 - kind: `suggestion`
 - input: `quiero una alerta de precio de soja`
 - expected: `ALERTA`
-- got: `Detecté una intención de comando.\n👉 Probá con: *ALERTA ... / AVISAME ...*\nSi querés ver todos los comandos, escribí: *VER COMANDOS*`
+- got: `Para eso usá *ALERTA ... / AVISAME ...*. (También entiendo lenguaje natural — si no estás seguro, escribime cómo lo dirías.)`
 
 ### ✅ suggestion-no-mi-ganado-con-pregunta - No sugerir comando si MI GANADO viene en consulta natural larga
 - kind: `suggestion`

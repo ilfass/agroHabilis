@@ -14,7 +14,7 @@ const { clasificarMensaje, clasificarHeuristica, normalizarClasificacion } = req
 const { routear } = require("../src/services/router");
 const {
   obtenerYCompletarPerfil,
-} = require("../src/services/consultas/procesar_consulta");
+} = require("../src/services/consultas");
 
 const mensajes = [
   "cuánto está la soja hoy",

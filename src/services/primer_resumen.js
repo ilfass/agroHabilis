@@ -2,7 +2,7 @@ const axios = require("axios");
 const { query } = require("../config/database");
 const { actualizarUsuario } = require("../models/usuario");
 const { generarConPromptLibre } = require("./gemini");
-const { resolverPlanEfectivo } = require("./planes");
+const { resolverPlanEfectivo, PLAN_PRICES_CACHE } = require("./planes");
 const { ejecutarRecolectorDiario } = require("../jobs/recolector");
 const { obtenerMercadosWeb } = require("../scrapers/mercados_web");
 const { obtenerClima } = require("../scrapers/clima");
@@ -177,9 +177,7 @@ const obtenerPerfilGanaderoUsuario = async (usuarioId) => {
 };
 
 const limiteZonasPorPlan = (planEfectivo = "gratis") => {
-  if (planEfectivo === "pro") return 6;
-  if (planEfectivo === "basico") return 3;
-  return 1;
+  return 999;
 };
 
 const obtenerZonasUsuario = async ({ usuarioId, perfil, limite }) => {
@@ -1042,15 +1040,11 @@ const generarPrimerResumen = async (usuario, opts = {}) => {
     plan: perfil.plan,
     planActivoHasta: perfil.plan_activo_hasta,
   });
-  const esBasico = planEfectivo === "basico";
-  const esPro = planEfectivo === "pro";
-  const maxZonas = limiteZonasPorPlan(planEfectivo);
-  const noticiasPorPlan = planEfectivo === "pro"
-    ? Math.max(1, Math.min(15, Number(perfil.noticias_cantidad_pref) || 8))
-    : planEfectivo === "basico"
-    ? 5
-    : 2;
-  const tieneBloquesPlus = esBasico || esPro;
+  const esBasico = true;
+  const esPro = true;
+  const maxZonas = 6;
+  const noticiasPorPlan = Math.max(1, Math.min(15, Number(perfil.noticias_cantidad_pref) || 8));
+  const tieneBloquesPlus = true;
   const cultivosCrudos = perfil.cultivos || [];
   const cultivos = Array.from(
     new Set(cultivosCrudos.map((c) => normalizarCultivo(c)).filter(Boolean))
@@ -1297,37 +1291,30 @@ const generarPrimerResumen = async (usuario, opts = {}) => {
     "💡 *PODÉS PREGUNTARME AHORA*",
     "━━━━━━━━━━━━━━━━━━━━━━━",
     ...ejemplos,
-    ...(tieneBloquesPlus
-      ? [
-          "",
-          "━━━━━━━━━━━━━━━━━━━━━━━",
-          bloqueOportunidad,
-          "━━━━━━━━━━━━━━━━━━━━━━━",
-          bloqueRiesgos,
-        ]
-      : []),
-    ...(esPro
-      ? [
-          "",
-          "━━━━━━━━━━━━━━━━━━━━━━━",
-          "🧠 *INSIGHTS PRO (PRODUCTO + ZONA)*",
-          "━━━━━━━━━━━━━━━━━━━━━━━",
-          insightsPro,
-          "",
-          "━━━━━━━━━━━━━━━━━━━━━━━",
-          bloquesProExtra[0],
-          "━━━━━━━━━━━━━━━━━━━━━━━",
-          bloquesProExtra[1],
-        ]
-      : []),
+    "",
+    "━━━━━━━━━━━━━━━━━━━━━━━",
+    bloqueOportunidad || "🎯 *OPORTUNIDAD DE VENTA (48/72h)*\nSin señal fuerte hoy.",
+    "━━━━━━━━━━━━━━━━━━━━━━━",
+    bloqueRiesgos || "⚠️ *RIESGOS OPERATIVOS (SEMANA)*\n🟢 Sin riesgos relevantes.",
+    "",
+    "━━━━━━━━━━━━━━━━━━━━━━━",
+    "🧠 *INSIGHTS PRO (PRODUCTO + ZONA)*",
+    "━━━━━━━━━━━━━━━━━━━━━━━",
+    insightsPro || "Sin insights específicos hoy.",
+    "",
+    "━━━━━━━━━━━━━━━━━━━━━━━",
+    bloquesProExtra[0] || "🧪 *ESCENARIOS RÁPIDOS (PRO)*\nSin simulaciones activas.",
+    "━━━━━━━━━━━━━━━━━━━━━━━",
+    bloquesProExtra[1] || "🔔 *ALERTAS SUGERIDAS (PRO)*\n1) Avisame si hay heladas en próximos 3 días.",
     "",
     "━━━━━━━━━━━━━━━━━━━━━━━",
     `📦 *PLAN ACTUAL: ${String(planEfectivo).toUpperCase()}*`,
     "━━━━━━━━━━━━━━━━━━━━━━━",
     "Si querés cambiarlo, escribí:",
-    "- QUIERO PLAN BASICO ($9.000/mes)",
-    "- QUIERO PLAN PRO ($18.000/mes)",
-    "- QUIERO PLAN GRATIS ($0/mes)",
+    `- QUIERO PLAN BASICO ($${Number(PLAN_PRICES_CACHE.basico || 22000).toLocaleString("es-AR")}/mes)`,
+    `- QUIERO PLAN PRO ($${Number(PLAN_PRICES_CACHE.pro || 29000).toLocaleString("es-AR")}/mes)`,
+    `- QUIERO PLAN PRO MAX ($${Number(PLAN_PRICES_CACHE.pro_max || 50000).toLocaleString("es-AR")}/mes)`,
+    `- QUIERO PLAN GRATIS ($${Number(PLAN_PRICES_CACHE.gratis || 0).toLocaleString("es-AR")}/mes)`,
     "",
     "📆 En Plan Gratis recibís resumen 2 veces por semana:",
     "- al día siguiente de tu registro",

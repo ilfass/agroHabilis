@@ -47,8 +47,7 @@ const {
   obtenerContextoPlanPorWhatsapp,
   actualizarPlanPorWhatsapp,
   validarCupoConsultasMensual,
-  puedeUsarAlertas,
-  puedeUsarFinanzas,
+  obtenerConfigPlan,
 } = require("../services/planes");
 const {
   crearLinkSuscripcionParaUsuario,
@@ -97,6 +96,8 @@ const resumenInteractivo = require("../services/resumen_interactivo");
 const { parseComandoBot } = require("../services/consultas/bot_control");
 const { analizarMediaAgro } = require("../services/vision/agro_vision");
 const { transcribirAudio } = require("../services/voice/transcription");
+const { iniciarProcesadorColaReintentosVision } = require("../services/vision/telemetria_worker");
+const { evaluarPromptInjection } = require("../services/agent/guardrails");
 /**
  * TurnController (P2#10) — migración gradual del dispatcher.
  *
@@ -195,12 +196,22 @@ const humanizarSalidaConIA = async ({
       "- Respondé como un asistente humano atento, no como un bot rígido.",
       "- No inventes datos, fechas, precios ni fuentes. Respetá el 'borrador' al 100%.",
       "- Conservá los bloques de datos con separadores ━ si el borrador los trae, son útiles para la lectura rápida.",
-      "- Saludá al usuario si es el primer mensaje del día o parece natural hacerlo.",
-      "- Cerrá el mensaje de forma servicial (ej: 'Cualquier otra duda me chiflas', 'Espero que te sirva el dato').",
+      "- NO saludes al usuario (no digas 'Hola', '¿Cómo andás?', etc.) si en el 'historial' ves mensajes recientes de hoy. Tratalo directamente como una conversación fluida continua.",
+      "- NO uses firmas ni cierres serviciales repetitivos (como 'cualquier cosa me chiflas', 'un abrazo', etc.) en cada respuesta consecutiva. Omitilos en interacciones rápidas e idas y vueltas continuas para sonar 100% humano.",
+      "- Solo saludá amigablemente al inicio si es el primer mensaje del día o si el 'historial' está completamente vacío.",
+      "- Solo usá cierres serviciales en respuestas complejas, informativas o que den cierre a una consulta.",
       "- No repitas la pregunta del usuario como encabezado.",
       "- Mantené negritas (*) y emojis del borrador si aportan, pero sentite libre de agregar calidez.",
       "- Si el borrador trae errores técnicos (NO_DATA, etc), explicalo amablemente sin lenguaje técnico.",
     ].join("\n");
+    let rows = historial.rows || [];
+    if (rows.length > 0) {
+      const qNorm = String(mensajeUsuario || "").trim().toLowerCase();
+      const firstQNorm = String(rows[0].pregunta || "").trim().toLowerCase();
+      if (firstQNorm === qNorm || firstQNorm.startsWith(qNorm) || qNorm.startsWith(firstQNorm)) {
+        rows = rows.slice(1);
+      }
+    }
     const user = JSON.stringify(
       {
         fecha_hoy_ar: fechaISOArgentina(),
@@ -210,7 +221,7 @@ const humanizarSalidaConIA = async ({
           plan: usuario?.plan || null,
         },
         mensajeUsuario: String(mensajeUsuario || "").slice(0, 350),
-        historial: historial.rows || [],
+        historial: rows,
         borrador: draft,
       },
       null,
@@ -556,6 +567,12 @@ client.on("auth_failure", (message) => {
   estadoConexion = "desconectado";
   ultimoMotivoWhatsapp = `auth_failure: ${String(message || "").slice(0, 200)}`;
   console.error("Fallo autenticacion WhatsApp:", message);
+
+  const { enviarAlertaSistema } = require("../services/alertas_sistema");
+  enviarAlertaSistema({
+    titulo: "⚠️ Alerta AgroHabilis: Fallo de autenticación en WhatsApp",
+    mensaje: `El cliente de WhatsApp no pudo autenticarse.\nDetalle: ${message}\n\nPor favor, revise el estado del servidor VPS.`
+  }).catch(err => console.error("Error enviando alerta de sistema:", err));
 });
 
 client.on("disconnected", async (reason) => {
@@ -564,6 +581,12 @@ client.on("disconnected", async (reason) => {
   estadoConexion = "desconectado";
   ultimoMotivoWhatsapp = String(reason || "").slice(0, 300) || "desconocido";
   console.warn("WhatsApp desconectado:", reason);
+
+  const { enviarAlertaSistema } = require("../services/alertas_sistema");
+  enviarAlertaSistema({
+    titulo: "⚠️ Alerta AgroHabilis: WhatsApp Desconectado",
+    mensaje: `El cliente de WhatsApp se ha desconectado.\nDetalle/Motivo: ${reason || "desconocido"}\n\nEl sistema intentará reconectar automáticamente.`
+  }).catch(err => console.error("Error enviando alerta de sistema:", err));
 
   if (reconnectInProgress) {
     console.log("[WhatsApp] Reconexion ya en progreso, se omite intento duplicado.");
@@ -575,6 +598,13 @@ client.on("disconnected", async (reason) => {
       console.error(
         `[WhatsApp] Error crítico: no se pudo reconectar tras ${MAX_RECONNECT_ATTEMPTS} intentos.`
       );
+
+      enviarAlertaSistema({
+        titulo: "🚨 Alerta Crítica AgroHabilis: Falló Reconexión de WhatsApp",
+        mensaje: `El cliente de WhatsApp se desconectó y falló al intentar reconectarse tras ${MAX_RECONNECT_ATTEMPTS} intentos.\n\nEs necesario intervenir de forma manual ingresando a la VPS y reiniciando el servicio, o escaneando un nuevo código QR en caso de que la sesión haya expirado.`,
+        ignorarCooldown: true
+      }).catch(err => console.error("Error enviando alerta de sistema:", err));
+
       return;
     }
 
@@ -612,23 +642,104 @@ const procesarMensajeEntranteWhatsapp = async (msg) => {
     const replyContexto = { intencionTipo: null };
 
     let consulta = String(msg.body || "").trim();
+    let monitorExtractData = null;
+    let remateExtractData = null;
 
     if (msg.hasMedia) {
       try {
         const media = await msg.downloadMedia();
         if (media && (media.mimetype.startsWith("image/") || media.mimetype === "application/pdf")) {
           const buffer = Buffer.from(media.data, "base64");
-          const visionText = await analizarMediaAgro(buffer, media.mimetype, consulta);
-          if (visionText) {
-            consulta = `[Análisis de archivo: ${visionText}] ${consulta}`.trim();
-            console.log(`[Vision] Procesado media ${media.mimetype} para ${msg.from}`);
+          try {
+            const { analizarMediaAgroUnificado } = require("../services/vision/agro_vision");
+            const resUnificado = await analizarMediaAgroUnificado(buffer, media.mimetype, consulta);
+            
+            if (resUnificado) {
+              if (resUnificado.es_monitor && resUnificado.monitor_datos && resUnificado.monitor_datos.tipo_labor) {
+                monitorExtractData = resUnificado.monitor_datos;
+                console.log(`[Vision Monitor] Detección exitosa de monitor agrícola (${monitorExtractData.tipo_labor})`);
+                if (!consulta) {
+                  consulta = "[Monitor Agrícola]";
+                }
+              } else if (resUnificado.es_remate && resUnificado.remate_datos) {
+                remateExtractData = resUnificado.remate_datos;
+                console.log(`[Vision Remate] Detección exitosa de remate de hacienda (${remateExtractData.lugar_o_firma || 'Consignataria S/D'})`);
+                if (!consulta) {
+                  consulta = "[Remate de Hacienda]";
+                }
+              } else if (resUnificado.transcripcion_general) {
+                consulta = `[Análisis de archivo: ${resUnificado.transcripcion_general}] ${consulta}`.trim();
+                console.log(`[Vision] Procesado media general ${media.mimetype} para ${msg.from}`);
+              }
+            }
+          } catch (eMedia) {
+            const errText = eMedia.message.toLowerCase();
+            const isQuotaError = errText.includes("429") || 
+                                 errText.includes("spending cap") || 
+                                 errText.includes("limit") || 
+                                 errText.includes("quota") || 
+                                 errText.includes("exhausted");
+
+            if (isQuotaError) {
+              console.warn(`[Vision] ⚠️ Error de cuota detectado. Guardando en cola de reintentos...`);
+              try {
+                const numeroReal = await resolverNumeroRealMensaje(msg);
+                const planCtx = await obtenerContextoPlanPorWhatsapp(msg.from, numeroReal);
+                const usuarioId = planCtx?.usuario?.id;
+                if (usuarioId) {
+                  await query(`
+                    INSERT INTO vision_retry_queue (usuario_id, whatsapp_norm, media_buffer, mime_type, error_mensaje)
+                    VALUES ($1, $2, $3, $4, $5)
+                  `, [
+                    usuarioId,
+                    msg.from,
+                    buffer,
+                    media.mimetype,
+                    eMedia.message
+                  ]);
+
+                  const retryNotice = `📸 *Recibí tu foto.* En este momento el sistema de telemetría de IA está con alta demanda. La voy a analizar automáticamente en unos minutos y te confirmo el registro.`;
+                  await client.sendMessage(msg.from, formatearRespuestaAmigable(retryNotice));
+                  return; // Abortar flujo para este mensaje
+                }
+              } catch (eQueue) {
+                console.error("[Vision] Error al encolar reintento:", eQueue.message);
+              }
+            } else {
+              console.error("[Vision Unificado] Fallo en procesamiento multimodal:", eMedia.message);
+            }
           }
+        } else if (media && (
+          media.mimetype === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
+          media.mimetype === "application/vnd.ms-excel"
+        )) {
+          const excelNotice = 
+            `📊 *¡Hola! Recibí tu planilla de Excel.* Actualmente no puedo procesar archivos de Excel directamente por este chat.\n\n` +
+            `👉 *¿Cómo podemos hacerlo?*\n` +
+            `1️⃣ Podés sacarle una *foto nítida* a la planilla o pantalla de tu computadora y mandármela como imagen.\n` +
+            `2️⃣ Podés guardarla como *PDF* y enviarme el PDF.\n\n` +
+            `¡De esa forma te analizo y guardo todos los datos al instante! 🚜`;
+          await msg.reply(formatearRespuestaAmigable(excelNotice));
+          return;
         } else if (media && media.mimetype.startsWith("audio/")) {
           const buffer = Buffer.from(media.data, "base64");
-          const transcript = await transcribirAudio(buffer, media.mimetype);
-          if (transcript) {
-            consulta = `${consulta} [Audio transcrito: ${transcript}]`.trim();
-            console.log(`[Voice] Audio transcrito para ${msg.from}: ${transcript.slice(0, 50)}...`);
+          try {
+            const transcript = await transcribirAudio(buffer, media.mimetype);
+            if (transcript) {
+              // Para mensajes de audio: el transcript ES el mensaje completo;
+              // no debe mezclarse con el body vacío ni con el contexto de hilo previo
+              // de registro para la clasificación de intención.
+              consulta = `[Audio transcrito: ${transcript}]`.trim();
+              console.log(`[Voice] Audio transcrito para ${msg.from}: ${transcript.slice(0, 50)}...`);
+            } else {
+              throw new Error("Transcripción vacía");
+            }
+          } catch (eTrans) {
+            console.error("[Voice] Error al transcribir audio de " + msg.from + ":", eTrans.message);
+            const avisoAudioFallo = `🎤 *Recibí tu nota de audio,* pero en este momento no logré procesar el sonido correctamente.\n\n` +
+                                    `¿Me lo podrías escribir por texto, o probar enviarlo de nuevo en unos minutos?`;
+            await client.sendMessage(msg.from, formatearRespuestaAmigable(avisoAudioFallo));
+            return; // Abortar flujo de forma segura
           }
         }
       } catch (err) {
@@ -645,7 +756,37 @@ const procesarMensajeEntranteWhatsapp = async (msg) => {
 
     const comando = normalizarParaComandoRuteo(consulta);
     const comandoAlias = resolverComandoAlias(comando);
-    const planCtx = await obtenerContextoPlanPorWhatsapp(msg.from);
+    const planCtx = await obtenerContextoPlanPorWhatsapp(msg.from, numeroReal);
+
+    // Guardrail conversacional ante Prompt Injection / Jailbreaks
+    if (evaluarPromptInjection(consulta)) {
+      const warningJailbreak = 
+        `⚠️ *Atención*: En AgroHabilis nos enfocamos exclusivamente en la asistencia técnica y gestión de tu establecimiento agropecuario.\n\n` +
+        `Para consultar precios, clima, registrar ganado o labores, escribime una consulta sencilla (ej. 'precio soja rosario hoy' o 'registrar 30 vacas').`;
+      
+      const identCaptura = extraerIdentidadWhatsapp(msg.from);
+      const waCapturaNorm = normalizarWhatsapp(numeroReal || identCaptura.numeroReal || identCaptura.numero || "") || "";
+      
+      capturaInteraccion.registrarFireAndForget({
+        whatsappNorm: waCapturaNorm,
+        usuarioId: planCtx.usuario?.id ?? null,
+        direccion: "in",
+        cuerpo: consulta,
+        ruta: "guardrail_blocked_in",
+      });
+      
+      const outMsg = formatearRespuestaAmigable(warningJailbreak);
+      capturaInteraccion.registrarFireAndForget({
+        whatsappNorm: waCapturaNorm,
+        usuarioId: planCtx.usuario?.id ?? null,
+        direccion: "out",
+        cuerpo: outMsg,
+        ruta: "guardrail_blocked_out",
+      });
+      
+      await msg.reply(outMsg);
+      return;
+    }
 
     const identCaptura = extraerIdentidadWhatsapp(msg.from);
     const waCapturaNorm =
@@ -677,7 +818,8 @@ const procesarMensajeEntranteWhatsapp = async (msg) => {
     msg.reply = async (texto, ...args) => {
       const humanizada = await humanizarSalidaConIA({
         whatsapp: msg.from,
-        mensajeUsuario: String(msg.body || ""),
+        // Usar consulta (que incluye el transcript del audio si hubo) en lugar de msg.body
+        mensajeUsuario: consulta || String(msg.body || ""),
         borrador: String(texto || ""),
         intencionTipo: replyContexto.intencionTipo,
       });
@@ -685,6 +827,276 @@ const procesarMensajeEntranteWhatsapp = async (msg) => {
       emitCapturaSalida(final, replyContexto.intencionTipo || "reply");
       return msgReplyRaw(final, ...args);
     };
+
+    // Interceptor para Registrar Monitor de Maquinaria detectado por Gemini Vision
+    if (monitorExtractData) {
+      const usuarioId = planCtx.usuario?.id;
+      if (usuarioId) {
+        await query(`
+          INSERT INTO registro_labores_maquinaria 
+            (usuario_id, tipo_labor, lote_nombre, hectareas_reales, dosis_promedio, producto_insumo, datos_crudos_json)
+          VALUES ($1, $2, $3, $4, $5, $6, $7)
+        `, [
+          usuarioId,
+          monitorExtractData.tipo_labor,
+          monitorExtractData.lote_nombre || 'Establecimiento General',
+          monitorExtractData.hectareas_reales,
+          monitorExtractData.dosis_promedio,
+          monitorExtractData.producto_insumo || 'Insumo',
+          JSON.stringify(monitorExtractData)
+        ]);
+
+        const emojiMap = {
+          SIEMBRA: "🚜",
+          COSECHA: "🌾",
+          PULVERIZACION: "🌱"
+        };
+        const emoji = emojiMap[monitorExtractData.tipo_labor] || "🚜";
+        
+        const fmtNum = (val) => val != null ? Number(val).toLocaleString("es-AR", { maximumFractionDigits: 2 }) : null;
+        
+        let estDetalles = [];
+        if (monitorExtractData.finca_nombre) estDetalles.push(monitorExtractData.finca_nombre);
+        if (monitorExtractData.agricultor_nombre) estDetalles.push(monitorExtractData.agricultor_nombre);
+        const estStr = estDetalles.length ? estDetalles.join(" · ") : null;
+
+        let lines = [
+          `📲 *¡Listo! Registré la labor de tu monitor agrícola:*`,
+          ``,
+          `* **Operación**: ${monitorExtractData.tipo_labor} ${emoji}`
+        ];
+
+        if (estStr) {
+          lines.push(`* **Establecimiento**: ${estStr}`);
+        }
+        lines.push(`* **Lote**: ${monitorExtractData.lote_nombre || "Establecimiento General"}`);
+        lines.push(`* **Superficie**: ${fmtNum(monitorExtractData.hectareas_reales) || "—"} ha reales`);
+        lines.push(`* **Insumo**: ${monitorExtractData.producto_insumo || "—"}`);
+
+        const dosisUnidad = monitorExtractData.tipo_labor === 'SIEMBRA' ? 'sem/ha' : monitorExtractData.tipo_labor === 'PULVERIZACION' ? 'l/ha' : 'tn/ha';
+        lines.push(`* **Dosis Promedio**: ${fmtNum(monitorExtractData.dosis_promedio) || "—"} ${dosisUnidad}`);
+
+        if (monitorExtractData.rendimiento_total_t != null) {
+          lines.push(`* **Masa Seca Total**: ${fmtNum(monitorExtractData.rendimiento_total_t)} t`);
+        }
+        if (monitorExtractData.humedad_media != null) {
+          lines.push(`* **Humedad Media**: ${fmtNum(monitorExtractData.humedad_media)}%`);
+        }
+        if (monitorExtractData.velocidad_media != null) {
+          lines.push(`* **Velocidad Media**: ${fmtNum(monitorExtractData.velocidad_media)} km/h`);
+        }
+
+        lines.push(``);
+        lines.push(`_Los datos ya están guardados en tu panel histórico de forma segura._`);
+
+        const confirmationMsg = lines.join("\n");
+
+        try {
+          await guardarConsulta({
+            usuarioId,
+            whatsapp: waCapturaNorm,
+            pregunta: "[Imagen de monitor agrícola para extracción Vision]",
+            respuesta: confirmationMsg,
+            tokensUsados: null,
+            iaSinContexto: false,
+            iaProvider: "gemini_vision",
+            iaProviderTrace: [{ type: "vision_monitor", success: true, data: monitorExtractData }]
+          });
+        } catch (eGuardar) {
+          console.error("[Vision Monitor] Error al registrar en historial_consultas:", eGuardar.message);
+        }
+
+        await replySinIA(confirmationMsg);
+        return; // Detenemos la ejecución aquí para no procesar el mensaje con IA
+      }
+    }
+
+    // Interceptor para Registrar Remates de Hacienda detectados por Gemini Vision
+    if (remateExtractData) {
+      const usuarioId = planCtx.usuario?.id;
+      if (usuarioId) {
+        // Determinamos la fecha
+        let fechaRemate = remateExtractData.fecha;
+        if (!fechaRemate || !/^\d{4}-\d{2}-\d{2}$/.test(fechaRemate)) {
+          fechaRemate = fechaISOArgentina();
+        }
+
+        const lotes = Array.isArray(remateExtractData.lotes) ? remateExtractData.lotes : [];
+        const lotesGuardados = [];
+
+        for (const lote of lotes) {
+          if (!lote.categoria) continue;
+          
+          try {
+            await query(`
+              INSERT INTO precios_hacienda (categoria, precio_promedio, precio_max, precio_min, unidad, fecha)
+              VALUES ($1, $2, $3, $4, $5, $6)
+              ON CONFLICT (categoria, fecha) 
+              DO UPDATE SET
+                precio_promedio = EXCLUDED.precio_promedio,
+                precio_max = EXCLUDED.precio_max,
+                precio_min = EXCLUDED.precio_min,
+                unidad = EXCLUDED.unidad,
+                creado_en = NOW()
+            `, [
+              lote.categoria,
+              lote.precio_promedio != null ? Number(lote.precio_promedio) : null,
+              lote.precio_max != null ? Number(lote.precio_max) : null,
+              lote.precio_min != null ? Number(lote.precio_min) : null,
+              lote.unidad || 'kg',
+              fechaRemate
+            ]);
+            
+            lotesGuardados.push(lote);
+          } catch (errDb) {
+            console.error(`[Vision Remate] Error guardando lote ${lote.categoria}:`, errDb.message);
+          }
+        }
+
+        const fmtNum = (val) => val != null ? Number(val).toLocaleString("es-AR", { maximumFractionDigits: 2 }) : null;
+        
+        let lines = [
+          `🐮 *¡Listo! Registré los precios del remate de hacienda:*`,
+          ``
+        ];
+        
+        if (remateExtractData.lugar_o_firma) {
+          lines.push(`* **Firma / Lugar**: ${remateExtractData.lugar_o_firma}`);
+        }
+        lines.push(`* **Fecha**: ${fechaRemate}`);
+        lines.push(``);
+        lines.push(`*Lotes registrados:*`);
+
+        if (lotesGuardados.length === 0) {
+          lines.push(`_No se pudieron guardar lotes válidos._`);
+        } else {
+          for (const lote of lotesGuardados) {
+            let descLote = `* *${lote.categoria}*: `;
+            const preciosDetalle = [];
+            if (lote.precio_promedio != null) {
+              preciosDetalle.push(`Promedio: $${fmtNum(lote.precio_promedio)}`);
+            }
+            if (lote.precio_min != null || lote.precio_max != null) {
+              preciosDetalle.push(`Rango: $${fmtNum(lote.precio_min || 0)} - $${fmtNum(lote.precio_max || 0)}`);
+            }
+            descLote += preciosDetalle.join(" · ") + ` por ${lote.unidad || 'kg'}`;
+            if (lote.cantidad_cabezas) {
+              descLote += ` (${lote.cantidad_cabezas} cabezas`;
+              if (lote.peso_promedio) {
+                descLote += `, ø ${fmtNum(lote.peso_promedio)} kg`;
+              }
+              descLote += `)`;
+            } else if (lote.peso_promedio) {
+              descLote += ` (ø ${fmtNum(lote.peso_promedio)} kg)`;
+            }
+            lines.push(descLote);
+          }
+        }
+
+        lines.push(``);
+        lines.push(`_Los datos de precios se integraron a tu base de referencia ganadera para consultas de mercado._`);
+
+        const confirmationMsg = lines.join("\n");
+
+        try {
+          await guardarConsulta({
+            usuarioId,
+            whatsapp: waCapturaNorm,
+            pregunta: "[Planilla/Pizarra de remate para extracción Vision]",
+            respuesta: confirmationMsg,
+            tokensUsados: null,
+            iaSinContexto: false,
+            iaProvider: "gemini_vision",
+            iaProviderTrace: [{ type: "vision_remate", success: true, data: remateExtractData }]
+          });
+        } catch (eGuardar) {
+          console.error("[Vision Remate] Error al registrar en historial_consultas:", eGuardar.message);
+        }
+
+        await replySinIA(confirmationMsg);
+        return; // Detenemos la ejecución aquí para no procesar el mensaje con IA
+      }
+    }
+
+    // Interceptor de Aceptación de Invitación para Miembros de Equipo (Pendientes)
+    if (planCtx.usuario && planCtx.usuario.es_delegado && planCtx.usuario.delegado_pendiente) {
+      const respLimpia = String(msg.body || "").trim().toUpperCase();
+      if (respLimpia === "SI" || respLimpia === "SÍ" || respLimpia === "ACEPTO") {
+        // Aceptó!
+        await query(
+          `
+            UPDATE telefonos_autorizados 
+            SET aceptado = true 
+            WHERE usuario_principal_id = $1 AND whatsapp_autorizado = $2
+          `,
+          [planCtx.usuario.id, planCtx.usuario.whatsapp_autorizado]
+        );
+        // Actualizamos el objeto en memoria para que prosiga si es necesario, o salimos confirmando.
+        planCtx.usuario.delegado_pendiente = false;
+        
+        // Verificar si ya tiene cuenta de usuario principal
+        const { variantesTelefono } = require("../services/cliente_auth");
+        const variantes = variantesTelefono(planCtx.usuario.whatsapp_autorizado);
+        const checkIsAlreadyUser = await query(
+          `
+            SELECT id FROM usuarios 
+            WHERE regexp_replace(COALESCE(whatsapp, ''), '\\D', '', 'g') = ANY($1::text[])
+               OR regexp_replace(COALESCE(whatsapp_real, ''), '\\D', '', 'g') = ANY($1::text[])
+            LIMIT 1
+          `,
+          [variantes]
+        );
+        const yaEsUsuario = checkIsAlreadyUser.rows.length > 0;
+
+        const mapRoles = {
+          operario: "Operario/Tractorista",
+          encargado: "Encargado de Establecimiento",
+          socio: "Socio / Co-propietario",
+          asesor: "Asesor Técnico / Agrónomo",
+          admin: "Administrativo / Contador",
+          veterinario: "Veterinario"
+        };
+        const rolBonito = mapRoles[String(planCtx.usuario.rol_operario).toLowerCase()] || String(planCtx.usuario.rol_operario).toUpperCase();
+
+        let msjExito;
+        if (yaEsUsuario) {
+          msjExito = `✅ *¡Invitación aceptada!*\n\n` +
+            `A partir de ahora formás parte del equipo de *${planCtx.usuario.nombre}* con el rol de *${rolBonito}*.\n\n` +
+            `⚠️ *AVISO IMPORTANTE:* Como detectamos que ya tenés una cuenta individual registrada en el sistema, a partir de ahora *ya no vas a poder registrar cosas a tu nombre*.\n\n` +
+            `Todos tus registros y consultas en este chat se guardarán directamente *para el campo de ${planCtx.usuario.nombre}* con tu rol específico.\n\n` +
+            `Escribile al asistente de forma natural para empezar (ej: "registrá entrada de 10 bolsas de maíz").`;
+        } else {
+          msjExito = `✅ *¡Invitación aceptada!*\n\n` +
+            `A partir de ahora estás autorizado para registrar stock, gastos y movimientos en el establecimiento de *${planCtx.usuario.nombre}* con el rol de *${rolBonito}*.\n\n` +
+            `Escribile al asistente de forma natural para empezar (ej: "registrá entrada de 10 bolsas de maíz").`;
+        }
+
+        await replySinIA(msjExito);
+      } else if (respLimpia === "NO" || respLimpia === "RECHAZO") {
+        // Rechazó!
+        await query(
+          `
+            UPDATE telefonos_autorizados 
+            SET activo = false 
+            WHERE usuario_principal_id = $1 AND whatsapp_autorizado = $2
+          `,
+          [planCtx.usuario.id, planCtx.usuario.whatsapp_autorizado]
+        );
+        await replySinIA(
+          `❌ *Invitación rechazada.*\n\n` +
+          `Has rechazado la invitación de *${planCtx.usuario.nombre}*. Si fue un error, el dueño del campo tendrá que volver a agregarte desde el panel.`
+        );
+      } else {
+        // Recordatorio de invitación pendiente
+        await replySinIA(
+          `⚠️ *Invitación Pendiente* 🌾\n\n` +
+          `*${planCtx.usuario.nombre}* te ha invitado a formar parte de su equipo de campo en *AgroHabilis* como *${String(planCtx.usuario.rol_operario).toUpperCase()}*.\n\n` +
+          `¿Aceptás esta invitación para poder interactuar con el asistente y guardar datos en su cuenta?\n\n` +
+          `Respondé *SI* para confirmar o *NO* para rechazar.`
+        );
+      }
+      return;
+    }
 
     /**
      * P2#10 — TurnController (gradual). Si `AGENT_TURN_CONTROLLER=1` y hay
@@ -762,10 +1174,42 @@ const procesarMensajeEntranteWhatsapp = async (msg) => {
       }
     }
 
+    // 🚨 AUTO-RECUPERACIÓN / RESCATE CONVERSACIONAL ANTE QUEJAS
+    const { detectarQuejaUsuario, obtenerUltimaPreguntaFallida, eliminarConsultaHistorial } = require("../services/agent/recuperacion");
+    if (!esAdminWhatsapp(msg.from) && detectarQuejaUsuario(consulta)) {
+      const waN = normalizarWhatsapp(numeroReal || msg.from) || normalizarWhatsapp(msg.from);
+      const ult = await obtenerUltimaPreguntaFallida(waN, planCtx.usuario?.id);
+      if (ult) {
+        console.log(`[Recuperación] Queja detectada para ${waN}. Rescatando pregunta anterior: "${ult.pregunta.slice(0, 60)}..."`);
+        
+        // 1. Limpiar el historial conflictivo anterior para que no contamine
+        await eliminarConsultaHistorial(ult.id);
+        
+        // 2. Log de ruta
+        logRoute(msg.from, "RECOVERY_FLOW", { preguntaRescatada: ult.pregunta });
+        
+        // 3. Forzar el uso de premium temporalmente para este turno
+        process.env.GEMINI_FORCE_PREMIUM_TURN = "true";
+        
+        // 4. Re-lanzar el procesamiento del mensaje sobre la pregunta original rescatada
+        consulta = ult.pregunta;
+        
+        // Envolver el msg.reply original para anteponer la disculpa rioplatense
+        const originalReply = msg.reply.bind(msg);
+        msg.reply = async (texto, ...args) => {
+          const disculpa = `Uh, tenés toda la razón, disculpame. Interpreté mal tu mensaje anterior. Ahí lo analicé de nuevo con más detalle:\n\n`;
+          const textoConDisculpa = disculpa + texto;
+          // Limpiar flag global
+          process.env.GEMINI_FORCE_PREMIUM_TURN = "false";
+          return originalReply(textoConDisculpa, ...args);
+        };
+      }
+    }
+
     // Onboarding debe tener prioridad absoluta para evitar caer en IA libre
     // cuando el usuario todavía está completando alta.
     if (!esAdminWhatsapp(msg.from)) {
-      const onboarding = await gestionarOnboarding(msg.from, consulta);
+      const onboarding = await gestionarOnboarding(msg.from, consulta, numeroReal);
       if (onboarding.enOnboarding) {
         logRoute(msg.from, "ONBOARDING_FLOW", { tieneRespuesta: Boolean(onboarding.respuesta) });
         if (onboarding.respuesta) {
@@ -782,6 +1226,129 @@ const procesarMensajeEntranteWhatsapp = async (msg) => {
         }
         console.log(`[WhatsApp] Onboarding en curso para ${msg.from}`);
         return;
+      }
+    }
+
+    // Flujo del cambio de plan (email y confirmación)
+    const estadoCambioPlan = await conversacionEstadoService.obtenerEstado(msg.from);
+    if (estadoCambioPlan?.flujo === "cambio_plan") {
+      const planObjetivo = estadoCambioPlan.contexto?.planObjetivo || "basico";
+
+      if (estadoCambioPlan.paso === "esperando_email") {
+        const parsedEmail = parseEmail(consulta.trim());
+        if (!parsedEmail) {
+          await replySinIA(
+            `⚠️ Ese no parece ser un correo electrónico válido.\n\n` +
+            `Por favor, ingresá tu correo nuevamente (ej: tucorreo@dominio.com):`
+          );
+          return;
+        }
+
+        // Guardamos el email provisto y pasamos al paso de confirmación
+        await conversacionEstadoService.guardarEstado(msg.from, "cambio_plan", "esperando_confirmacion_email", {
+          planObjetivo,
+          email: parsedEmail
+        });
+
+        await replySinIA(
+          `¿Confirmás que *${parsedEmail}* es tu correo electrónico correcto?\n\n` +
+          `👉 Respondé *SI* para confirmar o escribí otro correo si te equivocaste.`
+        );
+        return;
+      }
+
+      if (estadoCambioPlan.paso === "esperando_confirmacion_email") {
+        const confirmacion = consulta.trim().toLowerCase();
+        const emailCandidato = estadoCambioPlan.contexto?.email;
+
+        if (["si", "sí", "sii", "siis", "correcto", "ok", "confirmar", "confirmo"].includes(confirmacion)) {
+          // 1. Guardar email en el perfil del usuario
+          if (planCtx.usuario?.id && emailCandidato) {
+            await actualizarUsuario(planCtx.usuario.id, { email: emailCandidato });
+            planCtx.usuario.email = emailCandidato; // actualizar contexto en caliente
+          }
+
+          await replySinIA(`✅ Email confirmado y guardado. Generando tu link de pago...`);
+
+          // 2. Ejecutar cambio de plan
+          try {
+            const outPlan = await resolverCambioPlanConPago({
+              whatsapp: msg.from,
+              planObjetivo,
+            });
+            await replySinIA(outPlan);
+            // 3. Limpiar estado de la conversación
+            await conversacionEstadoService.limpiarEstado(msg.from);
+          } catch (error) {
+            console.error("[WhatsApp] Error cambio de plan tras email:", error.message);
+            await replySinIA(mensajeErrorCambioPlan(error));
+          }
+          return;
+        } else {
+          // Si el usuario escribe otro correo en lugar de "SI"
+          const parsedEmail = parseEmail(consulta.trim());
+          if (parsedEmail) {
+            await conversacionEstadoService.guardarEstado(msg.from, "cambio_plan", "esperando_confirmacion_email", {
+              planObjetivo,
+              email: parsedEmail
+            });
+            await replySinIA(
+              `¿Confirmás que *${parsedEmail}* es tu correo electrónico correcto?\n\n` +
+              `👉 Respondé *SI* para confirmar o escribí otro correo si te equivocaste.`
+            );
+          } else {
+            await replySinIA(
+              `Por favor, respondé *SI* para confirmar que *${emailCandidato}* es tu correo electrónico correcto, o escribí otro correo si te equivocaste.`
+            );
+          }
+          return;
+        }
+      }
+    }
+
+    // Flujo del limite alcanzado
+    if (estadoCambioPlan?.flujo === "limite_alcanzado") {
+      if (estadoCambioPlan.paso === "esperando_confirmacion_explicacion") {
+        const respuestaUsuario = consulta.trim().toLowerCase();
+        const afirmativo = ["si", "sí", "sii", "sisi", "dale", "ok", "claro", "bueno", "obvio", "explicame", "como", "cómo", "como hago", "cómo hago"].some(aff => respuestaUsuario.includes(aff));
+        const negativo = ["no", "noo", "no gracias", "después", "mas tarde", "más tarde"].some(neg => respuestaUsuario.includes(neg));
+
+        if (afirmativo) {
+          await conversacionEstadoService.limpiarEstado(msg.from);
+
+          const configBasico = await obtenerConfigPlan("basico");
+          const configPro = await obtenerConfigPlan("pro");
+
+          const nombreUsuario = planCtx.usuario?.nombre ? planCtx.usuario.nombre.split(" ")[0] : "";
+          const saludo = nombreUsuario ? `¡Buenísimo, ${nombreUsuario}! ` : `¡Buenísimo! `;
+
+          const mensajeExplicacion = [
+            `${saludo}Te cuento cómo es:`,
+            ``,
+            `Actualmente estás en el *Plan Gratis* (con límite de 25 consultas semanales). Para operar sin límites y registrar toda la actividad de tu campo, tenés estas opciones con suscripción mensual de Mercado Pago:`,
+            ``,
+            `1️⃣ *Plan Básico*: $${configBasico.precio.toLocaleString("es-AR")}/mes. Incluye hasta ${configBasico.limite_consultas_semanal} consultas y ${configBasico.limite_audios_semanal} audios semanales.`,
+            `2️⃣ *Plan Pro*: $${configPro.precio.toLocaleString("es-AR")}/mes. Incluye hasta ${configPro.limite_consultas_semanal} consultas y ${configPro.limite_audios_semanal} audios semanales.`,
+            `3️⃣ *Plan Pro Max*: consultas e imágenes 100% ilimitadas.`,
+            ``,
+            `👉 *¿Cómo seguimos?*`,
+            `Si querés pasarte al Básico, simplemente escribí: *QUIERO PLAN BASICO*`,
+            `Si preferís el Pro, escribí: *QUIERO PLAN PRO*`,
+            `O si querés ver más detalles de cada plan, escribí: *MI PLAN*`,
+            ``,
+            `¿Con cuál preferís arrancar?`
+          ].join("\n");
+
+          await replySinIA(mensajeExplicacion);
+          return;
+        } else if (negativo) {
+          await conversacionEstadoService.limpiarEstado(msg.from);
+          const nombreUsuario = planCtx.usuario?.nombre ? `, ${planCtx.usuario.nombre.split(" ")[0]}` : "";
+          await replySinIA(`Entendido${nombreUsuario}. Si en algún momento querés sumarte a un plan superior para seguir cargando datos, acá voy a estar. ¡Un abrazo!`);
+          return;
+        } else {
+          await conversacionEstadoService.limpiarEstado(msg.from);
+        }
       }
     }
 
@@ -836,27 +1403,41 @@ const procesarMensajeEntranteWhatsapp = async (msg) => {
     if (
       pedidoPlanHeuristico === "QUIERO PLAN PRO" ||
       pedidoPlanHeuristico === "QUIERO PLAN BASICO" ||
-      pedidoPlanHeuristico === "QUIERO PLAN GRATIS"
+      pedidoPlanHeuristico === "QUIERO PLAN GRATIS" ||
+      pedidoPlanHeuristico === "QUIERO PLAN PRO MAX" ||
+      pedidoPlanHeuristico === "QUIERO PLAN PROMAX"
     ) {
       logRoute(msg.from, "CMD_PLAN_NATURAL_TEMPRANO", { natural: pedidoPlanHeuristico });
       if (!planCtx.usuario?.id) {
         await msg.reply("Primero completamos tu registro. Escribime cualquier mensaje y arrancamos el onboarding.");
         return;
       }
-      const planObjetivoTemprano = pedidoPlanHeuristico.endsWith("PRO")
-        ? "pro"
-        : pedidoPlanHeuristico.endsWith("BASICO")
-        ? "basico"
-        : "gratis";
+      const planObjetivoTemprano =
+        pedidoPlanHeuristico.endsWith("PRO MAX") || pedidoPlanHeuristico.endsWith("PROMAX")
+          ? "pro_max"
+          : pedidoPlanHeuristico.endsWith("PRO")
+          ? "pro"
+          : pedidoPlanHeuristico.endsWith("BASICO")
+          ? "basico"
+          : "gratis";
+      const email = String(planCtx.usuario?.email || "").trim();
+      if (["basico", "pro", "pro_max"].includes(planObjetivoTemprano) && !email) {
+        await conversacionEstadoService.guardarEstado(msg.from, "cambio_plan", "esperando_email", { planObjetivo: planObjetivoTemprano });
+        await replySinIA(
+          `Para activar el **${String(planObjetivoTemprano).toUpperCase()}** primero necesito registrar tu email para generar el link de Mercado Pago.\n\n` +
+          `👉 Por favor, escribí tu dirección de correo electrónico:`
+        );
+        return;
+      }
       try {
         const outPlanTemprano = await resolverCambioPlanConPago({
           whatsapp: msg.from,
           planObjetivo: planObjetivoTemprano,
         });
-        await msg.reply(outPlanTemprano);
+        await replySinIA(outPlanTemprano);
       } catch (error) {
         console.error("[WhatsApp] Error cambio de plan (natural temprano):", error.message);
-        await msg.reply(mensajeErrorCambioPlan(error));
+        await replySinIA(mensajeErrorCambioPlan(error));
       }
       return;
     }
@@ -865,27 +1446,41 @@ const procesarMensajeEntranteWhatsapp = async (msg) => {
     if (
       comandoAlias === "QUIERO PLAN GRATIS" ||
       comandoAlias === "QUIERO PLAN BASICO" ||
-      comandoAlias === "QUIERO PLAN PRO"
+      comandoAlias === "QUIERO PLAN PRO" ||
+      comandoAlias === "QUIERO PLAN PRO MAX" ||
+      comandoAlias === "QUIERO PLAN PROMAX"
     ) {
       logRoute(msg.from, "CMD_PLAN_HARD", { alias: comandoAlias });
       if (!planCtx.usuario?.id) {
         await msg.reply("Primero completamos tu registro. Escribime cualquier mensaje y arrancamos el onboarding.");
         return;
       }
-      const planObjetivo = comandoAlias.endsWith("PRO")
-        ? "pro"
-        : comandoAlias.endsWith("BASICO")
-        ? "basico"
-        : "gratis";
+      const planObjetivo =
+        comandoAlias.endsWith("PRO MAX") || comandoAlias.endsWith("PROMAX")
+          ? "pro_max"
+          : comandoAlias.endsWith("PRO")
+          ? "pro"
+          : comandoAlias.endsWith("BASICO")
+          ? "basico"
+          : "gratis";
+      const email = String(planCtx.usuario?.email || "").trim();
+      if (["basico", "pro", "pro_max"].includes(planObjetivo) && !email) {
+        await conversacionEstadoService.guardarEstado(msg.from, "cambio_plan", "esperando_email", { planObjetivo });
+        await replySinIA(
+          `Para activar el **${String(planObjetivo).toUpperCase()}** primero necesito registrar tu email para generar el link de Mercado Pago.\n\n` +
+          `👉 Por favor, escribí tu dirección de correo electrónico:`
+        );
+        return;
+      }
       try {
         const outPlan = await resolverCambioPlanConPago({
           whatsapp: msg.from,
           planObjetivo,
         });
-        await msg.reply(outPlan);
+        await replySinIA(outPlan);
       } catch (error) {
         console.error("[WhatsApp] Error cambio de plan:", error.message);
-        await msg.reply(mensajeErrorCambioPlan(error));
+        await replySinIA(mensajeErrorCambioPlan(error));
       }
       return;
     }
@@ -917,11 +1512,48 @@ const procesarMensajeEntranteWhatsapp = async (msg) => {
         await msg.reply("Todavía no estás registrado. Escribime cualquier mensaje y te guío con el onboarding.");
         return;
       }
-      await msg.reply(
-        `Tu plan actual es *${String(planCtx.planEfectivo || "gratis").toUpperCase()}*.\n` +
-          "Precios: GRATIS $0/mes | BASICO $9.000/mes | PRO $18.000/mes\n" +
-          "Para cambiarlo escribí: QUIERO PLAN GRATIS | QUIERO PLAN BASICO | QUIERO PLAN PRO"
-      );
+      try {
+        const cGratis = await obtenerConfigPlan("gratis");
+        const cBasico = await obtenerConfigPlan("basico");
+        const cPro = await obtenerConfigPlan("pro");
+        const cProMax = await obtenerConfigPlan("pro_max");
+
+        const fmtLmt = (l) => l === -1 ? "Ilimitados" : `${l} semanales`;
+        const fmtCons = (l) => l === -1 ? "Ilimitadas" : `${l} semanales`;
+
+        await msg.reply(
+          `🤖 *Planes Disponibles - AgroHabilis*\n` +
+          `━━━━━━━━━━━━━━━━━━━━\n` +
+          `Tu plan actual es *${String(planCtx.planEfectivo || "gratis").toUpperCase()}*.\n\n` +
+          `• *GRATIS* · $${cGratis.precio.toLocaleString("es-AR")}/mes\n` +
+          `  - ${fmtCons(cGratis.limite_consultas_semanal)} consultas con el Agente\n` +
+          `  - ${fmtLmt(cGratis.limite_audios_semanal)} notas de audio\n` +
+          `  - ${fmtLmt(cGratis.limite_fotos_semanal)} fotos / análisis en vivo\n\n` +
+          `• *BÁSICO* · $${cBasico.precio.toLocaleString("es-AR")}/mes\n` +
+          `  - ${fmtCons(cBasico.limite_consultas_semanal)} consultas con el Agente\n` +
+          `  - ${fmtLmt(cBasico.limite_audios_semanal)} notas de audio\n` +
+          `  - ${fmtLmt(cBasico.limite_fotos_semanal)} fotos / análisis en vivo\n\n` +
+          `• *PRO* · $${cPro.precio.toLocaleString("es-AR")}/mes\n` +
+          `  - ${fmtCons(cPro.limite_consultas_semanal)} consultas con el Agente\n` +
+          `  - ${fmtLmt(cPro.limite_audios_semanal)} notas de audio\n` +
+          `  - ${fmtLmt(cPro.limite_fotos_semanal)} fotos / análisis en vivo\n\n` +
+          `• *PRO MAX* · $${cProMax.precio.toLocaleString("es-AR")}/mes\n` +
+          `  - Consultas, notas de audio y fotos *ILIMITADAS*\n` +
+          `━━━━━━━━━━━━━━━━━━━━\n` +
+          `*Garantía de Valor:* Todos los planes acceden al 100% de las funcionalidades (márgenes, alertas, clima, finanzas y panel web).\n\n` +
+          `Para cambiar tu plan, escribí:\n` +
+          `👉 *QUIERO PLAN GRATIS*\n` +
+          `👉 *QUIERO PLAN BASICO*\n` +
+          `👉 *QUIERO PLAN PRO*\n` +
+          `👉 *QUIERO PLAN PRO MAX*`
+        );
+      } catch (error) {
+        console.error("[WhatsApp] Error mostrando planes:", error.message);
+        await msg.reply(
+          `Tu plan actual es *${String(planCtx.planEfectivo || "gratis").toUpperCase()}*.\n` +
+          "Para cambiarlo escribí: QUIERO PLAN GRATIS | QUIERO PLAN BASICO | QUIERO PLAN PRO | QUIERO PLAN PRO MAX"
+        );
+      }
       return;
     }
 
@@ -993,17 +1625,26 @@ const procesarMensajeEntranteWhatsapp = async (msg) => {
       }
     }
 
-    if (comandoNatural === "QUIERO PLAN PRO" || comandoNatural === "QUIERO PLAN BASICO" || comandoNatural === "QUIERO PLAN GRATIS") {
+    if (
+      comandoNatural === "QUIERO PLAN PRO" ||
+      comandoNatural === "QUIERO PLAN BASICO" ||
+      comandoNatural === "QUIERO PLAN GRATIS" ||
+      comandoNatural === "QUIERO PLAN PRO MAX" ||
+      comandoNatural === "QUIERO PLAN PROMAX"
+    ) {
       logRoute(msg.from, "CMDN_CAMBIO_PLAN", { natural: comandoNatural });
       if (!planCtx.usuario?.id) {
         await msg.reply("Primero completamos tu registro. Escribime cualquier mensaje y arrancamos el onboarding.");
         return;
       }
-      const planObjetivo = comandoNatural.endsWith("PRO")
-        ? "pro"
-        : comandoNatural.endsWith("BASICO")
-        ? "basico"
-        : "gratis";
+      const planObjetivo =
+        comandoNatural.endsWith("PRO MAX") || comandoNatural.endsWith("PROMAX")
+          ? "pro_max"
+          : comandoNatural.endsWith("PRO")
+          ? "pro"
+          : comandoNatural.endsWith("BASICO")
+          ? "basico"
+          : "gratis";
       try {
         const outPlan = await resolverCambioPlanConPago({
           whatsapp: msg.from,
@@ -1019,10 +1660,6 @@ const procesarMensajeEntranteWhatsapp = async (msg) => {
 
     if (comandoNatural === "__NOTICIAS__" && !comando.startsWith("MIS NOTICIAS ")) {
       logRoute(msg.from, "CMDN_NOTICIAS");
-      if (planCtx.planEfectivo !== "pro") {
-        await msg.reply("La configuración personalizada de noticias está disponible en Plan Pro. Escribí: QUIERO PLAN PRO");
-        return;
-      }
       const n = Number(consulta.match(/(\d{1,2})/)?.[1] || NaN);
       if (!Number.isFinite(n)) {
         await msg.reply('Decime la cantidad y lo aplico. Ejemplo: "MIS NOTICIAS 8".');
@@ -1044,6 +1681,7 @@ const procesarMensajeEntranteWhatsapp = async (msg) => {
       logRoute(msg.from, "CMDN_INSUMOS");
       const respuesta = await procesarConsulta(msg.from, consulta, {
         intencionPrecalculada: intencionIA,
+        numeroReal,
       });
       await msg.reply(formatearFechasTextoArg(respuesta));
       return;
@@ -1051,12 +1689,6 @@ const procesarMensajeEntranteWhatsapp = async (msg) => {
 
     if (comandoNatural === "__ALERTA__" && !comandoAlias.startsWith("ALERTA") && !comandoAlias.startsWith("AVISAME")) {
       logRoute(msg.from, "CMDN_ALERTA_NATURAL");
-      if (!puedeUsarAlertas(planCtx.planEfectivo)) {
-        await msg.reply(
-          "Las alertas de precio están disponibles en Plan Básico o Pro. Escribí 'QUIERO PLAN BASICO' para activarlas."
-        );
-        return;
-      }
       const r = await configurarAlerta(msg.from, consulta);
       await msg.reply(r);
       return;
@@ -1065,10 +1697,6 @@ const procesarMensajeEntranteWhatsapp = async (msg) => {
     if (comandoAlias.startsWith("MIS NOTICIAS ")) {
       if (!planCtx.usuario?.id) {
         await msg.reply("Primero completamos tu registro. Escribime cualquier mensaje y arrancamos el onboarding.");
-        return;
-      }
-      if (planCtx.planEfectivo !== "pro") {
-        await msg.reply("La configuración personalizada de cantidad de noticias está disponible en Plan Pro.");
         return;
       }
       const n = Number(consulta.slice("MIS NOTICIAS ".length).trim());
@@ -1141,7 +1769,7 @@ const procesarMensajeEntranteWhatsapp = async (msg) => {
         await msg.reply('Formato: "MI ZONA Buenos Aires, Tandil - Córdoba, Río Cuarto"');
         return;
       }
-      const maxZonas = planCtx.planEfectivo === "pro" ? 6 : planCtx.planEfectivo === "basico" ? 3 : 1;
+      const maxZonas = 999;
       const zonasLimitadas = zonas.slice(0, maxZonas);
       await query("DELETE FROM usuario_zonas WHERE usuario_id = $1", [planCtx.usuario.id]);
       for (let i = 0; i < zonasLimitadas.length; i += 1) {
@@ -1156,7 +1784,7 @@ const procesarMensajeEntranteWhatsapp = async (msg) => {
       }
       await actualizarUsuario(planCtx.usuario.id, zonasLimitadas[0]);
       await msg.reply(
-        `✅ Zonas actualizadas (${zonasLimitadas.length}/${maxZonas} por tu plan).\n` +
+        `✅ Zonas actualizadas:\n` +
           zonasLimitadas.map((z) => `- ${z.provincia}, ${z.partido}`).join("\n")
       );
       return;
@@ -1260,17 +1888,22 @@ const procesarMensajeEntranteWhatsapp = async (msg) => {
     if (
       comandoAlias === "QUIERO PLAN GRATIS" ||
       comandoAlias === "QUIERO PLAN BASICO" ||
-      comandoAlias === "QUIERO PLAN PRO"
+      comandoAlias === "QUIERO PLAN PRO" ||
+      comandoAlias === "QUIERO PLAN PRO MAX" ||
+      comandoAlias === "QUIERO PLAN PROMAX"
     ) {
       if (!planCtx.usuario?.id) {
         await msg.reply("Primero completamos tu registro. Escribime cualquier mensaje y arrancamos el onboarding.");
         return;
       }
-      const planObjetivo = comandoAlias.endsWith("PRO")
-        ? "pro"
-        : comandoAlias.endsWith("BASICO")
-        ? "basico"
-        : "gratis";
+      const planObjetivo =
+        comandoAlias.endsWith("PRO MAX") || comandoAlias.endsWith("PROMAX")
+          ? "pro_max"
+          : comandoAlias.endsWith("PRO")
+          ? "pro"
+          : comandoAlias.endsWith("BASICO")
+          ? "basico"
+          : "gratis";
       try {
         const outPlan = await resolverCambioPlanConPago({
           whatsapp: msg.from,
@@ -1328,7 +1961,7 @@ const procesarMensajeEntranteWhatsapp = async (msg) => {
           .replace(/^zonas?\s+/i, "")
       );
       if (zonasDirectas.length) {
-        const maxZonas = planCtx.planEfectivo === "pro" ? 6 : planCtx.planEfectivo === "basico" ? 3 : 1;
+        const maxZonas = 999;
         const zonasLimitadas = zonasDirectas.slice(0, maxZonas);
         await query("DELETE FROM usuario_zonas WHERE usuario_id = $1", [planCtx.usuario.id]);
         for (let i = 0; i < zonasLimitadas.length; i += 1) {
@@ -1343,7 +1976,7 @@ const procesarMensajeEntranteWhatsapp = async (msg) => {
         }
         await actualizarUsuario(planCtx.usuario.id, zonasLimitadas[0]);
         await msg.reply(
-          `✅ Zonas actualizadas (${zonasLimitadas.length}/${maxZonas} por tu plan).\n` +
+          `✅ Zonas actualizadas:\n` +
             zonasLimitadas.map((z) => `- ${z.provincia}, ${z.partido}`).join("\n")
         );
         return;
@@ -1373,38 +2006,22 @@ const procesarMensajeEntranteWhatsapp = async (msg) => {
 
     if (comandoAlias === "MIS ALERTAS" || comandoNatural === "MIS ALERTAS") {
       logRoute(msg.from, "CMD_MIS_ALERTAS");
-      if (!puedeUsarAlertas(planCtx.planEfectivo)) {
-        await msg.reply(
-          "Las alertas de precio están disponibles en Plan Básico o Pro. Escribí 'QUIERO PLAN BASICO' para activarlas."
-        );
-        return;
-      }
-      const r = await listarAlertas(msg.from);
+      const r = await listarAlertas(planCtx.usuario || msg.from);
       await msg.reply(r);
       return;
     }
 
     if (comandoAlias.startsWith("CANCELAR ALERTA")) {
       logRoute(msg.from, "CMD_CANCELAR_ALERTA");
-      if (!puedeUsarAlertas(planCtx.planEfectivo)) {
-        await msg.reply("Tu plan actual no incluye alertas de precio.");
-        return;
-      }
       const id = consulta.match(/(\d+)/)?.[1];
-      const r = await cancelarAlerta(msg.from, id);
+      const r = await cancelarAlerta(planCtx.usuario || msg.from, id);
       await msg.reply(r);
       return;
     }
 
     if (comandoAlias.startsWith("ALERTA") || comandoAlias.startsWith("AVISAME")) {
       logRoute(msg.from, "CMD_ALERTA");
-      if (!puedeUsarAlertas(planCtx.planEfectivo)) {
-        await msg.reply(
-          "Las alertas de precio están disponibles en Plan Básico o Pro. Escribí 'QUIERO PLAN BASICO' y te ayudamos a activarlo."
-        );
-        return;
-      }
-      const r = await configurarAlerta(msg.from, consulta);
+      const r = await configurarAlerta(planCtx.usuario || msg.from, consulta);
       await msg.reply(r);
       return;
     }
@@ -1417,13 +2034,7 @@ const procesarMensajeEntranteWhatsapp = async (msg) => {
       comandoNatural === "__GASTO__"
     ) {
       logRoute(msg.from, "CMD_GASTO");
-      if (!puedeUsarFinanzas(planCtx.planEfectivo)) {
-        await msg.reply(
-          "El registro de gastos está disponible en Plan Pro. Escribí 'QUIERO PLAN PRO' para activarlo."
-        );
-        return;
-      }
-      const r = await registrarGasto(msg.from, consulta);
+      const r = await registrarGasto(planCtx.usuario || msg.from, consulta);
       await msg.reply(r);
       return;
     }
@@ -1434,53 +2045,63 @@ const procesarMensajeEntranteWhatsapp = async (msg) => {
       !esConsultaMercadoExcluyeRegistroVenta(consulta)
     ) {
       logRoute(msg.from, "CMD_VENTA");
-      if (!puedeUsarFinanzas(planCtx.planEfectivo)) {
-        await msg.reply(
-          "El registro de ventas está disponible en Plan Pro. Escribí 'QUIERO PLAN PRO' para activarlo."
-        );
-        return;
-      }
-      const r = await registrarVenta(msg.from, consulta);
+      const r = await registrarVenta(planCtx.usuario || msg.from, consulta);
       await msg.reply(r);
       return;
     }
 
+    const esRolRestringidoFinanzas = (u) => {
+      if (!u?.es_delegado) return false;
+      const rol = String(u.rol_operario || "").trim().toLowerCase();
+      return ["operario", "tractorista"].includes(rol);
+    };
+
+    const MENSAJE_RESTRICCION_FINANZAS = (rol) => {
+      return `⚠️ *Acceso Restringido: Finanzas*\n\n` +
+             `Como integrante de equipo con el rol de *${String(rol || "operario").toUpperCase()}*, no tenés permisos para visualizar información financiera, gastos, ventas o resúmenes del establecimiento.\n\n` +
+             `Si necesitás acceso, por favor solicitalo al administrador principal de la cuenta.`;
+    };
+
     if (comandoAlias === "MIS GASTOS") {
       logRoute(msg.from, "CMD_MIS_GASTOS");
-      if (!puedeUsarFinanzas(planCtx.planEfectivo)) {
-        await msg.reply("Esta funcionalidad está disponible en Plan Pro.");
+      if (esRolRestringidoFinanzas(planCtx.usuario)) {
+        await msg.reply(MENSAJE_RESTRICCION_FINANZAS(planCtx.usuario.rol_operario));
         return;
       }
-      const r = await obtenerTextoMisGastos(msg.from);
+      const r = await obtenerTextoMisGastos(planCtx.usuario || msg.from);
       await msg.reply(r);
       return;
     }
 
     if (comandoAlias === "MIS VENTAS") {
       logRoute(msg.from, "CMD_MIS_VENTAS");
-      if (!puedeUsarFinanzas(planCtx.planEfectivo)) {
-        await msg.reply("Esta funcionalidad está disponible en Plan Pro.");
+      if (esRolRestringidoFinanzas(planCtx.usuario)) {
+        await msg.reply(MENSAJE_RESTRICCION_FINANZAS(planCtx.usuario.rol_operario));
         return;
       }
-      const r = await obtenerTextoMisVentas(msg.from);
+      const r = await obtenerTextoMisVentas(planCtx.usuario || msg.from);
       await msg.reply(r);
       return;
     }
 
     if (comandoAlias === "MI MARGEN" || comandoNatural === "MI MARGEN") {
       logRoute(msg.from, "CMD_MI_MARGEN");
-      if (!puedeUsarFinanzas(planCtx.planEfectivo)) {
-        await msg.reply("Esta funcionalidad está disponible en Plan Pro.");
+      if (esRolRestringidoFinanzas(planCtx.usuario)) {
+        await msg.reply(MENSAJE_RESTRICCION_FINANZAS(planCtx.usuario.rol_operario));
         return;
       }
-      const r = await obtenerTextoMiMargen(msg.from);
+      const r = await obtenerTextoMiMargen(planCtx.usuario || msg.from);
       await msg.reply(r);
       return;
     }
 
     if (comandoAlias === "MI RESUMEN" || comandoNatural === "MI RESUMEN") {
       logRoute(msg.from, "CMD_MI_RESUMEN");
-      const usuario = await buscarPorWhatsapp(msg.from);
+      if (esRolRestringidoFinanzas(planCtx.usuario)) {
+        await msg.reply(MENSAJE_RESTRICCION_FINANZAS(planCtx.usuario.rol_operario));
+        return;
+      }
+      const usuario = planCtx.usuario || await buscarPorWhatsapp(msg.from, numeroReal);
       if (!usuario) {
         await msg.reply(
           "Primero necesitamos completar tu perfil. Responde las preguntas de onboarding para habilitar tu resumen diario."
@@ -1577,6 +2198,13 @@ const procesarMensajeEntranteWhatsapp = async (msg) => {
         planEfectivo: planCtx.planEfectivo,
       });
       if (!cupo.ok) {
+        await conversacionEstadoService.guardarEstado(
+          msg.from,
+          "limite_alcanzado",
+          "esperando_confirmacion_explicacion",
+          { usuario_id: planCtx.usuario.id },
+          2
+        );
         await msg.reply(
           `Alcanzaste el límite de ${cupo.limite} consultas este mes en Plan Gratis. Pasate a Plan Básico para consultas ilimitadas.`
         );
@@ -1586,7 +2214,7 @@ const procesarMensajeEntranteWhatsapp = async (msg) => {
 
     console.log(`[WhatsApp] Consulta recibida de ${msg.from}: ${consulta}`);
     logRoute(msg.from, "CONSULTA_OPERATIVA");
-    const opcionesConsulta = { intencionPrecalculada: intencionIA };
+    const opcionesConsulta = { intencionPrecalculada: intencionIA, numeroReal };
     const asyncCola = !["0", "false", "off", "no", ""].includes(
       String(process.env.AGENT_CONSULTA_ASYNC ?? "").trim().toLowerCase()
     );
@@ -1700,6 +2328,7 @@ client.on("ready", () => {
     void drenarChatsNoLeidosWhatsapp();
   }, delayMs);
   iniciarDrenadorColaAgentConsultasSiCorresponde();
+  iniciarProcesadorColaReintentosVision({ sendMessage });
 });
 
 client.on("authenticated", () => {
@@ -1758,10 +2387,10 @@ const enviarCambioPlanWhatsapp = async ({ whatsapp, planObjetivo }) => {
     return { ok: false, error: "whatsapp requerido", detalle: "" };
   }
   const plan = String(planObjetivo || "").trim().toLowerCase();
-  if (!["basico", "pro", "gratis"].includes(plan)) {
+  if (!["basico", "pro", "pro_max", "gratis"].includes(plan)) {
     return {
       ok: false,
-      error: "planObjetivo inválido. Usar: basico | pro | gratis",
+      error: "planObjetivo inválido. Usar: basico | pro | pro_max | gratis",
       detalle: "",
     };
   }
@@ -1814,6 +2443,8 @@ const iniciarDrenadorColaAgentConsultasSiCorresponde = () => {
   console.log(`[WhatsApp] Cola agent (consulta async): drenador cada ${ms}ms`);
 };
 
+// procesarColaReintentosVision y su iniciador fueron modularizados a src/services/vision/telemetria_worker.js
+
 module.exports = {
   client,
   estaListo,
@@ -1824,4 +2455,5 @@ module.exports = {
   sendMessage,
   enviarCambioPlanWhatsapp,
   getRutaQrWhatsappPng,
+  resolverNumeroRealMensaje,
 };

@@ -66,7 +66,7 @@ const obtenerClimaWeatherApi = async (latitude, longitude) => {
       alerts: "no",
       lang: "es",
     },
-    timeout: 60_000,
+    timeout: 10_000,
     validateStatus: (s) => s === 200,
   });
   const forecastDays = Array.isArray(response.data?.forecast?.forecastday)
@@ -102,7 +102,7 @@ const obtenerPrecipitacionAyerWeatherApi = async (latitude, longitude, fecha) =>
       dt: fecha,
       lang: "es",
     },
-    timeout: 60_000,
+    timeout: 10_000,
     validateStatus: (s) => s === 200,
   });
   const forecastDay = response.data?.forecast?.forecastday?.[0]?.day;
@@ -117,7 +117,11 @@ const obtenerPrecipitacionAyerWeatherApi = async (latitude, longitude, fecha) =>
 const obtenerClima = async (lat, lng) => {
   const { latitude, longitude } = validarCoordenadas(lat, lng, "obtenerClima");
   try {
-    return await obtenerClimaWeatherApi(latitude, longitude);
+    const res = await obtenerClimaWeatherApi(latitude, longitude);
+    if (res && res.length >= 7) {
+      return res;
+    }
+    throw new Error("WeatherAPI plan gratuito limitó la respuesta a menos de 7 días");
   } catch (error) {
     const response = await axios.get("https://api.open-meteo.com/v1/forecast", {
       params: {
@@ -129,7 +133,7 @@ const obtenerClima = async (lat, lng) => {
         forecast_days: 7,
         windspeed_unit: "kmh",
       },
-      timeout: 60_000,
+      timeout: 10_000,
       validateStatus: (s) => s === 200,
     });
 
@@ -196,7 +200,7 @@ const obtenerPrecipitacionAyer = async (lat, lng) => {
         daily: "precipitation_sum",
         timezone: "America/Argentina/Buenos_Aires",
       },
-      timeout: 60_000,
+      timeout: 10_000,
       validateStatus: (s) => s === 200,
     });
 

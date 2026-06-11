@@ -27,7 +27,7 @@ const {
 } = require("./mercado_pago");
 
 const resolverCambioPlanConPago = async ({ whatsapp, planObjetivo }) => {
-  if (["basico", "pro"].includes(planObjetivo)) {
+  if (["basico", "pro", "pro_max"].includes(planObjetivo)) {
     const pago = await crearLinkSuscripcionParaUsuario({
       whatsapp,
       planObjetivo,

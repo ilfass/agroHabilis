@@ -29,8 +29,9 @@ const construirHistorialNaturalParaPlantilla = (filas = [], maxResp = 450) =>
     })
     .join("\n\n");
 
-const construirPreguntaConHiloInterpretado = (mensajeUsuario, ultimasHist, modo) => {
-  const hist = construirHistorialNaturalParaPlantilla((ultimasHist || []).slice(0, 5), 460);
+const construirPreguntaConHiloInterpretado = (mensajeUsuario, ultimasHist, modo, opts = {}) => {
+  const maxTurnos = Math.min(20, Math.max(3, Number(opts.maxTurnosHilo) || 5));
+  const hist = construirHistorialNaturalParaPlantilla((ultimasHist || []).slice(0, maxTurnos), 460);
   const msg = String(mensajeUsuario || "").trim();
   const nseg = normSeguimientoCalendario(msg);
   let directiva =
@@ -102,12 +103,52 @@ const obtenerUltimaInteraccion = async ({ usuarioId, whatsapp }) => {
 
 const obtenerUltimasInteracciones = async ({ usuarioId, whatsapp, limite = 3 }) => {
   /**
-   * Cap subido de 8 → 12 para casos "agente" donde el productor carga
-   * varios lotes seguidos o hace seguimientos largos ("y el resto?",
-   * "podés con varios?"). Los callers piden lo que necesitan; este es
-   * solo el techo de seguridad para no romper performance.
+   * Techo de seguridad (filas). Los callers piden lo que necesitan
+   * (`AGENT_HISTORIAL_CLASIFICADOR_LIMITE`, modo Cursor, etc.).
    */
-  const n = Math.min(Math.max(Number(limite) || 1, 1), 12);
+  const n = Math.min(Math.max(Number(limite) || 1, 1), 64);
+  const waNorm = whatsapp ? normalizarWhatsapp(whatsapp) : null;
+
+  try {
+    const r = await query(
+      `
+        SELECT direccion, cuerpo, creado_en
+        FROM whatsapp_interaccion_log
+        WHERE (usuario_id = $1 AND usuario_id IS NOT NULL)
+           OR whatsapp_norm = $2
+        ORDER BY creado_en DESC
+        LIMIT $3
+      `,
+      [usuarioId || null, waNorm, n * 4]
+    );
+    const rows = r.rows || [];
+    const turns = [];
+    let i = 0;
+    while (i < rows.length && turns.length < n) {
+      if (rows[i].direccion === 'in') {
+        const pregunta = rows[i].cuerpo;
+        const creado_en = rows[i].creado_en;
+        const respuestas = [];
+        let j = i - 1;
+        while (j >= 0 && rows[j].direccion === 'out') {
+          respuestas.push(rows[j].cuerpo);
+          j--;
+        }
+        turns.push({
+          pregunta,
+          respuesta: respuestas.reverse().join('\n').trim(),
+          creado_en
+        });
+      }
+      i++;
+    }
+    if (turns.length > 0) {
+      return turns;
+    }
+  } catch (e) {
+    console.error("[obtenerUltimasInteracciones] error rebuilding from log:", e.message);
+  }
+
   const h = horasFeedbackBroadcastMasivo();
   const filtro = sqlMasivoAdminRecienteOtroHistorial(2);
   if (usuarioId) {
@@ -134,7 +175,7 @@ const obtenerUltimasInteracciones = async ({ usuarioId, whatsapp, limite = 3 }) 
         ORDER BY creado_en DESC
         LIMIT $3
       `,
-      [normalizarWhatsapp(whatsapp), h, n]
+      [waNorm, h, n]
     );
     return r.rows || [];
   }
@@ -425,6 +466,47 @@ const construirRespuestaInteligenteGeneral = async (
   const fechaISOArgentina = typeof fechaISOArgentinaFn === "function" ? fechaISOArgentinaFn : () => null;
 
   try {
+    let preciosPapa = [];
+    let analisisPapa = null;
+    const esUsuarioPapero = Array.isArray(usuario?.cultivos) &&
+      usuario.cultivos.some(c => String(c.cultivo || "").toLowerCase().includes("papa"));
+    const esPreguntaPapa = /\b(papa|spunta|kennebec|innovator|horticola|argenpapa)\b/i.test(pregunta);
+
+    if (esUsuarioPapero || esPreguntaPapa) {
+      try {
+        const { obtenerPreciosPapa, obtenerAnalisisPapa } = require("../horticola");
+        preciosPapa = await obtenerPreciosPapa({ mercado: "MCBA" });
+        analisisPapa = await obtenerAnalisisPapa({ mercado: "MCBA" });
+      } catch (errPapa) {
+        console.warn("[contexto] Error fetching potato context:", errPapa.message);
+      }
+    }
+
+    let fragmentosRag = [];
+    try {
+      const { generarEmbedding } = require("../agent/ia/embeddings");
+      const embedding = await generarEmbedding(pregunta);
+      const vectorStr = `[${embedding.join(",")}]`;
+      const result = await query(
+        `
+          SELECT titulo, fuente, contenido, (embedding <=> $1::vector) AS distancia
+          FROM rag_documentos
+          WHERE (embedding <=> $1::vector) < 0.65
+          ORDER BY embedding <=> $1::vector
+          LIMIT 3
+        `,
+        [vectorStr]
+      );
+      fragmentosRag = (result.rows || []).map(row => ({
+        titulo: row.titulo,
+        fuente: row.fuente,
+        contenido: row.contenido,
+        distancia: row.distancia
+      }));
+    } catch (eRag) {
+      console.warn("[RAG] Falla en recuperación de contexto:", eRag.message);
+    }
+
     const contextoDatos = JSON.stringify(
       {
         fecha_hoy_ar: fechaISOArgentina(),
@@ -441,6 +523,9 @@ const construirRespuestaInteligenteGeneral = async (
           tipo_cambio_fecha: tipoCambio?.fecha || null,
           tipo_cambio_items: (tipoCambio?.items || []).slice(0, 6),
           clima_items: (clima || []).slice(0, 5),
+          precios_papa: preciosPapa && preciosPapa.length ? preciosPapa.slice(0, 12) : null,
+          analisis_papa: analisisPapa || null,
+          manuales_y_guias_tecnicas_locales_rag: fragmentosRag.length ? fragmentosRag : null,
         },
         instruccion: "Si falta el dato puntual, no cortar. Dar referencia de mercado si existe y una recomendación práctica corta.",
       },

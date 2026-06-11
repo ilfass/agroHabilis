@@ -1,21 +1,21 @@
 "use strict";
 
 /**
- * Gate de dominio del turno (agro operativo vs fuera de foco).
- * @see docs en `agent/pipeline` — forma parte del pipeline tipo agente.
+ * Gate de dominio del turno: **solo cadena IA** cuando hay proveedor;
+ * sin heurísticas locales de timing / no‑agro (eso lo ve el modelo).
  */
 
 const {
   obtenerUltimasInteracciones,
   construirPreguntaConHiloInterpretado,
 } = require("../../consultas/contexto");
-const {
-  esProbableConocimientoGeneralSinAgro,
-  esActualidadGeopoliticaSinAnclaAgro,
-  esProbableNoAgroDeportesOcio,
-} = require("../../intent_classifier");
 const { AGENT_PROMPT_VERSION, buildAgentDominioTurnoSystem } = require("../prompts/builders");
 const { hayProveedorIa, ejecutarJsonConCadenaIA } = require("../ia/json_chain");
+const {
+  cursorMode,
+  historialHiloPromptTurnos,
+  dominioHistorialLimite,
+} = require("../cursor_mode");
 
 const REPREGUNTA_DOMINIO_FIJA = [
   "Eso queda fuera de lo que puedo resolver bien desde *AgroHabilis* (mi fuerte es campo: precios, clima, mercado, cargar o consultar tus datos y los comandos del bot).",
@@ -32,21 +32,6 @@ const INTENCIONES_QUE_SALTAN_GATE = new Set([
   "analisis_interno",
   "consulta_registros",
 ]);
-
-const normMsg = (s = "") =>
-  String(s || "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase();
-
-function esConsultaTimingMercadoAgro(mensaje = "") {
-  const t = normMsg(mensaje);
-  if (!t) return false;
-  if (/\b(me\s+)?conviene\s+vender\b|\bdebo\s+vender\b|\bvender\s+o\s+esperar\b|\besperar\s+o\s+vender\b/.test(t)) return true;
-  if (/\bconviene\s+comprar\b|\bme\s+conviene\s+comprar\b/.test(t)) return true;
-  if (/\bconviene\b/.test(t) && /\bvender\b/.test(t)) return true;
-  return false;
-}
 
 const envAgentDominioEncendido = () => {
   const v = String(process.env.AGENT_DOMINIO_TURNO ?? "1")
@@ -82,29 +67,17 @@ function debeEjecutarGateDominio(clasificacion, mensaje) {
   return true;
 }
 
-function heuristicaNoAgroFuerte(mensaje) {
-  return (
-    esProbableNoAgroDeportesOcio(mensaje) ||
-    esActualidadGeopoliticaSinAnclaAgro(mensaje) ||
-    esProbableConocimientoGeneralSinAgro(mensaje)
-  );
-}
-
 async function llamarDominioJson({ clasificacion, mensaje, usuario, numeroWhatsapp, modoPrompt, historialPrecargado }) {
+  const lim = dominioHistorialLimite();
   let ultimas = [];
   if (Array.isArray(historialPrecargado) && historialPrecargado.length) {
-    ultimas = historialPrecargado.slice(0, 5);
+    ultimas = historialPrecargado.slice(0, lim);
   } else {
     try {
       ultimas = await obtenerUltimasInteracciones({
-        usuarioId: usuario?.id || null,
+        usuarioId: usuario?.es_delegado ? null : (usuario?.id || null),
         whatsapp: numeroWhatsapp || null,
-        /**
-         * Subido 5 → 8 para mejor detección de "dominio del turno" en
-         * conversaciones largas (carga multi-lote, planillas con varios
-         * mensajes, seguimientos del estilo "y el resto?").
-         */
-        limite: 8,
+        limite: lim,
       });
     } catch (_e) {
       ultimas = [];
@@ -114,7 +87,9 @@ async function llamarDominioJson({ clasificacion, mensaje, usuario, numeroWhatsa
   const int = String(clasificacion?.intencion || "");
   const userIa = [
     `Intención del clasificador (referencia interna; puede estar errada): \`${int}\``,
-    construirPreguntaConHiloInterpretado(mensaje, ultimas, "duda"),
+    construirPreguntaConHiloInterpretado(mensaje, ultimas, "duda", {
+      maxTurnosHilo: historialHiloPromptTurnos(),
+    }),
   ].join("\n\n");
 
   return ejecutarJsonConCadenaIA({
@@ -138,68 +113,23 @@ async function evaluarDominioTurnoAntesDeRouter({
   }
 
   const int = String(clasificacion?.intencion || "");
-  const hibrido = dominioModoHibrido();
   const tieneIa = hayProveedorIa();
 
-  if (hibrido) {
-    if (esConsultaTimingMercadoAgro(mensaje)) {
-      if (int === "no_agro" || int === "agro_general") {
-        clasificacion.intencion = "analisis_mercado";
-        if (!clasificacion.confianza) clasificacion.confianza = "media";
-      }
-      return { accion: "delegar", texto: null };
-    }
+  if (!tieneIa) {
     if (int === "no_agro") {
       pushAgentTurnTrace(clasificacion, {
         ok: true,
-        via: "clasificador_no_agro",
-        modo: "hibrido",
+        via: "sin_ia_clasificador_no_agro",
+        modo: "fallback",
         emitioRepregunta: true,
       });
       return { accion: "repregunta_dominio", texto: REPREGUNTA_DOMINIO_FIJA };
     }
-    if (heuristicaNoAgroFuerte(mensaje)) {
-      pushAgentTurnTrace(clasificacion, {
-        ok: true,
-        via: "heuristica_local",
-        modo: "hibrido",
-        emitioRepregunta: true,
-      });
-      return { accion: "repregunta_dominio", texto: REPREGUNTA_DOMINIO_FIJA };
-    }
-    if (!tieneIa) {
-      return { accion: "delegar", texto: null };
-    }
-  } else {
-    if (!tieneIa) {
-      if (esConsultaTimingMercadoAgro(mensaje) && (int === "no_agro" || int === "agro_general")) {
-        clasificacion.intencion = "analisis_mercado";
-        if (!clasificacion.confianza) clasificacion.confianza = "media";
-      }
-      if (int === "no_agro") {
-        pushAgentTurnTrace(clasificacion, {
-          ok: true,
-          via: "sin_ia_clasificador_no_agro",
-          modo: "solo_ia_fallback",
-          emitioRepregunta: true,
-        });
-        return { accion: "repregunta_dominio", texto: REPREGUNTA_DOMINIO_FIJA };
-      }
-      if (heuristicaNoAgroFuerte(mensaje)) {
-        pushAgentTurnTrace(clasificacion, {
-          ok: true,
-          via: "heuristica_fallback_sin_ia",
-          modo: "solo_ia_fallback",
-          emitioRepregunta: true,
-        });
-        return { accion: "repregunta_dominio", texto: REPREGUNTA_DOMINIO_FIJA };
-      }
-      return { accion: "delegar", texto: null };
-    }
+    return { accion: "delegar", texto: null };
   }
 
   try {
-    const modoPrompt = hibrido ? "hibrido" : "solo_ia";
+    const modoPrompt = dominioModoHibrido() ? "hibrido" : "solo_ia";
     const { parsed, providerUsed, model, trace } = await llamarDominioJson({
       clasificacion,
       mensaje,

@@ -38,78 +38,6 @@ const esPreguntaAyudaRegistroGasto = (texto = "") => {
   return pideComo && mencionaGasto && !/(gaste|gast[eé]|compre|compr[eé])\s+[\d.,]/i.test(t);
 };
 
-/** Última línea + texto completo (citas / respuestas largas arriba en WhatsApp). */
-const candidatosMetaFechaHora = (texto = "") => {
-  const raw = String(texto || "").trim();
-  const lines = raw.split(/\r?\n+/).map((l) => l.trim()).filter(Boolean);
-  const out = [];
-  if (lines.length) out.push(lines[lines.length - 1].replace(/\s+/g, " ").trim());
-  out.push(raw.replace(/\s+/g, " ").trim());
-  return [...new Set(out.filter(Boolean))];
-};
-
-const esMetaFechaHeuristica = (texto = "") => {
-  for (const cand of candidatosMetaFechaHora(texto)) {
-    const t = normalizarTexto(cand).replace(/[¿?]/g, "").replace(/\s+/g, " ").trim();
-    if (!t || t.length > 96) continue;
-    if (
-      /^(que|qu[eé])\s+d[ií]a\s+(es\s+)?(hoy|ahora)\b/.test(t) ||
-      /^fecha\s+(de\s+)?hoy\b/.test(t) ||
-      /^hoy\s+que\s+d[ií]a\b/.test(t) ||
-      /^que\s+fecha\s+(es\s+)?hoy\b/.test(t) ||
-      /^(cu[aá]l|cual)\s+es\s+la\s+fecha\s+(de\s+)?hoy\b/.test(t) ||
-      /^(cu[aá]l|cual)\s+d[ií]a\s+(es\s+)?(hoy|este)\b/.test(t) ||
-      /\bque\s+d[ií]a\s+corresponde\b/.test(t) ||
-      /\bque\s+d[ií]a\s+es\s+hoy\b/.test(t)
-    ) {
-      return true;
-    }
-  }
-  return false;
-};
-
-const esMetaHoraHeuristica = (texto = "") => {
-  for (const cand of candidatosMetaFechaHora(texto)) {
-    const t = normalizarTexto(cand).replace(/[¿?]/g, "").replace(/\s+/g, " ").trim();
-    if (!t || t.length > 96) continue;
-    if (
-      /^(y\s+)?(que|qu[eé])\s+hora\s+es\b/.test(t) ||
-      /^hora\s+actual\b/.test(t) ||
-      /^decime\s+la\s+hora\b/.test(t) ||
-      /^me\s+decis\s+la\s+hora\b/.test(t) ||
-      /^ten[eé]s\s+la\s+hora\b/.test(t) ||
-      /\bqu[eé]\s+hora\s+es\b/.test(t)
-    ) {
-      return true;
-    }
-  }
-  return false;
-};
-
-/**
- * El usuario indica que la respuesta anterior fue fuera de tema o repetitiva.
- * No debe caer en `rutaSaludo` con el menú precio/clima/análisis en bucle.
- */
-const esQuejaCorreccionRespuestaBot = (texto = "") => {
-  const t = normalizarTexto(texto).replace(/[¿?¡!.,;:]+/g, " ").replace(/\s+/g, " ").trim();
-  if (!t || t.length > 220) return false;
-  return (
-    /\bno\s+te\s+pregunt/.test(t) ||
-    /\bno\s+es\s+eso\s+lo\s+que\s+pregunt/.test(t) ||
-    /\bsolo\s+te\s+pregunt/.test(t) ||
-    /\bsolo\s+quer[ií]a\s+(saber|pregunt)/.test(t) ||
-    /\bme\s+(?:estas|est[aá]s)\s+respond/.test(t) ||
-    /\bsiempre\s+lo\s+mismo\b/.test(t) ||
-    /\bme\s+repet[ií]s\b/.test(t) ||
-    /\bno\s+me\s+entend/.test(t) ||
-    /\bte\s+equivoc/.test(t) ||
-    /\best[aá]s\s+equivocad/.test(t) ||
-    /\bpor\s+el\s+d[ií]a\b/.test(t) ||
-    /\bme\s+refer[ií]a\s+al\s+d[ií]a\b/.test(t) ||
-    /\bera\s+(por\s+)?el\s+d[ií]a\b/.test(t)
-  );
-};
-
 const esMensajeRuidoOSinSentido = (texto = "") => {
   const raw = String(texto || "").trim();
   if (!raw) return true;
@@ -228,6 +156,7 @@ const normalizarTipoIntencion = (raw = "") => {
     fuera_dominio: "no_agro",
     off_topic: "no_agro",
     trivia: "no_agro",
+    consulta_registros: "consulta_registros",
   };
   return map[t] || "consulta_libre";
 };
@@ -264,6 +193,15 @@ const inferirComandoNatural = (texto = "") => {
   if (/cuanto gane|cuanto gan[eé]|mi margen|margen del mes|gan[eé] este mes/.test(t)) return "MI MARGEN";
   // Cambio de plan en lenguaje natural (antes que "planes" → MI PLAN; sin matchear solo "¿cuánto sale el plan pro?").
   if (
+    /\bquiero\s+plan\s+pro\s*max\b/.test(t) ||
+    /\bquiero\s+el\s+plan\s+pro\s*max\b/.test(t) ||
+    /\b(pasar|cambiar|cambio|subir|activar|contratar|suscribirme|suscribir|pasarme|pasame|pasá)\b.*\bplan\s+pro\s*max\b/.test(t) ||
+    /\bplan\s+pro\s*max\b.*\b(pasar|cambiar|cambio|subir|activar|contratar|suscribir)\b/.test(t) ||
+    /\b(me\s+)?(pod[eé]s|podes)\s+(pasar|pasarme)\b.*\bplan\s+pro\s*max\b/.test(t)
+  ) {
+    return "QUIERO PLAN PRO MAX";
+  }
+  if (
     /\bquiero\s+plan\s+pro\b/.test(t) ||
     /\bquiero\s+el\s+plan\s+pro\b/.test(t) ||
     /\b(pasar|cambiar|cambio|subir|activar|contratar|suscribirme|suscribir|pasarme|pasame|pasá)\b.*\bplan\s+pro\b/.test(t) ||
@@ -291,8 +229,11 @@ const inferirComandoNatural = (texto = "") => {
     return "QUIERO PLAN GRATIS";
   }
   if (/que planes|planes tienen|planes/.test(t)) return "MI PLAN";
-  if (/(ver|mostrar|consultar).*(insumos)|\binsumos\b/.test(t)) return "__INSUMOS__";
-  if (/(alerta|avisame|av[ií]same|me avisas|me avises|avisa cuando|avisar cuando|avisar si|avisame si|av[ií]same si|alertame)/.test(t)) return "__ALERTA__";
+  if (/(ver|mostrar|consultar|listar|mis|cargar|carga)\s*insumos/i.test(t) || t.trim() === "insumos") return "__INSUMOS__";
+  if (
+    /(crear\s+alerta|nueva\s+alerta|configurar\s+alerta|alertame|alert[aá]me)\b/i.test(t) ||
+    /(avisame|av[ií]same|avisa|avisar|me\s+avisas|me\s+avises)\s+(cuando|si|cuando\s+supere|cuando\s+baje|cuando\s+llegue)\b/i.test(t)
+  ) return "__ALERTA__";
   if (
     /(quiero desuscribirme|desuscribirme|dar de baja suscripcion|dar de baja suscripción|cancelar suscripcion|cancelar suscripción|cancelar mercado pago|cancelar mp|dar de baja mp)/.test(
       t
@@ -301,7 +242,7 @@ const inferirComandoNatural = (texto = "") => {
     return "QUIERO DESUSCRIBIRME";
   }
   if (/editar perfil|modificar perfil|actualizar perfil|completar perfil/.test(t)) return "COMPLETAR PERFIL";
-  if (/(agregar|actualizar|modificar).*(zona|zonas|lote|lotes)|quiero agregar zonas/.test(t)) return "__ZONAS__";
+  if (/\b(agregar|actualizar|modificar)\s+(mi\s+)?zonas?\b|quiero agregar zonas/.test(t)) return "__ZONAS__";
   if (/(agregar|sumar|mas|más).*(noticia|noticias)|configurar noticias/.test(t)) return "__NOTICIAS__";
   if (/(vendi|vendi|venta|vender)/.test(t) && /\d/.test(t)) return "__VENTA__";
   if (/(gaste|gaste|compre|compr[eé]|gasto|compra)/.test(t) && /\d/.test(t)) return "__GASTO__";
@@ -460,8 +401,9 @@ const esFrasePuenteConsulta = (texto = "") => {
 };
 
 /**
- * Intención clara sin llamar a Gemini (saludar, TC solo, menú, fecha, puente).
- * Orden: ayuda menú → meta fecha → dólar (antes que saludo por "buenas, el dólar…") → saludo/puente.
+ * Intención clara sin llamar a Gemini (saludar, TC solo, menú, puente).
+ * Fecha/hora civil y reproches van al clasificador + verify (`clasificador.js`).
+ * Orden: ayuda menú → dólar (antes que saludo por "buenas, el dólar…") → saludo/puente.
  */
 const intencionHeuristicaRapidaSinGemini = (input = "") => {
   const t = String(input || "").trim();
@@ -471,12 +413,6 @@ const intencionHeuristicaRapidaSinGemini = (input = "") => {
   }
   if (esPreguntaAyudaComandosOMenu(t)) {
     return { tipo: "ayuda_uso", comando: null, parametros: { recurso: "comandos" } };
-  }
-  if (esMetaHoraHeuristica(t)) {
-    return { tipo: "meta_hora", comando: null, parametros: {} };
-  }
-  if (esMetaFechaHeuristica(t)) {
-    return { tipo: "meta_fecha", comando: null, parametros: {} };
   }
   if (esActualidadGeopoliticaSinAnclaAgro(t)) {
     return { tipo: "no_agro", comando: null, parametros: {} };
@@ -551,26 +487,51 @@ const detectarIntencionIA = async (texto = "") => {
   const inputEfectivo = textoParaClasificacionSaludo(input);
   try {
     const system = [
-      "Clasificá intención de mensaje WhatsApp (productor agro, Argentina) en JSON estricto.",
-      "Responder SOLO JSON válido sin texto extra.",
-      "Schema:",
-      '{"tipo":"saludo|meta_fecha|ayuda_uso|tipo_cambio|no_agro|comando|consulta_libre","comando":"MI_RESUMEN|MIS_ALERTAS|MI_MARGEN|CREAR_ALERTA|REGISTRAR_GASTO|REGISTRAR_VENTA|ANALIZAR_CULTIVO|PLANES|null","parametros":{"cultivo":null,"valor":null,"recurso":null}}',
-      "tipo:",
-      "- saludo: interacción social o cortesía (saludar, preguntar cómo estás, desear buen día, charla breve sin pedido). Incluye errores de tipeo, abreviaturas y oralidad si NO hay pedido explícito de datos agro (precio, cultivo, clima, MATBA, dólar, logística, hectáreas, venta, comandos).",
-      "- Si además de cortesía pide precio, clima, futuros, logística o cualquier dato operativo → consulta_libre (no saludo).",
-      "- meta_fecha: pregunta por el día/fecha de hoy o 'qué día es', sin pedir precios ni mercado.",
-      "- tipo_cambio: SOLO cotización del dólar/tipo de cambio (oficial, blue, MEP, CCL) sin mezclar con precios de granos ni cultivos.",
-      "- no_agro: conocimiento general o curiosidad SIN ancla al negocio agropecuario argentino operativo (no pide precio de granos, clima de campo, logística de cosecha, MAGYP, MATBA, hacienda, insumos, normativa sectorial ni decisión de venta). Incluye geografía/enciclopedia (p. ej. capital de un país, población, continentes), astronomía recreativa, deportes, historia no ligada al campo, tecnología de consumo. Mencionar otro país (México, Brasil, etc.) por sí solo NO es consulta agro: solo es consulta_libre si pide datos de mercado, logística o política comercial explícitos.",
-      "- NO usar no_agro si hay cultivo, precio, clima operativo, flete, dólar para operar, ganado, hectáreas, 'me conviene', exportación/importación de granos, ni onboarding de datos productivos.",
-      "- Ante duda entre no_agro y consulta_libre en preguntas de cultura general o geografía sin esos anclas → preferir no_agro.",
-      "- ayuda_uso: quiere saber CÓMO usar el bot (registrar venta/gasto, comandos, dónde cargar datos). Sin números de operación para registrar.",
-      "- ayuda_uso recurso comandos: 'qué comando puedo usar', 'lista de comandos', 'cómo se usa el bot', 'menú', 'ver comandos', 'qué escribo acá' (sin pedir precio de un cultivo).",
-      "- comando: quiere ejecutar un comando explícito o equivalente claro (resumen, alertas, margen, etc.).",
-      "- consulta_libre: consulta de precios, clima, decisión de venta, MATBA, logística, u otro tema agro con datos.",
-      "parametros.recurso (solo si tipo=ayuda_uso): 'venta'|'gasto'|'comandos'|'otro'.",
-      "Si no encaja nada, usar consulta_libre.",
-      "REGISTRAR_VENTA: SOLO si anota una venta concreta (montos/cantidades explícitos). NO para 'cómo agrego' ni 'dónde cargo'.",
-      "NUNCA REGISTRAR_VENTA si solo pregunta si conviene vender, análisis de mercado, MATBA, spread, carry, FOB, Rosario, o mezcla de fuentes.",
+      "Clasificá la intención del mensaje de WhatsApp (productor agro argentino) y extraé entidades clave en JSON estricto.",
+      "Responder SOLO JSON válido sin texto extra, sin markdown block (```json).",
+      "",
+      "Schema JSON:",
+      "{",
+      "  \"tipo\": \"saludo|meta_fecha|ayuda_uso|tipo_cambio|no_agro|comando|consulta_libre|consulta_registros\",",
+      "  \"comando\": \"MI_RESUMEN|MIS_ALERTAS|MI_MARGEN|CREAR_ALERTA|REGISTRAR_GASTO|REGISTRAR_VENTA|PLANES|null\",",
+      "  \"parametros\": {",
+      "    \"cultivo\": \"soja|maiz|trigo|girasol|cebada|sorgo|papa|null\",",
+      "    \"producto\": \"hacienda|insumo|null\",",
+      "    \"monto\": number o null,",
+      "    \"cantidad\": number o null,",
+      "    \"unidad\": \"kg|tn|qq|cabezas|has|bolsas|lts|null\",",
+      "    \"concepto\": \"concepto del gasto/compra o null\",",
+      "    \"periodo\": \"hoy|manana|pasado_manana|fin_de_semana|semana|todos|null\",",
+      "    \"zona\": \"nombre de zona o null\",",
+      "    \"caravana\": \"código de caravana o null\",",
+      "    \"recurso\": \"venta|gasto|comandos|otro|null\",",
+      "    \"valor\": \"string o null\"",
+      "  }",
+      "}",
+      "",
+      "Explicación de tipo:",
+      "- saludo: cortesía o charla social corta sin pedido operativo de datos agro.",
+      "- meta_fecha: pregunta por el día civil/fecha de hoy (sin precios ni mercado).",
+      "- tipo_cambio: cotización exclusiva de dólar (oficial, blue, MEP, CCL) sin cultivos.",
+      "- no_agro: temas ajenos a la producción agropecuaria de Argentina (deportes, geopolítica, ocio).",
+      "- ayuda_uso: el usuario quiere saber cómo usar el bot o comandos.",
+      "- comando: quiere ejecutar funciones del bot (MI RESUMEN, MIS ALERTAS, etc.) o configurar alertas (avisame si soja supera X) o registrar gastos/ventas concretas.",
+      "- consulta_libre: precios de cultivos, clima futuro, análisis de mercado o ratio técnico.",
+      "- consulta_registros: consultar datos que él mismo cargó antes (mis gastos, mis ventas, inventario, etc.).",
+      "",
+      "Comandos Especiales de Registro (tipo=comando):",
+      "- REGISTRAR_GASTO: si el usuario ingresa un gasto concreto con montos/cantidades (ej. 'gasté 450000 pesos en urea', 'compré semilla por 150000').",
+      "- REGISTRAR_VENTA: si el usuario ingresa una venta concreta con cantidades (ej. 'vendí 80 tn de soja a 430000').",
+      "- CREAR_ALERTA: si pide que le avises cuando un cultivo alcance cierto precio.",
+      "",
+      "Extracción de Parámetros:",
+      "- concepto: el producto o servicio del gasto (ej. 'urea', 'semilla', 'flete').",
+      "- producto: 'insumo' para agroquímicos/semillas/fertilizantes, o 'hacienda' para vacunos/novillos/etc.",
+      "- monto: el importe total en números.",
+      "- cantidad: volumen o unidades físicas.",
+      "- unidad: la unidad de medida (ej. 'tn', 'qq', 'cabezas').",
+      "- periodo: periodo de clima consultado.",
+      "- zona: localidad o provincia consultada."
     ].join("\n");
     const user = `Mensaje: ${inputEfectivo}`;
     const out = await generarClasificacionIntencion({ system, user });
@@ -583,6 +544,18 @@ const detectarIntencionIA = async (texto = "") => {
     let comando = parsed?.comando || null;
     let parametros = typeof parsed?.parametros === "object" && parsed?.parametros ? { ...parsed.parametros } : {};
     if (tipo === "comando" && !comando) tipo = "consulta_libre";
+
+    if (comando === "MI_RESUMEN" || tipo === "ayuda_uso") {
+      const tNorm = normalizarTexto(input);
+      if (
+        (/\b(registrad\w*|regstrad\w*|cargad\w*|guardad\w*|tengo|hay|stock|inventario|saldos?|existencias?)\b/i.test(tNorm) || 
+         /\bque\s+tengo\b/i.test(tNorm)) &&
+        !/\bresumen\b/i.test(tNorm)
+      ) {
+        tipo = "consulta_registros";
+        comando = null;
+      }
+    }
     if (
       tipo === "ayuda_uso" ||
       tipo === "meta_fecha" ||
@@ -596,6 +569,22 @@ const detectarIntencionIA = async (texto = "") => {
     if (comando === "REGISTRAR_VENTA" && (esConsultaMercadoExcluyeRegistroVenta(input) || esPreguntaAyudaRegistroVenta(input))) {
       tipo = "consulta_libre";
       comando = null;
+    }
+    if (comando === "REGISTRAR_GASTO") {
+      const t = normalizarTexto(input);
+      const tieneCantidadFisica = /\b(bolsas?|kilos?|kgs?|tn|toneladas?|cabezas?|cabs?\.?|hect[aá]reas?|has?|lts?\.?|litros?|lote|vacas?|novillos?|terneros?)\b/i.test(t);
+      if (tieneCantidadFisica || !/\d/.test(t)) {
+        tipo = "consulta_libre";
+        comando = null;
+      }
+    }
+    if (comando === "MI MARGEN") {
+      const t = normalizarTexto(input);
+      const esPedidoCalculoDinamico = /\b(calcula|estimar|estima|calcular|supongamos|supongas|si\s+tengo|con\s+un\s+rinde)\b/i.test(t) || (t.includes("margen") && /\d/.test(t));
+      if (esPedidoCalculoDinamico) {
+        tipo = "consulta_libre";
+        comando = null;
+      }
     }
     if (tipo === "consulta_libre" && esConsultaDolarRapida(input)) {
       tipo = "tipo_cambio";
@@ -627,18 +616,6 @@ const detectarIntencionIA = async (texto = "") => {
       comando = null;
       parametros = {};
     }
-    /** Post-Gemini: calendario civil (día/hora) no debe ir a plantilla de mercado. */
-    const puedeForzarMetaTiempo = (x) =>
-      ["consulta_libre", "saludo", "no_agro", "analisis_mercado", "analisis_interno", "precio", "clima", "agro_general"].includes(x);
-    if (esMetaHoraHeuristica(input) && puedeForzarMetaTiempo(tipo)) {
-      tipo = "meta_hora";
-      comando = null;
-      parametros = {};
-    } else if (esMetaFechaHeuristica(input) && puedeForzarMetaTiempo(tipo)) {
-      tipo = "meta_fecha";
-      comando = null;
-      parametros = {};
-    }
     if (tipo === "ayuda_uso") {
       parametros.recurso = normalizarRecursoAyuda(parametros.recurso || parametros.tema || "");
     }
@@ -655,7 +632,14 @@ const detectarIntencionIA = async (texto = "") => {
     const heur = inferirComandoNatural(input);
     if (heur === "MI RESUMEN") return { tipo: "comando", comando: "MI_RESUMEN", parametros: {} };
     if (heur === "MIS ALERTAS") return { tipo: "comando", comando: "MIS_ALERTAS", parametros: {} };
-    if (heur === "MI MARGEN") return { tipo: "comando", comando: "MI_MARGEN", parametros: {} };
+    if (heur === "MI MARGEN") {
+      const t = normalizarTexto(input);
+      const esPedidoCalculoDinamico = /\b(calcula|estimar|estima|calcular|supongamos|supongas|si\s+tengo|con\s+un\s+rinde)\b/i.test(t) || (t.includes("margen") && /\d/.test(t));
+      if (esPedidoCalculoDinamico) {
+        return { tipo: "consulta_libre", comando: null, parametros: {} };
+      }
+      return { tipo: "comando", comando: "MI_MARGEN", parametros: {} };
+    }
     if (heur === "MI PLAN") return { tipo: "comando", comando: "PLANES", parametros: {} };
     if (heur === "__ALERTA__") return { tipo: "comando", comando: "CREAR_ALERTA", parametros: {} };
     if (heur === "__GASTO__") return { tipo: "comando", comando: "REGISTRAR_GASTO", parametros: {} };
@@ -691,9 +675,6 @@ module.exports = {
   esConsultaMercadoExcluyeRegistroVenta,
   esPreguntaAyudaRegistroVenta,
   esPreguntaAyudaRegistroGasto,
-  esMetaFechaHeuristica,
-  esMetaHoraHeuristica,
-  esQuejaCorreccionRespuestaBot,
   esPreguntaAyudaComandosOMenu,
   esConsultaDolarRapida,
   esFrasePuenteConsulta,
