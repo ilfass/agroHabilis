@@ -2693,10 +2693,7 @@
                   Hacé clic en el mapa para ubicar lotes o arrastrá los marcadores para actualizar su posición. También podés hacer doble-clic para crear un lote nuevo.
                 </p>
                 <div id="catastroMap" style="flex-grow: 1; border-radius: 12px; z-index: 1; min-height: 480px;"></div>
-                <div id="catastroMapModeOverlay" class="hide" style="position: fixed; top: 100px; left: 50%; transform: translateX(-50%); z-index: 9999; background: rgba(16, 185, 129, 0.97); color: white; padding: 12px 20px; border-radius: 12px; font-weight: 700; font-size: 13px; box-shadow: 0 6px 20px rgba(0,0,0,0.25); display: flex; align-items: center; gap: 12px; white-space: nowrap;">
-                  <span id="catastroMapModeText">📌 Hacé clic en el mapa para posicionar el lote.</span>
-                  <button type="button" id="btnCancelMapMode" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.5); color: white; padding: 4px 12px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: 700;">✕ Cancelar</button>
-                </div>
+
               </div>
 
               <!-- Listados y Controles de Gestión -->
@@ -2705,7 +2702,11 @@
                 <div style="display: flex; gap: 8px; border-bottom: 2px solid #f1f5f9; padding-bottom: 12px; margin-bottom: 16px;">
                   <button type="button" class="btn-secondary active" id="btnCatTabLotes" style="flex: 1; padding: 8px 4px; font-size: 12px;">🌾 Lotes</button>
                   <button type="button" class="btn-secondary" id="btnCatTabFirmas" style="flex: 1; padding: 8px 4px; font-size: 12px;">🏢 Firmas</button>
-                  <button type="button" class="btn-secondary" id="btnCatTabCampos" style="flex: 1; padding: 8px 4px; font-size: 12px;">🚜 Campos</button>
+                </div>
+                
+                <div id="catastroMapModeOverlay" class="hide" style="margin-bottom: 16px; background: rgba(16, 185, 129, 0.1); border: 2px dashed #10b981; color: #065f46; padding: 12px 16px; border-radius: 12px; font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+                  <span id="catastroMapModeText">📌 Hacé clic en el mapa para posicionar el lote.</span>
+                  <button type="button" id="btnCancelMapMode" style="background: white; border: 1px solid #10b981; color: #10b981; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: 800; transition: background 0.2s;" onmouseover="this.style.background='#f0fdf4'" onmouseout="this.style.background='white'">✕ Cancelar</button>
                 </div>
 
                 <!-- Content Lotes -->
