@@ -81,7 +81,7 @@ const analizarMediaAgro = async (mediaBuffer, mimeType, userPrompt = "", isRetry
   } catch (error) {
     console.error("[Vision] Error analizando media:", error.message);
     const errText = error.message.toLowerCase();
-    const isQuotaError = errText.includes("429") || errText.includes("spending cap") || errText.includes("limit") || errText.includes("quota");
+    const isQuotaError = errText.includes("429") || errText.includes("spending cap") || errText.includes("limit") || errText.includes("quota") || errText.includes("exhausted") || errText.includes("503") || errText.includes("unavailable") || errText.includes("high demand");
     if (isQuotaError && !isRetry) {
       markFreeKeyAsFailed(true);
       console.log("[Vision] Reintentando analizarMediaAgro con clave de Fallback...");
@@ -196,7 +196,7 @@ Reglas específicas de extracción:
   } catch (error) {
     console.error("[Vision Monitor] Error analizando media:", error.message);
     const errText = error.message.toLowerCase();
-    const isQuotaError = errText.includes("429") || errText.includes("spending cap") || errText.includes("limit") || errText.includes("quota");
+    const isQuotaError = errText.includes("429") || errText.includes("spending cap") || errText.includes("limit") || errText.includes("quota") || errText.includes("exhausted") || errText.includes("503") || errText.includes("unavailable") || errText.includes("high demand");
     if (isQuotaError && !isRetry) {
       markFreeKeyAsFailed(true);
       console.log("[Vision Monitor] Reintentando extraerDatosMonitor con clave de Fallback...");
@@ -300,7 +300,7 @@ const analizarMediaAgroUnificado = async (mediaBuffer, mimeType, userPrompt = ""
   } catch (error) {
     console.error("[Vision Unificado] Error analizando media:", error.message);
     const errText = error.message.toLowerCase();
-    const isQuotaError = errText.includes("429") || errText.includes("spending cap") || errText.includes("limit") || errText.includes("quota");
+    const isQuotaError = errText.includes("429") || errText.includes("spending cap") || errText.includes("limit") || errText.includes("quota") || errText.includes("exhausted") || errText.includes("503") || errText.includes("unavailable") || errText.includes("high demand");
     if (isQuotaError && !isRetry) {
       markFreeKeyAsFailed(true);
       console.log("[Vision Unificado] Reintentando analizarMediaAgroUnificado con clave de Fallback...");

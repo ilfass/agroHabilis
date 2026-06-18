@@ -678,7 +678,10 @@ const procesarMensajeEntranteWhatsapp = async (msg) => {
                                  errText.includes("spending cap") || 
                                  errText.includes("limit") || 
                                  errText.includes("quota") || 
-                                 errText.includes("exhausted");
+                                 errText.includes("exhausted") ||
+                                 errText.includes("503") ||
+                                 errText.includes("unavailable") ||
+                                 errText.includes("high demand");
 
             if (isQuotaError) {
               console.warn(`[Vision] ⚠️ Error de cuota detectado. Guardando en cola de reintentos...`);
