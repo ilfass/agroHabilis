@@ -366,8 +366,12 @@ CREATE TABLE IF NOT EXISTS campanas_agricolas (
   fecha_inicio DATE,
   fecha_fin DATE,
   activa BOOLEAN DEFAULT true,
+  comentarios TEXT,
   creado_en TIMESTAMP DEFAULT NOW()
 );
+
+-- Migración segura si la tabla ya existía
+ALTER TABLE campanas_agricolas ADD COLUMN IF NOT EXISTS comentarios TEXT;
 
 
 CREATE TABLE IF NOT EXISTS firmas (

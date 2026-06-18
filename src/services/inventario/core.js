@@ -99,7 +99,7 @@ async function listarCampanasUsuario(usuarioId) {
   if (!usuarioId) return [];
   const r = await query(
     `
-      SELECT id, nombre, fecha_inicio, fecha_fin, activa
+      SELECT id, nombre, fecha_inicio, fecha_fin, activa, comentarios
       FROM campanas_agricolas
       WHERE usuario_id = $1
       ORDER BY activa DESC NULLS LAST, id DESC
@@ -117,9 +117,25 @@ async function crearCampanaUsuario({ usuarioId, nombre, fechaInicio = null, fech
     `
       INSERT INTO campanas_agricolas (usuario_id, nombre, fecha_inicio, fecha_fin, activa)
       VALUES ($1, $2, $3, $4, true)
-      RETURNING id, nombre, fecha_inicio, fecha_fin, activa
+      RETURNING id, nombre, fecha_inicio, fecha_fin, activa, comentarios
     `,
     [usuarioId, n, fechaInicio || null, fechaFin || null]
+  );
+  return r.rows[0];
+}
+
+async function editarCampanaUsuario({ usuarioId, campanaId, nombre, comentarios }) {
+  const n = String(nombre || "").trim();
+  if (!n) throw new Error("nombre_campana_obligatorio");
+  const r = await query(
+    `
+      UPDATE campanas_agricolas
+      SET nombre = $3,
+          comentarios = $4
+      WHERE id = $2 AND usuario_id = $1
+      RETURNING id, nombre, fecha_inicio, fecha_fin, activa, comentarios
+    `,
+    [usuarioId, campanaId, n, comentarios || null]
   );
   return r.rows[0];
 }
@@ -862,6 +878,7 @@ module.exports = {
   asegurarCampanaUsuario,
   listarCampanasUsuario,
   crearCampanaUsuario,
+  editarCampanaUsuario,
   resolverCampanaPorNombre,
   listarLotesUsuario,
   crearLoteUsuario,

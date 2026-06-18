@@ -125,14 +125,15 @@ router.post("/lotes", async (req, res) => {
     const partido = req.body.partido ? String(req.body.partido).trim() : null;
     const cultivo = req.body.cultivo ? String(req.body.cultivo).trim() : null;
     const variedad = req.body.variedad ? String(req.body.variedad).trim() : null;
+    const uso = req.body.uso ? String(req.body.uso).trim() : null;
     if (!nombre) return res.status(400).json({ ok: false, error: "Nombre requerido" });
 
     const codigo = await generarCodigo(query, "ubicaciones", PREFIJOS.lotes, uid);
     const { rows } = await query(
-      `INSERT INTO ubicaciones (usuario_id, nombre, campo_id, hectareas, lat, lng, geojson, tipo, codigo, firma, provincia, partido, cultivo, variedad)
-       VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10,$11,$12,$13,$14)
+      `INSERT INTO ubicaciones (usuario_id, nombre, campo_id, hectareas, lat, lng, geojson, tipo, codigo, firma, provincia, partido, cultivo, variedad, uso)
+       VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10,$11,$12,$13,$14,$15)
        RETURNING *`,
-      [uid, nombre, campo_id, hectareas, lat, lng, geojson ? JSON.stringify(geojson) : null, tipo, codigo, firma, provincia, partido, cultivo, variedad]
+      [uid, nombre, campo_id, hectareas, lat, lng, geojson ? JSON.stringify(geojson) : null, tipo, codigo, firma, provincia, partido, cultivo, variedad, uso]
     );
     res.json({ ok: true, data: rows[0] });
   } catch (e) { res.status(500).json({ ok: false, error: e.message }); }
@@ -153,6 +154,7 @@ router.put("/lotes/:id", async (req, res) => {
     const partido = req.body.partido !== undefined ? (req.body.partido ? String(req.body.partido).trim() : null) : undefined;
     const cultivo = req.body.cultivo !== undefined ? (req.body.cultivo ? String(req.body.cultivo).trim() : null) : undefined;
     const variedad = req.body.variedad !== undefined ? (req.body.variedad ? String(req.body.variedad).trim() : null) : undefined;
+    const uso = req.body.uso !== undefined ? (req.body.uso ? String(req.body.uso).trim() : null) : undefined;
     if (!nombre) return res.status(400).json({ ok: false, error: "Nombre requerido" });
 
     let sql = "UPDATE ubicaciones SET nombre=$1, campo_id=$2, hectareas=$3, lat=$4, lng=$5";
@@ -166,6 +168,7 @@ router.put("/lotes/:id", async (req, res) => {
     if (partido !== undefined) { sql += `, partido=$${idx}`; params.push(partido); idx++; }
     if (cultivo !== undefined) { sql += `, cultivo=$${idx}`; params.push(cultivo); idx++; }
     if (variedad !== undefined) { sql += `, variedad=$${idx}`; params.push(variedad); idx++; }
+    if (uso !== undefined) { sql += `, uso=$${idx}`; params.push(uso); idx++; }
                     
     sql += ` WHERE id=$${idx} AND usuario_id=$${idx+1} RETURNING *`;
     params.push(req.params.id, uid);

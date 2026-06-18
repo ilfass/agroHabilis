@@ -90,6 +90,7 @@ const {
   crearLoteUsuario: invCrearLote,
   listarCampanasUsuario: invListarCampanas,
   crearCampanaUsuario: invCrearCampana,
+  editarCampanaUsuario: invEditarCampana,
   listarSaldos: invListarSaldos,
   listarMovimientos: invListarMovimientos,
   registroConfirmadoDirecto: invRegistroDirecto,
@@ -378,7 +379,8 @@ app.use(async (req, res, next) => {
   if (
     req.path.startsWith("/api/dashboard/cliente") ||
     req.path.startsWith("/api/inventario/") ||
-    req.path.startsWith("/api/catastro/")
+    req.path.startsWith("/api/catastro/") ||
+    req.path.startsWith("/api/registros/")
   ) {
     return requireClienteApiAuth({ requirePasswordChanged: true })(req, res, next);
   }
@@ -560,6 +562,7 @@ app.get("/api/health", (_req, res) => {
 });
 
 app.use("/api/catastro", require("./services/api_catastro"));
+app.use("/api/registros", require("./services/api_registros"));
 
 app.get("/health", (_req, res) => {
   res.json({
@@ -3154,6 +3157,23 @@ app.post("/api/inventario/campanas", async (req, res) => {
     return res.json({ ok: true, campana: row });
   } catch (error) {
     console.error("Fallo POST /api/inventario/campanas:", error.message);
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+app.put("/api/inventario/campanas/:id", async (req, res) => {
+  try {
+    const usuarioId = req.clienteSession?.user?.id;
+    const campanaId = Number(req.params.id);
+    if (!Number.isFinite(campanaId)) return res.status(400).json({ ok: false, error: "ID de campaña inválido" });
+    const nombre = String(req.body?.nombre || "").trim();
+    const comentarios = req.body?.comentarios !== undefined ? String(req.body.comentarios).trim() : null;
+    if (!nombre) return res.status(400).json({ ok: false, error: "nombre obligatorio" });
+    
+    const row = await invEditarCampana({ usuarioId, campanaId, nombre, comentarios });
+    return res.json({ ok: true, campana: row });
+  } catch (error) {
+    console.error("Fallo PUT /api/inventario/campanas:", error.message);
     return res.status(500).json({ ok: false, error: error.message });
   }
 });

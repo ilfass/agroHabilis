@@ -1948,6 +1948,11 @@
           </button>
           
           <div class="nav-section-title">🚜 Gestión Productiva</div>
+          <button class="tab-link" data-tab="campanas" type="button">
+            <span class="title-text">📅 Campañas</span>
+            <small>Resumen y Cuaderno</small>
+          </button>
+
           <button class="tab-link" data-tab="hacienda_pasturas" type="button">
             <span class="title-text">Ganadería y Pasturas</span>
             <small>Carga animal y pastoreo</small>
@@ -2193,6 +2198,8 @@
                     <tbody id="enviosBody"></tbody>
                   </table>
                 </div>
+              </div>
+            </div>
             <div class="layout-split-equal" style="margin-top: 24px;">
               <!-- Mapa de Lotes -->
               <div class="card" style="display: flex; flex-direction: column; height: 400px; min-height: 400px;">
@@ -2424,6 +2431,25 @@
             </div>
           </section>
 
+          <!-- TAB NUEVO: CAMPAÑAS -->
+          <section class="tab-panel" data-panel="campanas">
+            <div style="display: flex; flex-direction: column; gap: 24px;">
+              <div class="card" style="width: 100%;">
+                <div class="card-header-group" style="display: flex; justify-content: space-between; align-items: center;">
+                  <div>
+                    <h3>📅 Gestión de Campañas</h3>
+                    <p class="card-subtitle" style="margin-bottom: 0;">Cuaderno de campo y organización de tus ciclos productivos.</p>
+                  </div>
+                  <button type="button" class="btn-primary" onclick="abrirModalCampana()" style="padding: 10px 20px; font-size: 14px; font-weight: 800; background-color: #f59e0b; border-color: #f59e0b; box-shadow: 0 4px 6px rgba(245, 158, 11, 0.2);">+ Nueva Campaña</button>
+                </div>
+                
+                <div id="campanasContainer" style="margin-top: 24px; display: grid; grid-template-columns: 1fr; gap: 16px;">
+                  <div style="text-align: center; padding: 24px; color: #64748b;">Cargando campañas...</div>
+                </div>
+              </div>
+            </div>
+          </section>
+
           <!-- TAB 2: GANADERÍA Y PASTURAS (DEDICADO Y COMPLETO) -->
           <section class="tab-panel" data-panel="hacienda_pasturas">
             <div class="card tab-hero">
@@ -2438,13 +2464,16 @@
 
             <!-- Hacienda Table (Full Width for Premium Readability) -->
             <div class="card" style="margin-bottom: 24px;">
-              <div class="card-header-group">
-                <div>
-                  <h3>🐄 Carga Ganadera Declarada</h3>
-                  <p class="card-subtitle">Categorías de hacienda y estimaciones de existencias físicas en stock.</p>
+                <div class="card-header-group">
+                  <div>
+                    <h3>🐄 Carga Ganadera Declarada</h3>
+                    <p class="card-subtitle">Categorías de hacienda y estimaciones de existencias físicas en stock.</p>
+                  </div>
+                  <div style="display: flex; gap: 8px; align-items: center;">
+                    <button class="btn-primary" onclick="window.abrirModalGanaderiaPerfil()" type="button" style="font-size: 11px; padding: 6px 10px;">+ Agregar</button>
+                    <button class="btn-help-bubble" onclick="abrirGloboAyuda('ganaderia')" type="button">💡 Ejemplo WhatsApp</button>
+                  </div>
                 </div>
-                <button class="btn-help-bubble" onclick="abrirGloboAyuda('ganaderia')" type="button">💡 Ejemplo WhatsApp</button>
-              </div>
               <div class="table-wrapper">
                 <table id="tableHacienda">
                   <thead>
@@ -2473,6 +2502,7 @@
                     <p class="card-subtitle">Estado de rebrote, descanso sugerido y carga ganadera actual.</p>
                   </div>
                   <div style="display: flex; gap: 8px; align-items: center;">
+                    <button class="btn-primary" onclick="window.abrirModalEventoPastura()" type="button" style="font-size: 11px; padding: 6px 10px;">+ Registrar Evento</button>
                     <span class="badge success">Lectura Rápida</span>
                     <button class="btn-help-bubble" onclick="abrirGloboAyuda('pasturas')" type="button">💡 Ejemplo WhatsApp</button>
                   </div>
@@ -2568,6 +2598,121 @@
               </div>
             </div>
 
+            <!-- Panel de Registro de Operaciones (Siembra y Aplicaciones) -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 24px; margin-bottom: 24px;">
+              <!-- Form: Registrar Siembra -->
+              <div class="card" style="margin-bottom: 0;">
+                <div class="card-header-group">
+                  <div>
+                    <h3>🌱 Registrar Siembra</h3>
+                    <p class="card-subtitle">Cargá una nueva siembra para vincularla a un lote existente.</p>
+                  </div>
+                  <span class="badge success" style="background-color: #e6f4ea; color: #137333;">Nuevo Registro</span>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 14px;">
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                    <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+                      <label for="agr-siembra-lote" style="font-weight: 700; font-size: 12px; color: #475569;">Lote / Campo</label>
+                      <select id="agr-siembra-lote" style="width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px;">
+                        <option value="">Seleccionar Lote...</option>
+                      </select>
+                    </div>
+                    <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+                      <label for="agr-siembra-campania" style="font-weight: 700; font-size: 12px; color: #475569;">Campaña</label>
+                      <select id="agr-siembra-campania" style="width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px;">
+                        <option value="23/24">23/24</option>
+                        <option value="24/25">24/25</option>
+                        <option value="25/26">25/26</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                    <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+                      <label for="agr-siembra-fecha" style="font-weight: 700; font-size: 12px; color: #475569;">Fecha de Siembra</label>
+                      <input type="date" id="agr-siembra-fecha" style="width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px;">
+                    </div>
+                    <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+                      <label for="agr-siembra-cultivo" style="font-weight: 700; font-size: 12px; color: #475569;">Cultivo</label>
+                      <input type="text" id="agr-siembra-cultivo" placeholder="Ej: Maíz" style="width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px;">
+                    </div>
+                  </div>
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                    <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+                      <label for="agr-siembra-hibrido" style="font-weight: 700; font-size: 12px; color: #475569;">Híbrido / Variedad</label>
+                      <input type="text" id="agr-siembra-hibrido" placeholder="Ej: DK72-10" style="width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px;">
+                    </div>
+                    <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+                      <label for="agr-siembra-densidad" style="font-weight: 700; font-size: 12px; color: #475569;">Densidad (sem/ha)</label>
+                      <input type="number" id="agr-siembra-densidad" placeholder="Ej: 78000" style="width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px;">
+                    </div>
+                  </div>
+                  <button type="button" id="btnGuardarSiembra" class="btn-primary" style="margin-top: 4px; width: 100%; padding: 10px; border-radius: 8px; font-weight: 700;">Guardar Siembra</button>
+                </div>
+              </div>
+
+              <!-- Form: Registrar Labor -->
+              <div class="card" style="margin-bottom: 0;">
+                <div class="card-header-group">
+                  <div>
+                    <h3>🚜 Registrar Labor</h3>
+                    <p class="card-subtitle">Registrá pulverización, fertilización, cosecha, rolo u otra labor.</p>
+                  </div>
+                  <span class="badge warning" style="background-color: #fef3c7; color: #d97706;">Nuevo Registro</span>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 14px;">
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                    <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+                      <label for="agr-aplicacion-lote" style="font-weight: 700; font-size: 12px; color: #475569;">Lote / Campo</label>
+                      <select id="agr-aplicacion-lote" style="width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px;">
+                        <option value="">Seleccionar Lote...</option>
+                      </select>
+                    </div>
+                    <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+                      <label for="agr-aplicacion-tipo" style="font-weight: 700; font-size: 12px; color: #475569;">Tipo de Labor</label>
+                      <select id="agr-aplicacion-tipo" style="width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px;" onchange="document.getElementById('insumosContainer').style.display = (this.value==='Pulverización' || this.value==='Fertilización') ? 'block' : 'none'">
+                        <option value="Pulverización">Pulverización</option>
+                        <option value="Fertilización">Fertilización</option>
+                        <option value="Cosecha">Cosecha</option>
+                        <option value="Rolo">Rolo</option>
+                        <option value="Siembra">Siembra</option>
+                        <option value="Desmalezado">Desmalezado</option>
+                        <option value="Otra">Otra Labor</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+                    <label for="agr-aplicacion-fecha" style="font-weight: 700; font-size: 12px; color: #475569;">Fecha de Labor</label>
+                    <input type="date" id="agr-aplicacion-fecha" style="width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px;">
+                  </div>
+
+                  <div id="insumosContainer" style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; background: #f8fafc;">
+                    <label style="font-weight: 700; font-size: 12px; color: #475569; display: block; margin-bottom: 8px;">Productos / Insumos Aplicados</label>
+                    <div id="productosList" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px;">
+                      <!-- Productos se agregan dinámicamente -->
+                    </div>
+                    <div style="display: grid; grid-template-columns: 2fr 3fr 2fr; gap: 8px;">
+                      <select id="addInsumoTipo" style="padding: 6px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px;">
+                        <option value="Herbicida">Herbicida</option>
+                        <option value="Fungicida">Fungicida</option>
+                        <option value="Insecticida">Insecticida</option>
+                        <option value="Fertilizante">Fertilizante</option>
+                        <option value="Coadyuvante">Coadyuvante</option>
+                      </select>
+                      <input type="text" id="addInsumoNombre" placeholder="Producto" style="padding: 6px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px;">
+                      <input type="text" id="addInsumoDosis" placeholder="Dosis" style="padding: 6px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px;">
+                    </div>
+                    <button type="button" onclick="agregarProductoLabor()" class="btn-secondary" style="margin-top: 8px; padding: 6px; font-size: 11px; width: 100%;">+ Añadir Insumo a la Mezcla</button>
+                  </div>
+
+                  <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+                    <label for="agr-aplicacion-plaga" style="font-weight: 700; font-size: 12px; color: #475569;">Observaciones / Rendimiento / Plaga</label>
+                    <input type="text" id="agr-aplicacion-plaga" placeholder="Ej: Rendimiento 35 qq/ha / Presencia de Roya" style="width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px;">
+                  </div>
+                  <button type="button" id="btnGuardarAplicacion" class="btn-primary" style="margin-top: 4px; width: 100%; padding: 10px; border-radius: 8px; font-weight: 700;">Guardar Labor</button>
+                </div>
+              </div>
+            </div>
+
             <!-- Tabla de Cultivos (Ancho Completo para Máxima Claridad) -->
             <div class="card" style="margin-bottom: 24px;">
               <div class="card-header-group">
@@ -2604,7 +2749,10 @@
                     <h3>🚜 Plan de Arrendamientos y Hectáreas</h3>
                     <p class="card-subtitle">Resumen consolidado de campos alquilados y costos asociados en USD.</p>
                   </div>
-                  <span class="badge warning" style="background-color: #fef3c7; color: #d97706;">Arrendamientos</span>
+                  <div style="display: flex; gap: 8px; align-items: center;">
+                    <button class="btn-primary" onclick="window.abrirModalArrendamiento()" type="button" style="font-size: 11px; padding: 6px 10px;">+ Configurar Lote</button>
+                    <span class="badge warning" style="background-color: #fef3c7; color: #d97706;">Arrendamientos</span>
+                  </div>
                 </div>
                 
                 <div class="table-wrapper" style="margin-bottom: 16px;">
@@ -2700,8 +2848,9 @@
               <div class="card" style="width: 100%; display: flex; flex-direction: column; min-height: 500px; height: auto;">
                 <!-- Mini Tab Navigation for the Admin Panel -->
                 <div style="display: flex; gap: 8px; border-bottom: 2px solid #f1f5f9; padding-bottom: 12px; margin-bottom: 16px;">
-                  <button type="button" class="btn-secondary active" id="btnCatTabLotes" style="flex: 1; padding: 8px 4px; font-size: 12px;">🌾 Lotes</button>
                   <button type="button" class="btn-secondary" id="btnCatTabFirmas" style="flex: 1; padding: 8px 4px; font-size: 12px;">🏢 Firmas</button>
+                  <button type="button" class="btn-secondary" id="btnCatTabCampos" style="flex: 1; padding: 8px 4px; font-size: 12px;">🏡 Campos</button>
+                  <button type="button" class="btn-secondary active" id="btnCatTabLotes" style="flex: 1; padding: 8px 4px; font-size: 12px;">🌾 Lotes</button>
                 </div>
                 
                 <div id="catastroMapModeOverlay" class="hide" style="margin-bottom: 16px; background: rgba(16, 185, 129, 0.1); border: 2px dashed #10b981; color: #065f46; padding: 12px 16px; border-radius: 12px; font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: space-between; gap: 12px;">
@@ -2711,8 +2860,13 @@
 
                 <!-- Content Lotes -->
                 <div id="catContentLotes" style="flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px;">
-                  <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <h4 style="margin: 0; font-size: 14px;">Lotes, Corrales y Feedlots</h4>
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                      <h4 style="margin: 0; font-size: 14px;">Lotes, Corrales y Feedlots</h4>
+                      <select id="filterCatastroCampana" style="padding: 4px 8px; font-size: 12px; border-radius: 6px; border: 1px solid #cbd5e1;">
+                        <option value="">Todas las Campañas</option>
+                      </select>
+                    </div>
                     <button type="button" class="btn-primary" id="btnCatNuevoLote" style="padding: 6px 12px; font-size: 12px;">+ Nuevo Lote</button>
                   </div>
                   <div style="overflow-x: auto; flex-grow: 1; min-height: 200px;">
@@ -2857,46 +3011,7 @@
                 <div id="invMsg" style="font-size: 13px; font-weight: 600; color: var(--color-success);"></div>
               </div>
 
-              <!-- Lote & Campaña Creation -->
-              <div class="card">
-                <div class="card-header-group" style="margin-bottom: 16px;">
-                  <div>
-                    <h3>🆕 Creación de Estructura</h3>
-                    <p class="card-subtitle">Generar Lotes, Corrales, Feedlots y Campañas asociadas.</p>
-                  </div>
-                  <button class="btn-help-bubble" onclick="abrirGloboAyuda('estructura')" type="button">💡 Ejemplo WhatsApp</button>
-                </div>
-                
-                <div class="form-group" style="margin-bottom: 14px;">
-                  <label>Crear Lote</label>
-                  <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 4px;">
-                    <div style="display: flex; flex-wrap: wrap; gap: 8px;">
-                      <input id="invLoteNombre" placeholder="Nombre (ej: Lote Norte)" style="flex: 1; min-width: 130px;" />
-                      <input id="invLoteCliente" placeholder="Establecimiento / Campo (ej: Don Pedro)" style="flex: 1; min-width: 130px;" />
-                      <input id="invLoteFirma" placeholder="Firma / Razón Social (ej: Daedaz S.A.)" style="flex: 1; min-width: 130px;" />
-                    </div>
-                    <div style="display: flex; flex-wrap: wrap; gap: 8px;">
-                      <input id="invLoteProvincia" placeholder="Provincia (ej: Buenos Aires)" style="flex: 1; min-width: 130px;" />
-                      <input id="invLotePartido" placeholder="Ciudad/Localidad" style="flex: 1; min-width: 130px;" />
-                      <select id="invLoteTipo" style="width: 130px; font-size: 13px; font-weight: 600; padding: 6px 12px; border-radius: 8px; border: 1px solid #e2e8f0; background: #ffffff;">
-                        <option value="lote">Lote Agrícola</option>
-                        <option value="lote">Lote Ganadero</option>
-                      </select>
-                      <input id="invLoteHa" type="number" step="any" placeholder="ha (opcional)" style="width: 80px;" />
-                      <button id="invBtnNuevoLote" class="btn-secondary" type="button">Crear</button>
-                    </div>
-                  </div>
-                </div>
 
-                <div class="form-group">
-                  <label>Crear Campaña</label>
-                  <div style="display: flex; gap: 8px; margin-top: 4px;">
-                    <input id="invCampNombre" placeholder="Ej: Campaña 2026" style="flex: 1;" />
-                    <button id="invBtnNuevaCamp" class="btn-secondary" type="button">Crear</button>
-                  </div>
-                </div>
-              </div>
-            </div>
 
             <!-- Stock Saldos Table -->
             <div class="card">
@@ -2905,8 +3020,11 @@
                   <h3>📦 Balances de Stock Consolidados</h3>
                   <p class="card-subtitle">Saldos de inventario actuales calculados en base a movimientos confirmados.</p>
                 </div>
-                <div class="table-search-bar">
-                  <input id="searchSaldos" class="table-search-input" placeholder="Filtrar saldos..." type="text" />
+                <div class="table-search-bar" style="display: flex; gap: 8px;">
+                  <select id="filterSaldosCampana" style="padding: 6px 12px; font-size: 13px; border-radius: 8px; border: 1px solid #cbd5e1;">
+                    <option value="">Todas las Campañas</option>
+                  </select>
+                  <input id="searchSaldos" class="table-search-input" placeholder="Filtrar saldos..." type="text" style="flex: 1;" />
                 </div>
               </div>
               <div class="table-wrapper">
@@ -2963,7 +3081,10 @@
                   <h2 style="color: #ffffff;">Trazabilidad Individual Animal</h2>
                   <p class="card-subtitle" style="color: #93c5fd;">Seguimiento Clínico y Físico por Caravana de Ganado.</p>
                 </div>
-                <span class="badge success" style="background-color: rgba(255, 255, 255, 0.15); color: #ffffff; border-color: rgba(255, 255, 255, 0.25);">Sanidad Aprobada</span>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                  <button class="btn-primary" onclick="window.abrirModalAnimal()" type="button" style="font-size: 11px; padding: 6px 10px; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3);">+ Ingresar Animal</button>
+                  <span class="badge success" style="background-color: rgba(255, 255, 255, 0.15); color: #ffffff; border-color: rgba(255, 255, 255, 0.25);">Sanidad Aprobada</span>
+                </div>
               </div>
             </div>
 
@@ -3348,6 +3469,7 @@
         <!-- Footer -->
         <div class="whatsapp-chat-footer">
         </div>
+      </div>
     </dialog>
 
     <!-- Modal para Planificar Tarea de Calendario -->
@@ -3438,6 +3560,7 @@
         <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
           <label for="loteFormTipo" style="font-weight: 700; font-size: 12px; color: #475569;">¿Qué estás agregando?</label>
           <select id="loteFormTipo" style="width: 100%; padding: 10px 12px; border: 2px solid #6366f1; border-radius: 10px; font-weight: 700; font-size: 14px; color: #1e293b; background: #f8fafc;">
+            <option value="campo">📍 Establecimiento / Campo</option>
             <option value="lote">📐 Lote (Superficie)</option>
             <option value="corral">🚧 Corral</option>
             <option value="feedlot">🏭 Feedlot</option>
@@ -3456,6 +3579,16 @@
         <div id="loteFormHectareasContainer" class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
           <label for="loteFormHectareas" style="font-weight: 700; font-size: 12px; color: #475569;">Hectáreas</label>
           <input type="number" id="loteFormHectareas" step="0.01" min="0" style="width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px;" />
+        </div>
+
+        <!-- 3.b USO DEL LOTE — solo para lote -->
+        <div id="loteFormUsoContainer" class="form-group hide" style="display: flex; flex-direction: column; gap: 6px;">
+          <label for="loteFormUso" style="font-weight: 700; font-size: 12px; color: #475569;">Uso del Lote</label>
+          <select id="loteFormUso" style="width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px;">
+            <option value="agricola">Agrícola</option>
+            <option value="ganadero">Ganadero</option>
+            <option value="mixto">Mixto</option>
+          </select>
         </div>
 
         <!-- 4. FIRMA — solo para tipo "campo" -->
@@ -3548,7 +3681,7 @@
         <div style="display: flex; flex-direction: column; gap: 8px;">
           <div style="display: flex; align-items: center; justify-content: space-between;">
             <label style="font-weight: 700; font-size: 12px; color: #475569;">📍 Ubicación GPS</label>
-            <button type="button" id="btnElegirEnMapa" onclick="window.activarModoMapaNuevo()" style="padding: 5px 12px; font-size: 11px; font-weight: 700; border-radius: 8px; border: none; background: linear-gradient(135deg, #10b981, #059669); color: white; cursor: pointer; display: flex; align-items: center; gap: 5px; box-shadow: 0 2px 8px rgba(16,185,129,0.35); transition: opacity 0.2s;" onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">
+            <button type="button" id="btnElegirEnMapa" onclick="window.activarModoMapaEdicion()" style="padding: 5px 12px; font-size: 11px; font-weight: 700; border-radius: 8px; border: none; background: linear-gradient(135deg, #10b981, #059669); color: white; cursor: pointer; display: flex; align-items: center; gap: 5px; box-shadow: 0 2px 8px rgba(16,185,129,0.35); transition: opacity 0.2s;" onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">
               🗺️ Elegir en el mapa
             </button>
           </div>
@@ -3568,6 +3701,21 @@
         <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 16px;">
           <button type="button" class="btn-secondary" onclick="document.getElementById('loteEditModal').close()" style="padding: 8px 16px; border-radius: 8px; border: 1px solid #cbd5e1; background: transparent; cursor: pointer;">Cancelar</button>
           <button type="submit" class="btn-primary" style="padding: 8px 16px; border-radius: 8px; border: none; background: var(--color-primary); color: white; cursor: pointer; font-weight: 700;">Guardar</button>
+        </div>
+      </form>
+    </dialog>
+
+    <!-- Modal para Crear Campaña -->
+    <dialog id="modalCampana" style="border: none; border-radius: 16px; padding: 24px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); width: 100%; max-width: 400px; background: white; color: #0f172a;">
+      <h3 style="margin-top: 0; font-family: 'Outfit', sans-serif; font-weight: 800; font-size: 18px; margin-bottom: 16px;">Nueva Campaña</h3>
+      <form id="campanaForm" style="display: flex; flex-direction: column; gap: 14px;">
+        <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+          <label for="campanaNombre" style="font-weight: 700; font-size: 12px; color: #475569;">Nombre de la Campaña</label>
+          <input type="text" id="campanaNombre" required placeholder="Ej: Campaña 2026" style="width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px;" />
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 12px;">
+          <button type="button" class="btn-secondary" onclick="document.getElementById('modalCampana').close()" style="padding: 8px 16px; border-radius: 8px; border: 1px solid #cbd5e1; background: transparent; cursor: pointer;">Cancelar</button>
+          <button type="submit" class="btn-primary" style="padding: 8px 20px; border-radius: 8px;">Crear Campaña</button>
         </div>
       </form>
     </dialog>
@@ -3638,6 +3786,146 @@
       </form>
     </dialog>
 
+    <!-- Modal Carga Ganadera -->
+    <dialog id="modalGanaderiaPerfil" style="border: none; border-radius: 16px; padding: 24px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); width: 100%; max-width: 400px; background: white; color: #0f172a;">
+      <h3 style="margin-top: 0; margin-bottom: 8px; font-weight: 800; color: #1e293b; font-size: 16px;">🐄 Agregar Categoría Ganadera</h3>
+      <p style="font-size: 13px; color: #64748b; margin-bottom: 20px;">Declarar cantidad estimada para el stock.</p>
+      <form id="formGanaderiaPerfil" onsubmit="window.guardarGanaderiaPerfil(event)" style="display: flex; flex-direction: column; gap: 14px;">
+        <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+          <label style="font-weight: 700; font-size: 12px; color: #475569;">Especie</label>
+          <select id="ganaderiaPerfilEspecie" style="width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px;" required>
+            <option value="bovino">Bovinos</option>
+            <option value="ovino">Ovinos</option>
+            <option value="porcino">Porcinos</option>
+            <option value="equino">Equinos</option>
+          </select>
+        </div>
+        <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+          <label style="font-weight: 700; font-size: 12px; color: #475569;">Categoría</label>
+          <input type="text" id="ganaderiaPerfilCategoria" placeholder="Ej: Vaca de cría, Novillo, Ternero" style="width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px;" required />
+        </div>
+        <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+          <label style="font-weight: 700; font-size: 12px; color: #475569;">Cantidad Estimada (Cabezas)</label>
+          <input type="number" id="ganaderiaPerfilCantidad" min="0" placeholder="Ej: 150" style="width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px;" required />
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 8px;">
+          <button type="button" class="btn-secondary" onclick="document.getElementById('modalGanaderiaPerfil').close()" style="padding: 8px 16px; border-radius: 8px; border: 1px solid #cbd5e1; background: transparent; cursor: pointer;">Cancelar</button>
+          <button type="submit" class="btn-primary" style="padding: 8px 16px; border-radius: 8px; border: none; background: var(--color-primary); color: white; cursor: pointer; font-weight: 700;">Guardar</button>
+        </div>
+      </form>
+    </dialog>
+
+    <!-- Modal Trazabilidad Animal -->
+    <dialog id="modalAnimalIndividual" style="border: none; border-radius: 16px; padding: 24px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); width: 100%; max-width: 480px; background: white; color: #0f172a;">
+      <h3 style="margin-top: 0; margin-bottom: 8px; font-weight: 800; color: #1e293b; font-size: 16px;">📋 Ingresar Animal (Trazabilidad)</h3>
+      <p style="font-size: 13px; color: #64748b; margin-bottom: 20px;">Registrar un nuevo animal para seguimiento individual.</p>
+      <form id="formAnimalIndividual" onsubmit="window.guardarAnimalIndividual(event)" style="display: flex; flex-direction: column; gap: 14px;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+            <label style="font-weight: 700; font-size: 12px; color: #475569;">Caravana / ID</label>
+            <input type="text" id="animalCaravana" placeholder="Ej: 90210" style="width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px;" required />
+          </div>
+          <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+            <label style="font-weight: 700; font-size: 12px; color: #475569;">Categoría</label>
+            <input type="text" id="animalCategoria" placeholder="Ej: Toro" style="width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px;" required />
+          </div>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+            <label style="font-weight: 700; font-size: 12px; color: #475569;">Raza</label>
+            <input type="text" id="animalRaza" placeholder="Ej: Angus" style="width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px;" />
+          </div>
+          <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+            <label style="font-weight: 700; font-size: 12px; color: #475569;">Estado</label>
+            <select id="animalEstado" style="width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px;">
+              <option value="sano">Sano</option>
+              <option value="enfermo">Enfermo</option>
+              <option value="en_tratamiento">En Tratamiento</option>
+            </select>
+          </div>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+            <label style="font-weight: 700; font-size: 12px; color: #475569;">Peso Actual (kg)</label>
+            <input type="number" id="animalPeso" step="0.1" placeholder="Ej: 450.5" style="width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px;" />
+          </div>
+          <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+            <label style="font-weight: 700; font-size: 12px; color: #475569;">Lote / Ubicación</label>
+            <select id="animalLote" style="width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px;">
+              <option value="">Seleccionar Lote...</option>
+            </select>
+          </div>
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 8px;">
+          <button type="button" class="btn-secondary" onclick="document.getElementById('modalAnimalIndividual').close()" style="padding: 8px 16px; border-radius: 8px; border: 1px solid #cbd5e1; background: transparent; cursor: pointer;">Cancelar</button>
+          <button type="submit" class="btn-primary" style="padding: 8px 16px; border-radius: 8px; border: none; background: var(--color-primary); color: white; cursor: pointer; font-weight: 700;">Guardar</button>
+        </div>
+      </form>
+    </dialog>
+
+    <!-- Modal Evento Pastura -->
+    <dialog id="modalEventoPastura" style="border: none; border-radius: 16px; padding: 24px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); width: 100%; max-width: 440px; background: white; color: #0f172a;">
+      <h3 style="margin-top: 0; margin-bottom: 8px; font-weight: 800; color: #1e293b; font-size: 16px;">🌿 Registrar Evento de Pastura</h3>
+      <p style="font-size: 13px; color: #64748b; margin-bottom: 20px;">Registrar ingresos, retiros o descansos en un potrero.</p>
+      <form id="formEventoPastura" onsubmit="window.guardarEventoPastura(event)" style="display: flex; flex-direction: column; gap: 14px;">
+        <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+          <label style="font-weight: 700; font-size: 12px; color: #475569;">Potrero / Lote</label>
+          <select id="pasturaLote" style="width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px;" required>
+            <option value="">Seleccionar Lote...</option>
+          </select>
+        </div>
+        <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+          <label style="font-weight: 700; font-size: 12px; color: #475569;">Tipo de Evento</label>
+          <select id="pasturaTipo" style="width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px;" required>
+            <option value="ingreso_animales">Ingreso de animales</option>
+            <option value="retiro_animales">Retiro de animales</option>
+            <option value="inicio_descanso">Inicio de descanso</option>
+            <option value="rebrote">Rebrote detectado</option>
+            <option value="pesaje_pasto">Pesaje de pasto</option>
+          </select>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+            <label style="font-weight: 700; font-size: 12px; color: #475569;">Cabezas Involucradas</label>
+            <input type="number" id="pasturaCabezas" min="0" placeholder="Ej: 50" style="width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px;" />
+          </div>
+          <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+            <label style="font-weight: 700; font-size: 12px; color: #475569;">Días de Descanso</label>
+            <input type="number" id="pasturaDescanso" min="0" placeholder="Ej: 30" style="width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px;" />
+          </div>
+        </div>
+        <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+          <label style="font-weight: 700; font-size: 12px; color: #475569;">Observaciones (Opcional)</label>
+          <input type="text" id="pasturaObservacion" placeholder="Ej: Pasto muy corto" style="width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px;" />
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 8px;">
+          <button type="button" class="btn-secondary" onclick="document.getElementById('modalEventoPastura').close()" style="padding: 8px 16px; border-radius: 8px; border: 1px solid #cbd5e1; background: transparent; cursor: pointer;">Cancelar</button>
+          <button type="submit" class="btn-primary" style="padding: 8px 16px; border-radius: 8px; border: none; background: var(--color-primary); color: white; cursor: pointer; font-weight: 700;">Guardar</button>
+        </div>
+      </form>
+    </dialog>
+
+    <!-- Modal Arrendamiento -->
+    <dialog id="modalArrendamiento" style="border: none; border-radius: 16px; padding: 24px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); width: 100%; max-width: 400px; background: white; color: #0f172a;">
+      <h3 style="margin-top: 0; margin-bottom: 8px; font-weight: 800; color: #1e293b; font-size: 16px;">🚜 Configurar Arrendamiento</h3>
+      <p style="font-size: 13px; color: #64748b; margin-bottom: 20px;">Marcar lote como arrendado y fijar costo.</p>
+      <form id="formArrendamiento" onsubmit="window.guardarArrendamiento(event)" style="display: flex; flex-direction: column; gap: 14px;">
+        <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+          <label style="font-weight: 700; font-size: 12px; color: #475569;">Lote Arrendado</label>
+          <select id="arrendamientoLote" style="width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px;" required>
+            <option value="">Seleccionar Lote...</option>
+          </select>
+        </div>
+        <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+          <label style="font-weight: 700; font-size: 12px; color: #475569;">Costo (USD por Hectárea)</label>
+          <input type="number" id="arrendamientoCosto" min="0" step="0.1" placeholder="Ej: 250" style="width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px;" required />
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 8px;">
+          <button type="button" class="btn-secondary" onclick="document.getElementById('modalArrendamiento').close()" style="padding: 8px 16px; border-radius: 8px; border: 1px solid #cbd5e1; background: transparent; cursor: pointer;">Cancelar</button>
+          <button type="submit" class="btn-primary" style="padding: 8px 16px; border-radius: 8px; border: none; background: var(--color-primary); color: white; cursor: pointer; font-weight: 700;">Guardar</button>
+        </div>
+      </form>
+    </dialog>
     <!-- Chat Widget Flotante -->
     <div id="chatWidget" class="chat-widget">
       <!-- Botón Flotante -->
@@ -3818,6 +4106,7 @@
 
       function renderPremiumDashboardDesign(x) {
         const nombreShow = x.usuario?.nombre ? x.usuario.nombre : "Productor";
+        const nombreEstablecimiento = (x.lotes && x.lotes.length > 0 && x.lotes[0].cliente) ? x.lotes[0].cliente : "Establecimiento";
         
         // Sum up the true physical stock balances from the live ganaderiaPerfil
         let totalCabezas = 0;
@@ -3844,7 +4133,7 @@
             <div class="header-right-group" style="text-align: right; font-size: 13px; color: #475569; font-weight: 600; line-height: 1.4; display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
               <div style="text-align: right;">
                 <div style="color: #0f172a; font-weight: 800; font-size: 14px;">${nombreShow}</div>
-                <div>Establecimiento: La Esperanza - ${x.usuario?.partido || "Pergamino"}</div>
+                <div>${nombreEstablecimiento} - ${x.usuario?.partido || "Pergamino"}</div>
               </div>
               <div style="display: flex; gap: 8px; align-items: center;">
                 <button id="btnLoad" class="btn-secondary" type="button" style="padding: 6px 12px; font-size: 12px; border-radius: 8px; font-weight: 700;">Actualizar</button>
@@ -4118,7 +4407,7 @@
         `;
 
         setTimeout(() => {
-          initLotesMap(x.usuario);
+          initLotesMap(x.usuario, nombreEstablecimiento);
           drawGanaderiaChart(x.ganaderiaPerfil);
         }, 100);
       }
@@ -4154,7 +4443,7 @@
 
       // 🗺️ Mapa de Lotes interactivo (Leaflet.js)
       let activeMap = null;
-      function initLotesMap(usuario) {
+      function initLotesMap(usuario, nombreEstablecimiento = "Establecimiento") {
         const lat = usuario?.lat != null ? Number(usuario.lat) : -34.6037;
         const lng = usuario?.lng != null ? Number(usuario.lng) : -58.3816;
         
@@ -4189,7 +4478,7 @@
         
         // Marcador en la ubicación principal
         const marker = L.marker([lat, lng]).addTo(activeMap);
-        marker.bindPopup(`<b>Establecimiento La Esperanza</b><br>${usuario?.partido || 'Pergamino'}, ${usuario?.provincia || 'Buenos Aires'}`).openPopup();
+        marker.bindPopup(`<b>${nombreEstablecimiento}</b><br>${usuario?.partido || 'Pergamino'}, ${usuario?.provincia || 'Buenos Aires'}`).openPopup();
         
         // Lotes simulados en los alrededores
         const colors = ['#10b981', '#6366f1', '#f59e0b', '#3b82f6'];
@@ -4227,12 +4516,29 @@
             const cat = g.categoria || "Otros";
             dataMap[cat] = (dataMap[cat] || 0) + Number(g.cantidad_estimada || 0);
           });
-        } else {
-          // Fallback datos de demostración
-          dataMap["Vacas"] = 120;
-          dataMap["Novillos"] = 80;
-          dataMap["Terneros"] = 150;
-          dataMap["Toros"] = 10;
+        }
+        
+        if (Object.keys(dataMap).length === 0) {
+          activeGanaderiaChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+              labels: ['Sin Existencias'],
+              datasets: [{
+                data: [1],
+                backgroundColor: ['#e2e8f0'],
+                borderWidth: 0
+              }]
+            },
+            options: {
+              responsive: true,
+              cutout: '75%',
+              plugins: {
+                legend: { display: false },
+                tooltip: { enabled: false }
+              }
+            }
+          });
+          return;
         }
         
         const labels = Object.keys(dataMap);
@@ -5105,6 +5411,153 @@
           }
         }
       }
+      // Populate Agricultura form selectors with real user lotes
+      function populateAgrSelectores(lotes) {
+        const selectors = ['agr-siembra-lote', 'agr-aplicacion-lote'];
+        const lotesArr = Array.isArray(lotes) ? lotes : [];
+        selectors.forEach(selId => {
+          const sel = document.getElementById(selId);
+          if (!sel) return;
+          const currentVal = sel.value;
+          sel.innerHTML = '<option value="">Seleccionar Lote...</option>';
+          lotesArr.forEach(l => {
+            const opt = document.createElement('option');
+            opt.value = l.id;
+            const cultivoText = l.cultivo ? ` — ${l.cultivo}` : '';
+            const haText = l.hectareas ? ` (${l.hectareas} ha)` : '';
+            opt.textContent = `${l.nombre || 'Sin nombre'}${cultivoText}${haText}`;
+            sel.appendChild(opt);
+          });
+          if (currentVal) sel.value = currentVal;
+        });
+      }
+
+      // Guardar Siembra via API (updates the ubicacion with cultivo data)
+      (function() {
+        document.addEventListener('DOMContentLoaded', () => {
+          document.getElementById('btnGuardarSiembra')?.addEventListener('click', async () => {
+            const loteId = document.getElementById('agr-siembra-lote')?.value;
+            const fecha = document.getElementById('agr-siembra-fecha')?.value;
+            const cultivo = document.getElementById('agr-siembra-cultivo')?.value?.trim();
+            const variedad = document.getElementById('agr-siembra-hibrido')?.value?.trim();
+            const densidad = document.getElementById('agr-siembra-densidad')?.value;
+            const campania = document.getElementById('agr-siembra-campania')?.value;
+
+            if (!loteId) return alert('Seleccioná un lote para registrar la siembra.');
+            if (!cultivo) return alert('Ingresá el cultivo.');
+
+            try {
+              // 1. Crear el Plan de Siembra
+              const resPlan = await fetch('/api/registros/plan_siembra', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  ubicacion_id: loteId,
+                  cultivo,
+                  campania,
+                  variedad: variedad || null,
+                  densidad: densidad ? Number(densidad) : null,
+                  fecha_estimada: fecha || null
+                })
+              });
+              
+              // 2. Actualizar el lote con el cultivo actual y campaña
+              const res = await fetch(`/api/catastro/lotes/${loteId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  cultivo,
+                  variedad: variedad || null,
+                  densidad: densidad ? Number(densidad) : null,
+                  fecha_siembra: fecha || null,
+                  campania
+                })
+              });
+              const d = await res.json();
+              if (!d.ok) return alert(d.error || 'Error al guardar la siembra.');
+              alert('✅ Siembra y plan registrados correctamente.');
+              // Clear form
+              document.getElementById('agr-siembra-lote').value = '';
+              document.getElementById('agr-siembra-fecha').value = '';
+              document.getElementById('agr-siembra-cultivo').value = '';
+              document.getElementById('agr-siembra-hibrido').value = '';
+              document.getElementById('agr-siembra-densidad').value = '';
+              // Reload data
+              if (typeof cargar === 'function') cargar();
+            } catch (err) {
+              alert('Error de conexión: ' + err.message);
+            }
+          });
+
+          let productosLaborSeleccionados = [];
+          window.agregarProductoLabor = function() {
+            const tipo = document.getElementById('addInsumoTipo').value;
+            const prod = document.getElementById('addInsumoNombre').value.trim();
+            const dosis = document.getElementById('addInsumoDosis').value.trim();
+            if (!prod) return alert("Ingrese el nombre del producto");
+            productosLaborSeleccionados.push({ tipo, producto: prod, dosis });
+            document.getElementById('addInsumoNombre').value = '';
+            document.getElementById('addInsumoDosis').value = '';
+            renderProductosLabor();
+          };
+          window.eliminarProductoLabor = function(idx) {
+            productosLaborSeleccionados.splice(idx, 1);
+            renderProductosLabor();
+          };
+          function renderProductosLabor() {
+            const container = document.getElementById('productosList');
+            container.innerHTML = productosLaborSeleccionados.map((p, idx) => 
+              `<div style="display:flex; justify-content:space-between; align-items:center; background:white; padding:4px 8px; border-radius:4px; border:1px solid #e2e8f0; font-size:11px;">
+                <span><b>${p.producto}</b> (${p.tipo}) - Dosis: ${p.dosis || 'N/A'}</span>
+                <button type="button" onclick="eliminarProductoLabor(${idx})" style="border:none;background:none;color:#ef4444;cursor:pointer;">✕</button>
+              </div>`
+            ).join('');
+          }
+
+          document.getElementById('btnGuardarAplicacion')?.addEventListener('click', async () => {
+            const loteId = document.getElementById('agr-aplicacion-lote')?.value;
+            const fecha = document.getElementById('agr-aplicacion-fecha')?.value;
+            const tipoLabor = document.getElementById('agr-aplicacion-tipo')?.value;
+            const observaciones = document.getElementById('agr-aplicacion-plaga')?.value?.trim();
+
+            if (!loteId) return alert('Seleccioná un lote para registrar la labor.');
+
+            // Find lote name from cached data
+            const loteData = uiState.lastData?.lotes?.find(l => String(l.id) === String(loteId));
+            const loteName = loteData?.nombre || 'Lote';
+
+            try {
+              let productosStr = '';
+              if (productosLaborSeleccionados.length > 0) {
+                productosStr = ' con los siguientes productos: ' + productosLaborSeleccionados.map(p => `${p.producto} (${p.dosis})`).join(', ');
+              }
+
+              // Use the consulta endpoint with a structured message for the AI to register
+              const consultaMsg = `Registrar labor de ${tipoLabor}${productosStr} en ${loteName}${observaciones ? ` (Observaciones: ${observaciones})` : ''}${fecha ? ` el ${fecha}` : ''}`;
+              
+              const res = await fetch('/api/dashboard/cliente/consulta', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ consulta: consultaMsg })
+              });
+              const d = await res.json();
+              if (!d.ok) return alert(d.error || 'Error al registrar la labor.');
+              alert('✅ Labor registrada correctamente.');
+              
+              // Clear form
+              document.getElementById('agr-aplicacion-lote').value = '';
+              document.getElementById('agr-aplicacion-fecha').value = '';
+              document.getElementById('agr-aplicacion-plaga').value = '';
+              productosLaborSeleccionados = [];
+              renderProductosLabor();
+              // Reload data
+              if (typeof cargar === 'function') cargar();
+            } catch (err) {
+              alert('Error de conexión: ' + err.message);
+            }
+          });
+        });
+      })();
 
       function renderClimaCards(rows) {
         const el = $("climaCards");
@@ -5114,13 +5567,42 @@
           return;
         }
         el.innerHTML = rows
-          .map((c) => `
-            <div class="weather-card">
-              <div class="weather-day">${fmt(c.fecha)}</div>
-              <div class="weather-temp">${c.temp_min ?? "—"}° / ${c.temp_max ?? "—"}°</div>
-              <div class="weather-meta">${c.precipitacion ? '🌧️ ' + num(c.precipitacion) + ' mm' : '☀️ Seco'}<br />${esc(c.descripcion || "Despejado")}</div>
+          .map((c) => {
+            let windSpeed = 0;
+            const windMatch = c.descripcion?.match(/viento máx ~(\d+)/i);
+            if (windMatch) windSpeed = parseInt(windMatch[1], 10);
+            
+            let sprayStatus = "🟢 Óptimo";
+            let sprayColor = "#10b981"; // green
+            let sprayBg = "#d1fae5";
+            if (windSpeed > 15 || c.precipitacion > 5) {
+              sprayStatus = "🔴 Peligro";
+              sprayColor = "#ef4444"; // red
+              sprayBg = "#fee2e2";
+            } else if (windSpeed > 10 || c.precipitacion > 0) {
+              sprayStatus = "🟡 Precaución";
+              sprayColor = "#f59e0b"; // yellow
+              sprayBg = "#fef3c7";
+            }
+            
+            const desc = esc(c.descripcion || "Despejado").replace(/ · viento máx ~\d+ km\/h/i, "");
+            
+            return `
+            <div class="weather-card" style="display:flex; flex-direction:column; gap:6px; min-width:140px;">
+              <div class="weather-day" style="font-weight:700;">${fmt(c.fecha)}</div>
+              <div class="weather-temp" style="font-size:16px;">${c.temp_min ?? "—"}° / ${c.temp_max ?? "—"}°</div>
+              <div class="weather-meta" style="font-size:11px;">
+                ${c.precipitacion ? '🌧️ ' + num(c.precipitacion) + ' mm' : '☀️ Seco'}<br />
+                ${desc}
+              </div>
+              <div style="font-size:11px; margin-top:4px;">
+                💨 Viento: <b>${windSpeed} km/h</b>
+              </div>
+              <div style="font-size:10px; font-weight:700; padding:2px 6px; border-radius:4px; margin-top:auto; color:${sprayColor}; background-color:${sprayBg}; text-align:center;">
+                Pulverización: ${sprayStatus}
+              </div>
             </div>
-          `)
+          `})
           .join("");
       }
 
@@ -5697,9 +6179,24 @@
                 <button type="button" id="btnAddZona" class="btn-secondary" style="padding: 0 16px;">+ Agregar</button>
               </div>
             </div>
+          <div class="form-group" style="grid-column: span 2; border-top: 1px solid #e2e8f0; padding-top: 16px; margin-top: 8px;">
+            <label style="font-weight: 700; font-size: 13px; text-transform: uppercase; color: #475569; letter-spacing: 0.05em; display: block; margin-bottom: 10px;">🌾 Catálogo de Cultivos Activos</label>
+            <div id="cultivosActivosList" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; font-size: 12px;">Cargando cultivos...</div>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px;">
+              <input id="addCultivoNombre" placeholder="Cultivo / Pastura (ej: Soja 1ra)" style="flex: 1; min-width: 150px;" />
+              <select id="addCultivoCampania" style="flex: 1; min-width: 120px;">
+                <option value="23/24">23/24</option>
+                <option value="24/25">24/25</option>
+                <option value="25/26">25/26</option>
+              </select>
+              <button type="button" onclick="agregarCultivoActivo()" class="btn-secondary" style="padding: 0 16px;">+ Agregar</button>
+            </div>
           </div>
-          <button id="btnGuardarPerfil" class="btn-primary" type="button">Guardar Cambios</button>
-          <button id="btnCancelarPerfil" class="btn-secondary" type="button">Restaurar</button>
+
+          <div style="grid-column: span 2; margin-top: 16px;">
+            <button id="btnGuardarPerfil" class="btn-primary" type="button">Guardar Cambios</button>
+            <button id="btnCancelarPerfil" class="btn-secondary" type="button">Restaurar</button>
+          </div>
           <p style="font-size: 11px; color: var(--text-muted); margin-top: 12px;">ID Cuenta: ${usuario.id} · Plan: ${esc(usuario.plan || "Free")} · Estado: ${usuario.activo ? 'Cuenta Habilitada' : 'Cuenta Suspendida'}</p>
         `;
 
@@ -5989,6 +6486,9 @@
         renderPremiumDashboardDesign(filteredData);
         renderGanado(filteredGanaderiaPerfil);
         renderCultivosCards(filteredCultivos);
+
+        // Populate agriculture form selectors with real lotes
+        populateAgrSelectores(filteredData.lotes || []);
         
         renderRows("animalesBody", filteredAnimalesIndividuales.map(a => `
           <tr>
@@ -6225,6 +6725,24 @@
           const prev = selC.value;
           selC.innerHTML = `<option value="">Sin campaña</option>` + (rcD.campanas || []).map((c) => `<option value="${c.id}">${esc(c.nombre || "campaña " + c.id)}</option>`).join("");
           if (prev) selC.value = prev;
+        }
+
+        const filterC = $("filterCatastroCampana");
+        if (filterC && rcD.ok) {
+          const prev = filterC.value;
+          filterC.innerHTML = `<option value="">Todas las Campañas</option>` + (rcD.campanas || []).map((c) => `<option value="${c.id}">${esc(c.nombre || "campaña " + c.id)}</option>`).join("");
+          if (prev) filterC.value = prev;
+        }
+
+        const filterS = $("filterSaldosCampana");
+        if (filterS && rcD.ok) {
+          const prev = filterS.value;
+          filterS.innerHTML = `<option value="">Todas las Campañas</option>` + (rcD.campanas || []).map((c) => `<option value="${c.nombre || "campaña " + c.id}">${esc(c.nombre || "campaña " + c.id)}</option>`).join("");
+          if (prev) filterS.value = prev;
+        }
+
+        if (rcD.ok) {
+          renderCampanasTab(rcD.campanas || [], rsD.saldos || [], rmD.movimientos || []);
         }
 
         if (!rlD.ok || !rcD.ok || !rsD.ok || !rmD.ok) {
@@ -6830,6 +7348,8 @@
       let mapModeLoteId = null;    // ID of lot being georeferenced (reposition mode)
       let mapModeNuevo = false;    // true if picking location for a NEW lot/campo
       let mapModeNuevoTipo = null; // 'lote' or 'campo' when in nuevo mode
+      let mapModeEdicion = false;  // true if picking location for EDITING an existing lote
+      let mapModeEdicionData = null; // stores form data while modal is closed for map picking
 
       function activarModoMapa(ubicacionId, mensaje) {
         mapModeActive = true;
@@ -6881,11 +7401,57 @@
         }
       };
 
+      // Elegir en el mapa cuando se está EDITANDO un lote existente (no crear nuevo)
+      window.activarModoMapaEdicion = function() {
+        // Save current form data so we can restore it after map pick
+        const loteId = document.getElementById('loteFormId')?.value || '';
+        const formData = {
+          id: loteId,
+          nombre: document.getElementById('loteFormNombre')?.value || '',
+          hectareas: document.getElementById('loteFormHectareas')?.value || '',
+          tipo: document.getElementById('loteFormTipo')?.value || 'lote',
+          campoId: document.getElementById('loteFormCampoId')?.value || '',
+          firma: document.getElementById('loteFormFirmaSelect')?.value || '',
+          notas: document.getElementById('loteFormNotas')?.value || '',
+          provincia: document.getElementById('loteFormProvincia')?.value || '',
+          partido: document.getElementById('loteFormPartido')?.value || '',
+        };
+
+        // If map isn't initialized yet, switch to catastro tab first
+        if (!catastroMap) {
+          const catastroTab = document.querySelector('[data-tab="catastro"]');
+          if (catastroTab) catastroTab.click();
+          setTimeout(() => window.activarModoMapaEdicion(), 350);
+          return;
+        }
+
+        // Close modal so user can see the map
+        const modal = document.getElementById('loteEditModal');
+        if (modal && modal.open) modal.close();
+
+        mapModeActive = true;
+        mapModeEdicion = true;
+        mapModeEdicionData = formData;
+        mapModeNuevo = false;
+        mapModeLoteId = null;
+
+        const overlay = document.getElementById('catastroMapModeOverlay');
+        const textEl = document.getElementById('catastroMapModeText');
+        if (overlay) overlay.classList.remove('hide');
+        if (textEl) textEl.textContent = '📍 Hacé clic en el mapa para actualizar la ubicación del lote.';
+        if (catastroMap) {
+          catastroMap.getContainer().style.cursor = 'crosshair';
+          document.getElementById('catastroMapWrapper')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      };
+
       function desactivarModoMapa() {
         mapModeActive = false;
         mapModeLoteId = null;
         mapModeNuevo = false;
         mapModeNuevoTipo = null;
+        mapModeEdicion = false;
+        mapModeEdicionData = null;
         const overlay = document.getElementById('catastroMapModeOverlay');
         if (overlay) overlay.classList.add('hide');
         if (catastroMap) catastroMap.getContainer().style.cursor = '';
@@ -7460,7 +8026,40 @@
           const clickedLat = Number(e.latlng.lat.toFixed(6));
           const clickedLng = Number(e.latlng.lng.toFixed(6));
 
-          if (mapModeNuevo) {
+          if (mapModeEdicion && mapModeEdicionData) {
+            // Editing existing lote — re-open modal with updated coords
+            const formData = mapModeEdicionData;
+            desactivarModoMapa();
+            
+            // Re-open the modal with stored form data + new coords
+            const prefill = {
+              lat: clickedLat,
+              lng: clickedLng,
+              tipo: formData.tipo,
+              nombre: formData.nombre,
+              hectareas: formData.hectareas,
+              campo_id: formData.campoId,
+              firma: formData.firma,
+              provincia: formData.provincia,
+              partido: formData.partido,
+            };
+
+            if (formData.id) {
+              // Editing existing lote: re-open with its ID but override lat/lng
+              window.abrirModalLoteCatastro(Number(formData.id));
+              // After modal opens, inject the new coords
+              setTimeout(() => {
+                document.getElementById('loteFormLat').value = clickedLat;
+                document.getElementById('loteFormLng').value = clickedLng;
+                window.actualizarCoordPreview?.();
+                // Restore form fields that might have been overwritten
+                if (formData.notas) document.getElementById('loteFormNotas').value = formData.notas;
+              }, 100);
+            } else {
+              // New lote that was being edited before map pick
+              window.abrirModalLoteCatastro(prefill);
+            }
+          } else if (mapModeNuevo) {
             const tipoNuevo = mapModeNuevoTipo || 'lote';
             desactivarModoMapa();
             if (tipoNuevo === 'campo') {
@@ -7745,14 +8344,38 @@ async function loadCatastroData() {
 function renderCatastroUI() {
   const { firmas, campos, lotes } = window.catastroData;
   
+  // Variables de filtro global
+  window.catastroFiltroFirmaId = window.catastroFiltroFirmaId || null;
+  window.catastroFiltroCampoId = window.catastroFiltroCampoId || null;
+
+  // Funciones helper (se definen si no existen)
+  if (!window.seleccionarFirmaFiltro) {
+    window.seleccionarFirmaFiltro = function(id) {
+      window.catastroFiltroFirmaId = id;
+      window.catastroFiltroCampoId = null; // reset child
+      renderCatastroUI();
+      document.getElementById('btnCatTabCampos').click();
+    };
+    window.seleccionarCampoFiltro = function(id) {
+      window.catastroFiltroCampoId = id;
+      renderCatastroUI();
+      document.getElementById('btnCatTabLotes').click();
+    };
+    window.limpiarFiltrosCatastro = function() {
+      window.catastroFiltroFirmaId = null;
+      window.catastroFiltroCampoId = null;
+      renderCatastroUI();
+    };
+  }
+
   // Render Firmas
   const tbodyFirmas = document.getElementById("catFirmasTableBody");
   if(tbodyFirmas) {
     tbodyFirmas.innerHTML = firmas.length === 0 ? '<tr><td colspan="3" style="text-align:center;">Sin firmas</td></tr>' : firmas.map(f => {
       const codigoBadge = f.codigo ? `<span style="background:#ede9fe;color:#6d28d9;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:800;font-family:monospace;margin-right:6px;">${f.codigo}</span>` : '';
       return `
-      <tr>
-        <td>${codigoBadge}<b>${f.nombre}</b></td>
+      <tr style="${window.catastroFiltroFirmaId === f.id ? 'background-color:#f8fafc;' : ''}">
+        <td style="cursor:pointer;" onclick="seleccionarFirmaFiltro(${f.id})">${codigoBadge}<b>${f.nombre}</b> <span style="font-size:10px; color:#3b82f6; margin-left:8px;">🔍 Ver campos</span></td>
         <td>${campos.filter(c => c.firma_id === f.id).length} campos</td>
         <td style="text-align:right;">
           <button class="btn-secondary" onclick="abrirModalFirma(${f.id})" style="padding:4px 8px;font-size:11px;">Editar</button>
@@ -7765,26 +8388,48 @@ function renderCatastroUI() {
   // Render Campos
   const tbodyCampos = document.getElementById("catCamposTableBody");
   if(tbodyCampos) {
-    tbodyCampos.innerHTML = campos.length === 0 ? '<tr><td colspan="3" style="text-align:center;">Sin campos</td></tr>' : campos.map(c => {
+    const filteredCampos = window.catastroFiltroFirmaId ? campos.filter(c => c.firma_id === window.catastroFiltroFirmaId) : campos;
+    const firmaFiltroNombre = window.catastroFiltroFirmaId ? firmas.find(f => f.id === window.catastroFiltroFirmaId)?.nombre : '';
+    const headerFiltro = window.catastroFiltroFirmaId ? `<tr><td colspan="3" style="background:#e0f2fe; padding:8px;">Filtrado por Firma: <b>${firmaFiltroNombre}</b> <button onclick="limpiarFiltrosCatastro()" style="border:none;background:none;color:#ef4444;cursor:pointer;font-weight:bold;margin-left:8px;">✕ Quitar</button></td></tr>` : '';
+
+    tbodyCampos.innerHTML = headerFiltro + (filteredCampos.length === 0 ? '<tr><td colspan="3" style="text-align:center;">Sin campos</td></tr>' : filteredCampos.map(c => {
       const firmaName = firmas.find(f => f.id === c.firma_id)?.nombre || '-';
       const codigoBadge = c.codigo ? `<span style="background:#dbeafe;color:#1e40af;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:800;font-family:monospace;margin-right:6px;">${c.codigo}</span>` : '';
+      
+      const lotesAsociados = lotes.filter(l => l.campo_id === c.id);
+      const sumHectareas = lotesAsociados.reduce((sum, l) => sum + (Number(l.hectareas) || 0), 0);
+
       return `
-      <tr>
-        <td>${codigoBadge}<b>${c.nombre}</b> <br/><small>${c.ciudad || ''} ${c.provincia || ''}</small></td>
-        <td>Firma: ${firmaName}</td>
+      <tr style="${window.catastroFiltroCampoId === c.id ? 'background-color:#f8fafc;' : ''}">
+        <td style="cursor:pointer;" onclick="seleccionarCampoFiltro(${c.id})">${codigoBadge}<b>${c.nombre}</b> <br/><small>${c.ciudad || ''} ${c.provincia || ''}</small> <span style="font-size:10px; color:#3b82f6; margin-left:8px;">🔍 Ver lotes</span></td>
+        <td>Firma: ${firmaName}<br/><small>${lotesAsociados.length} lotes (${sumHectareas.toFixed(1)} ha)</small></td>
         <td style="text-align:right;">
           <button class="btn-secondary" onclick="abrirModalCampo(${c.id})" style="padding:4px 8px;font-size:11px;">Editar</button>
           <button class="btn-danger" onclick="eliminarCampo(${c.id})" style="padding:4px 8px;font-size:11px;">Borrar</button>
         </td>
       </tr>
       `;
-    }).join("");
+    }).join(""));
   }
   
   // Render Lotes (replace the old uiState.lastData logic)
   const tbodyLotes = document.getElementById("catLotesTableBody");
   if(tbodyLotes) {
-    tbodyLotes.innerHTML = lotes.length === 0 ? '<tr><td colspan="4" style="text-align:center;">Sin lotes</td></tr>' : lotes.map(l => {
+    let filteredLotes = lotes;
+    let headerFiltroLotes = '';
+    
+    if (window.catastroFiltroCampoId) {
+      filteredLotes = lotes.filter(l => l.campo_id === window.catastroFiltroCampoId);
+      const campoFiltroNombre = campos.find(c => c.id === window.catastroFiltroCampoId)?.nombre || '';
+      headerFiltroLotes = `<tr><td colspan="4" style="background:#e0f2fe; padding:8px;">Filtrado por Campo: <b>${campoFiltroNombre}</b> <button onclick="limpiarFiltrosCatastro()" style="border:none;background:none;color:#ef4444;cursor:pointer;font-weight:bold;margin-left:8px;">✕ Quitar</button></td></tr>`;
+    } else if (window.catastroFiltroFirmaId) {
+      const camposDeFirmaIds = campos.filter(c => c.firma_id === window.catastroFiltroFirmaId).map(c => c.id);
+      filteredLotes = lotes.filter(l => camposDeFirmaIds.includes(l.campo_id));
+      const firmaFiltroNombre = firmas.find(f => f.id === window.catastroFiltroFirmaId)?.nombre || '';
+      headerFiltroLotes = `<tr><td colspan="4" style="background:#e0f2fe; padding:8px;">Filtrado por Firma: <b>${firmaFiltroNombre}</b> <button onclick="limpiarFiltrosCatastro()" style="border:none;background:none;color:#ef4444;cursor:pointer;font-weight:bold;margin-left:8px;">✕ Quitar</button></td></tr>`;
+    }
+
+    tbodyLotes.innerHTML = headerFiltroLotes + (filteredLotes.length === 0 ? '<tr><td colspan="4" style="text-align:center;">Sin lotes</td></tr>' : filteredLotes.map(l => {
       const campo = campos.find(c => c.id === l.campo_id);
       const isCampo = l.tipo === 'campo';
       const isCorral = l.tipo === 'corral';
@@ -7796,7 +8441,7 @@ function renderCatastroUI() {
       else if (l.tipo === 'feedlot') badgeTipo = '<span style="background:#fef3c7;color:#78350f;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:bold;margin-left:6px;">🐂 Feedlot</span>';
       else if (isMarcadorH) badgeTipo = '<span style="background:#ffedd5;color:#7c2d12;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:bold;margin-left:6px;">🐄 Hacienda</span>';
       else if (isMarcadorA) badgeTipo = '<span style="background:#dcfce7;color:#15803d;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:bold;margin-left:6px;">🌾 Agricultura</span>';
-      else badgeTipo = '<span style="background:#d1fae5;color:#065f46;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:bold;margin-left:6px;">Lote</span>';
+      else badgeTipo = '<span style="background:#d1fae5;color:#065f46;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:bold;margin-left:6px;">Lote ' + (l.uso ? `(${l.uso})` : '') + '</span>';
 
       const codigoDisplay = l.codigo || '';
       const codigoBadge = codigoDisplay ? `<span style="background:#f0fdf4;color:#166534;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:800;font-family:monospace;margin-right:4px;border:1px solid #bbf7d0;">${esc(codigoDisplay)}</span>` : '';
@@ -7814,7 +8459,7 @@ function renderCatastroUI() {
         </td>
       </tr>
       `;
-    }).join("");
+    }).join(""));
   }
   
   // Render Feedlots + Corrales
@@ -8009,7 +8654,8 @@ document.addEventListener("DOMContentLoaded", () => {
           provincia: provinciaVal,
           partido: partidoVal,
           cultivo: cultivoVal,
-          variedad: variedadVal
+          variedad: variedadVal,
+          uso: tipo === 'lote' ? document.getElementById("loteFormUso").value : null
         };
         const method = id ? "PUT" : "POST";
         const url = id ? `/api/catastro/lotes/${id}` : "/api/catastro/lotes";
@@ -8098,6 +8744,7 @@ function actualizarUIModoLote(tipo) {
   const containerAgri = document.getElementById("loteFormAgriculturaDetailsContainer");
   const containerHectareas = document.getElementById("loteFormHectareasContainer");
   const containerParent = document.getElementById("loteFormParentContainer");
+  const containerUso = document.getElementById("loteFormUsoContainer");
   const labelNombre = document.getElementById("loteFormNombreLabel");
   const inputNombre = document.getElementById("loteFormNombre");
   
@@ -8156,6 +8803,8 @@ function actualizarUIModoLote(tipo) {
   
   // Detalles de Agricultura
   if (containerAgri) containerAgri.classList.toggle("hide", !isMarcadorA);
+  
+  if (containerUso) containerUso.classList.toggle("hide", !isLote);
 }
 
 function populateSelectParentForMarkers() {
@@ -8302,7 +8951,286 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 });
+
+// ====== FASE 2: GANADERÍA, PASTURAS Y ARRENDAMIENTOS ======
+
+window.abrirModalGanaderiaPerfil = function() {
+  document.getElementById("formGanaderiaPerfil").reset();
+  document.getElementById("modalGanaderiaPerfil").showModal();
+};
+
+window.guardarGanaderiaPerfil = async function(e) {
+  e.preventDefault();
+  const especie = document.getElementById("ganaderiaPerfilEspecie").value;
+  const categoria = document.getElementById("ganaderiaPerfilCategoria").value;
+  const cantidad = document.getElementById("ganaderiaPerfilCantidad").value;
+
+  try {
+    const res = await fetch("/api/registros/ganaderia/perfil", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ especie, categoria, cantidad })
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error);
+    
+    document.getElementById("modalGanaderiaPerfil").close();
+    await cargar(); // Recargar dashboard
+  } catch (err) {
+    alert("Error al guardar: " + err.message);
+  }
+};
+
+window.abrirModalAnimal = function() {
+  document.getElementById("formAnimalIndividual").reset();
+  
+  const selLote = document.getElementById("animalLote");
+  selLote.innerHTML = '<option value="">Seleccionar Lote...</option>';
+  if (uiState.lastData && uiState.lastData.lotes) {
+    uiState.lastData.lotes.forEach(l => {
+      const opt = document.createElement("option");
+      opt.value = l.id;
+      opt.textContent = l.nombre;
+      selLote.appendChild(opt);
+    });
+  }
+  
+  document.getElementById("modalAnimalIndividual").showModal();
+};
+
+window.guardarAnimalIndividual = async function(e) {
+  e.preventDefault();
+  const payload = {
+    caravana: document.getElementById("animalCaravana").value,
+    categoria: document.getElementById("animalCategoria").value,
+    raza: document.getElementById("animalRaza").value,
+    estado: document.getElementById("animalEstado").value,
+    peso: document.getElementById("animalPeso").value || null,
+    lote_id: document.getElementById("animalLote").value || null
+  };
+
+  try {
+    const res = await fetch("/api/registros/ganaderia/animal", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error);
+    
+    document.getElementById("modalAnimalIndividual").close();
+    await cargar();
+  } catch (err) {
+    alert("Error al guardar: " + err.message);
+  }
+};
+
+window.abrirModalEventoPastura = function() {
+  document.getElementById("formEventoPastura").reset();
+  
+  const selLote = document.getElementById("pasturaLote");
+  selLote.innerHTML = '<option value="">Seleccionar Lote...</option>';
+  if (uiState.lastData && uiState.lastData.lotes) {
+    uiState.lastData.lotes.forEach(l => {
+      const opt = document.createElement("option");
+      opt.value = l.id;
+      opt.textContent = l.nombre;
+      selLote.appendChild(opt);
+    });
+  }
+  
+  document.getElementById("modalEventoPastura").showModal();
+};
+
+window.guardarEventoPastura = async function(e) {
+  e.preventDefault();
+  const payload = {
+    lote_id: document.getElementById("pasturaLote").value,
+    tipo: document.getElementById("pasturaTipo").value,
+    cabezas: document.getElementById("pasturaCabezas").value || null,
+    dias_descanso: document.getElementById("pasturaDescanso").value || null,
+    observacion: document.getElementById("pasturaObservacion").value
+  };
+
+  try {
+    const res = await fetch("/api/registros/pasturas/evento", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error);
+    
+    document.getElementById("modalEventoPastura").close();
+    await cargar();
+  } catch (err) {
+    alert("Error al registrar evento: " + err.message);
+  }
+};
+
+window.abrirModalArrendamiento = function() {
+  document.getElementById("formArrendamiento").reset();
+  
+  const selLote = document.getElementById("arrendamientoLote");
+  selLote.innerHTML = '<option value="">Seleccionar Lote...</option>';
+  if (uiState.lastData && uiState.lastData.lotes) {
+    uiState.lastData.lotes.forEach(l => {
+      const opt = document.createElement("option");
+      opt.value = l.id;
+      opt.textContent = l.nombre;
+      selLote.appendChild(opt);
+    });
+  }
+  
+  document.getElementById("modalArrendamiento").showModal();
+};
+
+window.guardarArrendamiento = async function(e) {
+  e.preventDefault();
+  const payload = {
+    lote_id: document.getElementById("arrendamientoLote").value,
+    costo: document.getElementById("arrendamientoCosto").value
+  };
+
+  try {
+    const res = await fetch("/api/registros/agricultura/arrendamiento", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error);
+    
+    document.getElementById("modalArrendamiento").close();
+    await cargar();
+  } catch (err) {
+    alert("Error al configurar arrendamiento: " + err.message);
+  }
+};
+
+  // ----------------------------------------------------
+  // Campaña Modal & Filter Logic
+  // ----------------------------------------------------
+  window.abrirModalCampana = function() {
+    document.getElementById("campanaForm").reset();
+    document.getElementById("modalCampana").showModal();
+  };
+
+  document.getElementById("campanaForm")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const nombre = document.getElementById("campanaNombre").value.trim();
+    if (!nombre) return;
+
+    try {
+      const res = await fetch("/api/inventario/campanas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nombre })
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error);
+
+      document.getElementById("modalCampana").close();
+      await cargarInventarioPanel?.();
+      await cargar?.();
+      alert(`Campaña "${nombre}" creada con éxito.`);
+    } catch (err) {
+      alert("Error al crear campaña: " + err.message);
+    }
+  });
+
+  window.guardarComentarioCampana = async function(campanaId) {
+    const textarea = document.getElementById(`campanaComentarios_${campanaId}`);
+    const nombre = document.getElementById(`campanaNombre_${campanaId}`).value;
+    const comentarios = textarea ? textarea.value : "";
+    try {
+      const res = await fetch(`/api/inventario/campanas/${campanaId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nombre, comentarios })
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error);
+      alert("Comentarios guardados con éxito.");
+    } catch (err) {
+      alert("Error al guardar comentarios: " + err.message);
+    }
+  };
+
+  window.renderCampanasTab = function(campanas, saldos = [], movimientos = []) {
+    const container = document.getElementById("campanasContainer");
+    if (!container) return;
+    if (!campanas || campanas.length === 0) {
+      container.innerHTML = `<div style="text-align: center; padding: 24px; color: #64748b;">No hay campañas creadas todavía.</div>`;
+      return;
+    }
+    
+    container.innerHTML = campanas.map(c => {
+      // Calculate basic metrics for this campaign
+      const campSaldos = saldos.filter(s => s.campana_id === c.id);
+      const campMovs = movimientos.filter(m => m.campana_id === c.id);
+      
+      const cultivosCount = campSaldos.filter(s => s.dominio === 'cultivo').length;
+      const ganadosCount = campSaldos.filter(s => s.dominio === 'ganado').length;
+      const insumosCount = campSaldos.filter(s => s.dominio === 'insumo').length;
+      const movsCount = campMovs.length;
+
+      return `
+      <details ${c.activa ? 'open' : ''} style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+        <summary style="padding: 16px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f1f5f9; outline: none; list-style: none;">
+          <div style="display: flex; flex-direction: column; gap: 4px; flex: 1;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 16px; font-weight: 800; color: #0f172a;">${esc(c.nombre)}</span>
+              <span style="font-size: 10px; padding: 2px 6px; border-radius: 4px; background: ${c.activa ? '#dcfce7' : '#f1f5f9'}; color: ${c.activa ? '#166534' : '#64748b'}; font-weight: 700;">${c.activa ? 'ACTIVA' : 'CERRADA'}</span>
+            </div>
+            <div style="display: flex; gap: 12px; font-size: 11px; margin-top: 6px; flex-wrap: wrap;">
+              <span style="display: flex; align-items: center; gap: 6px; background: #ecfdf5; color: #065f46; padding: 4px 10px; border-radius: 8px; font-weight: 700; border: 1px solid #a7f3d0; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">🌾 ${cultivosCount} Lotes Cultivados</span>
+              <span style="display: flex; align-items: center; gap: 6px; background: #eff6ff; color: #1e40af; padding: 4px 10px; border-radius: 8px; font-weight: 700; border: 1px solid #bfdbfe; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">🐄 ${ganadosCount} Categorías de Hacienda</span>
+              <span style="display: flex; align-items: center; gap: 6px; background: #fdf4ff; color: #86198f; padding: 4px 10px; border-radius: 8px; font-weight: 700; border: 1px solid #f5d0fe; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">📦 ${insumosCount} Insumos/Granos</span>
+              <span style="display: flex; align-items: center; gap: 6px; background: #fffbeb; color: #92400e; padding: 4px 10px; border-radius: 8px; font-weight: 700; border: 1px solid #fde68a; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">📝 ${movsCount} Registros</span>
+            </div>
+          </div>
+          <div style="color: #94a3b8; font-size: 12px;">▼ Expandir</div>
+        </summary>
+
+        <div style="padding: 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+            <div style="flex: 1; margin-right: 16px;">
+              <label style="font-size: 11px; font-weight: 700; color: #475569;">Modificar Nombre</label>
+              <input type="text" id="campanaNombre_${c.id}" value="${esc(c.nombre)}" style="font-size: 14px; font-weight: 600; color: #0f172a; border: 1px solid #e2e8f0; border-radius: 6px; padding: 6px 10px; width: 100%; min-width: 250px; outline: none; margin-top: 4px;" />
+            </div>
+            <button type="button" class="btn-primary" onclick="guardarComentarioCampana(${c.id})" style="padding: 6px 16px; font-size: 12px; margin-top: 18px;">💾 Guardar Cambios</button>
+          </div>
+          
+          <div style="display: flex; flex-direction: column; gap: 6px;">
+            <label style="font-size: 11px; font-weight: 700; color: #475569;">Cuaderno de Campo (Observaciones, Rendimientos, Clima)</label>
+            <textarea id="campanaComentarios_${c.id}" placeholder="Escribí acá las observaciones climáticas, anotaciones sobre siembras, rendimiento esperado, problemas del ciclo..." style="width: 100%; min-height: 120px; padding: 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 13px; line-height: 1.5; resize: vertical; background: #f8fafc; box-shadow: inset 0 1px 2px rgba(0,0,0,0.02);">${esc(c.comentarios || "")}</textarea>
+          </div>
+        </div>
+      </details>
+      `;
+    }).join("");
+  };
+
+  // Listener for filtering table
+  document.getElementById("filterCatastroCampana")?.addEventListener("change", function() {
+    // Dummy filter for Catastro (Lotes don't have campaigns yet)
+  });
+
+  document.getElementById("filterSaldosCampana")?.addEventListener("change", function() {
+    const val = this.value.toLowerCase();
+    const rows = document.querySelectorAll("#invSaldosBody tr");
+    rows.forEach(tr => {
+      // The Campaña column is the 4th column (index 3)
+      const campanaText = tr.children[3]?.textContent.toLowerCase() || "";
+      if (!val || campanaText.includes(val)) {
+        tr.style.display = "";
+      } else {
+        tr.style.display = "none";
+      }
+    });
+  });
+
 </script>
 </body>
-
 </html>
