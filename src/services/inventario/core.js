@@ -195,11 +195,19 @@ async function crearLoteUsuario({
   const lLng = lng === null || lng === undefined || lng === "" ? null : Number(lng);
   const tipoSan = tipo ? String(tipo).trim() : 'lote';
   const codigo = await generarCodigo(query, "ubicaciones", PREFIJOS.lotes, usuarioId);
+
+  let campo_id = null;
+  const cCliente = cliente ? String(cliente).trim() : null;
+  if (cCliente) {
+    const rCampo = await query(`SELECT id FROM campos WHERE usuario_id = $1 AND LOWER(nombre) = LOWER($2) LIMIT 1`, [usuarioId, cCliente]);
+    if (rCampo.rows.length > 0) campo_id = rCampo.rows[0].id;
+  }
+
   const r = await query(
     `
-      INSERT INTO ubicaciones (usuario_id, nombre, hectareas, cultivo, arrendado, cliente, firma, provincia, partido, tipo, lat, lng, codigo)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-      RETURNING id, nombre, hectareas, cultivo, arrendado, cliente, firma, provincia, partido, tipo, lat, lng, codigo
+      INSERT INTO ubicaciones (usuario_id, nombre, hectareas, cultivo, arrendado, cliente, firma, provincia, partido, tipo, lat, lng, codigo, campo_id)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+      RETURNING id, nombre, hectareas, cultivo, arrendado, cliente, firma, provincia, partido, tipo, lat, lng, codigo, campo_id
     `,
     [
       usuarioId,
@@ -207,14 +215,15 @@ async function crearLoteUsuario({
       Number.isFinite(ha) ? ha : null,
       cultivo ? String(cultivo).trim() : null,
       Boolean(arrendado),
-      cliente ? String(cliente).trim() : null,
+      cCliente,
       firma ? String(firma).trim() : null,
       provincia ? String(provincia).trim() : null,
       partido ? String(partido).trim() : null,
       tipoSan,
       Number.isFinite(lLat) ? lLat : null,
       Number.isFinite(lLng) ? lLng : null,
-      codigo
+      codigo,
+      campo_id
     ]
   );
   return r.rows[0];
