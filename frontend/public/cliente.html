@@ -4626,7 +4626,8 @@
           { l: "Tokens Total", v: num(vals.tokens_total), s: series.tokens_total },
           { l: "Última Consulta Recibida", v: fmt(actividad.ultima_consulta), s: null },
         ];
-        $("kpis").innerHTML = items
+        const kpisEl = $("kpis");
+        if (kpisEl) kpisEl.innerHTML = items
           .map((k) => `<div class="kpi-card"><div class="kpi-label">${esc(k.l)}</div><div class="kpi-value">${esc(String(k.v))}</div>${k.s ? renderSparkline(k.s) : ""}</div>`)
           .join("");
       }
@@ -9887,9 +9888,9 @@ window.guardarArrendamiento = async function(e) {
       if (!data.ok) throw new Error(data.error);
 
       document.getElementById("modalCampana").close();
-      await cargarInventarioPanel?.();
-      await cargar?.();
       alert(`Campaña "${nombre}" creada con éxito.`);
+      try { await cargarInventarioPanel?.(); } catch (e) { console.warn("Recarga inventario tras crear campaña:", e); }
+      try { await cargar?.(); } catch (e) { console.warn("Recarga dashboard tras crear campaña:", e); }
     } catch (err) {
       alert("Error al crear campaña: " + err.message);
     }
