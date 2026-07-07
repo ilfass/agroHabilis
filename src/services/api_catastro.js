@@ -142,39 +142,61 @@ router.post("/lotes", async (req, res) => {
 router.put("/lotes/:id", async (req, res) => {
   try {
     const { id: uid } = req.clienteSession.user;
-    const nombre = String(req.body.nombre || "").trim();
-    const campo_id = req.body.campo_id ? Number(req.body.campo_id) : null;
-    const hectareas = req.body.hectareas ? Number(req.body.hectareas) : null;
-    const lat = req.body.lat ? Number(req.body.lat) : null;
-    const lng = req.body.lng ? Number(req.body.lng) : null;
-    const geojson = req.body.geojson !== undefined ? req.body.geojson : undefined;
-    const tipo = req.body.tipo ? String(req.body.tipo).trim() : undefined;
-    const firma = req.body.firma !== undefined ? (req.body.firma ? String(req.body.firma).trim() : null) : undefined;
-    const provincia = req.body.provincia !== undefined ? (req.body.provincia ? String(req.body.provincia).trim() : null) : undefined;
-    const partido = req.body.partido !== undefined ? (req.body.partido ? String(req.body.partido).trim() : null) : undefined;
-    const cultivo = req.body.cultivo !== undefined ? (req.body.cultivo ? String(req.body.cultivo).trim() : null) : undefined;
-    const variedad = req.body.variedad !== undefined ? (req.body.variedad ? String(req.body.variedad).trim() : null) : undefined;
-    const uso = req.body.uso !== undefined ? (req.body.uso ? String(req.body.uso).trim() : null) : undefined;
-    if (!nombre) return res.status(400).json({ ok: false, error: "Nombre requerido" });
+    const lotId = req.params.id;
 
-    let sql = "UPDATE ubicaciones SET nombre=$1, campo_id=$2, hectareas=$3, lat=$4, lng=$5";
-    let params = [nombre, campo_id, hectareas, lat, lng];
-    let idx = 6;
+    const fields = [];
+    const params = [];
+    let idx = 1;
 
-    if (geojson !== undefined) { sql += `, geojson=$${idx}::jsonb`; params.push(geojson ? JSON.stringify(geojson) : null); idx++; }
-    if (tipo !== undefined) { sql += `, tipo=$${idx}`; params.push(tipo); idx++; }
-    if (firma !== undefined) { sql += `, firma=$${idx}`; params.push(firma); idx++; }
-    if (provincia !== undefined) { sql += `, provincia=$${idx}`; params.push(provincia); idx++; }
-    if (partido !== undefined) { sql += `, partido=$${idx}`; params.push(partido); idx++; }
-    if (cultivo !== undefined) { sql += `, cultivo=$${idx}`; params.push(cultivo); idx++; }
-    if (variedad !== undefined) { sql += `, variedad=$${idx}`; params.push(variedad); idx++; }
-    if (uso !== undefined) { sql += `, uso=$${idx}`; params.push(uso); idx++; }
-                    
-    sql += ` WHERE id=$${idx} AND usuario_id=$${idx+1} RETURNING *`;
-    params.push(req.params.id, uid);
+    const addField = (fieldName, value, cast = "") => {
+      if (value !== undefined) {
+        fields.push(`${fieldName} = $${idx}${cast}`);
+        params.push(value);
+        idx++;
+      }
+    };
+
+    if (req.body.nombre !== undefined) {
+      const nombre = String(req.body.nombre || "").trim();
+      if (!nombre) return res.status(400).json({ ok: false, error: "Nombre requerido" });
+      addField("nombre", nombre);
+    }
+
+    if (req.body.campo_id !== undefined) addField("campo_id", req.body.campo_id ? Number(req.body.campo_id) : null);
+    if (req.body.hectareas !== undefined) addField("hectareas", req.body.hectareas != null ? Number(req.body.hectareas) : null);
+    if (req.body.lat !== undefined) addField("lat", req.body.lat != null ? Number(req.body.lat) : null);
+    if (req.body.lng !== undefined) addField("lng", req.body.lng != null ? Number(req.body.lng) : null);
+
+    if (req.body.geojson !== undefined) {
+      addField("geojson", req.body.geojson ? JSON.stringify(req.body.geojson) : null, "::jsonb");
+    }
+
+    if (req.body.tipo !== undefined) addField("tipo", req.body.tipo ? String(req.body.tipo).trim() : null);
+    if (req.body.firma !== undefined) addField("firma", req.body.firma ? String(req.body.firma).trim() : null);
+    if (req.body.provincia !== undefined) addField("provincia", req.body.provincia ? String(req.body.provincia).trim() : null);
+    if (req.body.partido !== undefined) addField("partido", req.body.partido ? String(req.body.partido).trim() : null);
+    if (req.body.cultivo !== undefined) addField("cultivo", req.body.cultivo ? String(req.body.cultivo).trim() : null);
+    if (req.body.variedad !== undefined) addField("variedad", req.body.variedad ? String(req.body.variedad).trim() : null);
+    if (req.body.uso !== undefined) addField("uso", req.body.uso ? String(req.body.uso).trim() : null);
+    if (req.body.campania !== undefined) addField("campania", req.body.campania ? String(req.body.campania).trim() : null);
+    if (req.body.fecha_siembra !== undefined) addField("fecha_siembra", req.body.fecha_siembra ? String(req.body.fecha_siembra).trim() : null);
+    if (req.body.densidad !== undefined) addField("densidad", req.body.densidad != null ? Number(req.body.densidad) : null);
+
+    if (fields.length === 0) {
+      return res.status(400).json({ ok: false, error: "Ningún campo provisto para actualizar" });
+    }
+
+    const sql = `UPDATE ubicaciones SET ${fields.join(", ")} WHERE id = $${idx} AND usuario_id = $${idx+1} RETURNING *`;
+    params.push(lotId, uid);
+
     const { rows } = await query(sql, params);
+    if (rows.length === 0) {
+      return res.status(404).json({ ok: false, error: "Lote no encontrado o no autorizado" });
+    }
     res.json({ ok: true, data: rows[0] });
-  } catch (e) { res.status(500).json({ ok: false, error: e.message }); }
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
 });
 
 router.delete("/lotes/:id", async (req, res) => {

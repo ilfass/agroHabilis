@@ -1620,7 +1620,8 @@ const getClienteDashboard = async ({ usuarioId }) => {
           producto_insumo AS insumo_nombre, 
           dosis_promedio,
           CASE 
-            WHEN tipo_labor = 'SIEMBRA' THEN 'sem/ha'
+            WHEN tipo_labor = 'SIEMBRA' AND (LOWER(producto_insumo) LIKE '%maiz%' OR LOWER(producto_insumo) LIKE '%girasol%') THEN 'sem/ha'
+            WHEN tipo_labor = 'SIEMBRA' THEN 'kg/ha'
             WHEN tipo_labor = 'PULVERIZACION' THEN 'l/ha'
             ELSE 'tn/ha'
           END AS unidad_dosis,

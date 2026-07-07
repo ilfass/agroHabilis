@@ -361,6 +361,7 @@ const client = new Client({
     dataPath: sessionPath,
   }),
   puppeteer: puppeteerConfig,
+  userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
   takeoverOnConflict: true,
   takeoverTimeoutMs: 0,
   qrMaxRetries: whatsappQrMaxRetries,
@@ -876,7 +877,9 @@ const procesarMensajeEntranteWhatsapp = async (msg) => {
         lines.push(`* **Superficie**: ${fmtNum(monitorExtractData.hectareas_reales) || "—"} ha reales`);
         lines.push(`* **Insumo**: ${monitorExtractData.producto_insumo || "—"}`);
 
-        const dosisUnidad = monitorExtractData.tipo_labor === 'SIEMBRA' ? 'sem/ha' : monitorExtractData.tipo_labor === 'PULVERIZACION' ? 'l/ha' : 'tn/ha';
+        const insumoLower = String(monitorExtractData.producto_insumo || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        const isSemillaDensidad = insumoLower.includes("maiz") || insumoLower.includes("girasol");
+        const dosisUnidad = monitorExtractData.tipo_labor === 'SIEMBRA' ? (isSemillaDensidad ? 'sem/ha' : 'kg/ha') : monitorExtractData.tipo_labor === 'PULVERIZACION' ? 'l/ha' : 'tn/ha';
         lines.push(`* **Dosis Promedio**: ${fmtNum(monitorExtractData.dosis_promedio) || "—"} ${dosisUnidad}`);
 
         if (monitorExtractData.rendimiento_total_t != null) {

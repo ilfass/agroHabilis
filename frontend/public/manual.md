@@ -1402,92 +1402,112 @@ El portal web está disponible en **`agro.habilispro.com`** para usuarios con pl
 
 ## Registro de datos desde el Portal Web
 
-El portal web te permite cargar datos de forma **visual e intuitiva** usando formularios, tablas y mapas interactivos:
+El portal web te permite cargar y gestionar datos de forma **visual e intuitiva** usando formularios, tablas, filtros y mapas interactivos. A continuación se detallan los módulos principales de la plataforma web y cómo utilizarlos:
 
-### 🗺️ Registro directo desde el Mapa
+### 🔍 Filtros de Control Global
+* **Qué muestra y qué hace:** Esta barra de control ubicada en la parte superior te permite segmentar la información de todo el portal web. Al seleccionar un filtro, todos los gráficos, reportes, mapas, tablas y balances de stock se recalculan en cascada para mostrar únicamente los datos correspondientes.
+* **Cómo usarlo:**
+  1. Hacé click en los selectores de **Firma** (razón social) o **Campo** (establecimiento) para elegir los que deseas visualizar.
+  2. También podés segmentar por **Provincia** y **Localidad**.
+  3. Presioná el botón **"Aplicar"** para actualizar la vista completa de AgroHabilis de manera instantánea.
 
-![Captura: Mapa interactivo y registro de lotes](/assets/docs/captura-portal-mapa.png)
+### 🛰️ Catastro Satelital Interactivo
+* **Qué muestra:** Un visor cartográfico interactivo que despliega los límites geográficos y polígonos de tus campos, lotes, corrales y feedlots. Además, dibuja marcadores con iconos dinámicos para identificar visualmente la hacienda (ganado) y la agricultura (siembras activas).
+* **Cómo hacer para que aparezcan tus campos y lotes:**
+  1. **Registrar coordenadas GPS:** Al crear o editar un Campo o Lote, ingresá su latitud y longitud correspondientes.
+  2. **Elegir en el mapa:** Hacé click en el botón "Elegir en el mapa" en el formulario del elemento.
+  3. **Dibujar polígono:** Utilizá las herramientas de dibujo (puntos, líneas y polígonos) para delimitar la superficie real en el mapa satelital. Al guardar, el lote aparecerá coloreado y geolocalizado en el mapa según el tipo de uso asignado.
 
-1. Ingresá al mapa de lotes en la pestaña **"Cultivos"**
-2. Hacé click directamente sobre cualquier potrero/lote dibujado en el mapa
-3. En el panel lateral que se abre, podés registrar rápidamente **siembras, aplicaciones, eventos de pastura o movimientos de hacienda** asociados directamente a ese lote.
+### 📋 Listados y Controles de Gestión
+* **Qué muestra:** Tablas administrativas editables organizadas en pestañas para controlar la estructura legal y física del campo (Firmas, Campos y Lotes/Corrales/Feedlots).
+* **Cómo agregar y gestionar elementos:**
+  * **Agregar Firmas:** Hacé click en **"+ Nueva Firma"** en la tabla de Firmas e ingresá el nombre o razón social. Podés editar o borrar registros desde las columnas de acción.
+  * **Agregar Campos:** Hacé click en **"+ Nuevo Campo"**, asignale un nombre, vinculalo a una de tus Firmas creadas, definí la provincia/localidad e ingresá las coordenadas GPS del establecimiento.
+  * **Agregar Lotes/Corrales/Feedlots:** Hacé click en **"+ Nuevo Lote"**, ingresá el nombre, hectáreas de superficie, vinculalo al Campo padre y definí su tipo de uso principal (Agrícola, Ganadero, Mixto).
 
-### ➕ Alta de Hacienda
+### 📅 Gestión de Campañas
+* **Qué es y qué muestra:** Una sección de control temporal para organizar tus ciclos productivos (ej: Campaña 2026). Muestra tarjetas expansibles con métricas en tiempo real de lotes cultivados, categorías de hacienda, insumos y cantidad de registros. Cada campaña cuenta con su propio *Cuaderno de Campo* integrado.
+* **Cómo agregar y usar información:**
+  1. Hacé click en **"+ Nueva Campaña"**, ingresá el nombre (ej: Campaña 25/26) y guardá.
+  2. Al realizar registros de siembra, pasturas, márgenes o stock, seleccioná la campaña correspondiente en los formularios.
+  3. Expandí la tarjeta de la campaña y escribí las observaciones climáticas, rendimientos obtenidos o notas de seguimiento en el editor del **Cuaderno de Campo**, presionando luego en **"Guardar Cambios"**.
 
-1. Ingresá a la pestaña **"Hacienda"**
-2. Hacé click en **"+ Agregar"**
-3. Completá los campos: categoría, cantidad, lote, raza, peso
-4. Confirmá con el botón **"Guardar"**
+### 🚜 Registrar Labor de Campo
+* **Qué es y cómo usarlo:** Un bloque de carga rápida para registrar labores de campo directamente asociadas a tus parcelas.
+* **Pasos para registrar:**
+  1. Seleccioná el **Lote / Campo** correspondiente.
+  2. Seleccioná el **Tipo de Labor** (Pulverización, Fertilización, Cosecha, Rolo, Siembra).
+  3. Si la labor es una pulverización o fertilización, se desplegará el panel para ingresar los insumos/agroquímicos utilizados y la dosis.
+  4. Agregá la fecha de ejecución, observaciones sobre plagas o rendimiento y hacé click en **"Guardar Labor"**.
 
-### ➕ Alta de Cultivos y Lotes
+### 🌾 Cultivos y Pasturas Activas
+* **Qué muestra y cómo usarlo:** Una planilla consolidada que sirve de inventario de toda la superficie de tierra sembrada.
+* **Cómo usarlo:** Permite visualizar de forma agrupada los lotes, cultivos, hectáreas, variedad de semilla, densidad y fecha de siembra. Se alimenta de forma automática de los registros del formulario de siembra o labores.
 
-1. Ingresá a la pestaña **"Cultivos"**
-2. Hacé click en **"+ Nuevo Lote"**
-3. Completá: nombre del lote, cultivo, hectáreas, variedad, fecha de siembra
-4. Guardá el registro
+### 📅 Calendario Operativo Unificado
+* **Qué es y qué muestra:** Un almanaque visual interactivo que centraliza todas las tareas programadas y actividades del establecimiento.
+* **Cómo usarlo:**
+  1. Para crear una actividad, hacé click en **"+ Planificar Tarea"**. Completá el título, descripción, seleccioná la categoría (Agricultura, Ganadería, Clima, etc.), definí las fechas de inicio/fin y asociala opcionalmente a un lote.
+  2. Hacé click sobre cualquier evento del calendario para abrir la ficha de detalle de la actividad.
+  3. Podés eliminar una actividad directamente desde su modal de detalle.
 
-### ➕ Registro de Gastos y Ventas
+### 📝 Registro de Movimiento
+* **Qué muestra y cómo usarlo:** Un bloque para ingresar registros o transacciones manuales que alteran las existencias físicas en el ledger.
+* **Cómo usarlo:**
+  1. Seleccioná el **Dominio** (Ganado, Cultivo, Granos en silos, o Insumo/Feed).
+  2. Elegí el **Lote/Corral** y la **Campaña** de destino.
+  3. Seleccioná el tipo de **Ajuste**: "Valor absoluto" (para fijar una cantidad fija de stock) o "Ajuste +/-" (para registrar entradas o salidas sumando/restando unidades al saldo actual).
+  5. Cargá los detalles específicos del insumo o categoría de hacienda y presioná **"Guardar Registro"**.
 
-1. Ingresá a la pestaña **"Finanzas"**
-2. Elegí **"Nuevo Gasto"** o **"Nueva Venta"**
-3. Completá monto, descripción y categoría
-4. Guardá
-
-### ➕ Eventos de Pastura
-
-1. Ingresá a la pestaña **"Pasturas"**
-2. Seleccioná el lote/potrero
-3. Registrá el evento: ingreso de animales, retiro, rebrote, descanso
+### 📦 Balances de Stock Consolidados
+* **Qué muestra y cómo usarlo:** Una tabla de saldos netos actuales que resume el inventario disponible en tiempo real.
+* **Cómo usarlo:**
+  1. Visualizá los saldos de granos en acopio, insumos en depósito y cabezas de hacienda por lote.
+  2. Usá el selector **"Filtrar por Campaña"** para aislar el stock y existencias correspondientes a un ciclo de producción específico.
+  3. Escribí en la barra de búsqueda para filtrar la tabla rápidamente por nombre de lote, cultivo o insumo.
 
 ## Secciones del Portal
 
 ### 🐄 Hacienda y Trazabilidad
-
-- **Dashboard de stock** por categoría con semáforos de carencia SENASA
-- **Fichas individuales** por caravana con historial sanitario completo
-- **Tabla editable** para modificar datos de animales directamente
-- Exportación de planillas PDF oficiales para manga veterinaria
+- **Dashboard de stock** por categoría con semáforos de carencia SENASA.
+- **Fichas individuales** por caravana con historial sanitario completo.
+- **Tabla editable** para modificar datos de animales directamente.
+- Exportación de planillas PDF oficiales para manga veterinaria.
 
 ### 🌾 Cultivos y Lotes
-
-- **Mapa de lotes** con geolocalización
-- **Tabla de siembras** con variedad, densidad, rinde esperado
-- **Historial de labores** (fertilización, aplicaciones, cosecha)
-- Edición directa de datos desde la tabla
+- **Mapa de lotes** con geolocalización.
+- **Tabla de siembras** con variedad, densidad, rinde esperado.
+- **Historial de labores** (fertilización, aplicaciones, cosecha).
+- Edición directa de datos desde la tabla.
 
 ### 📅 Campañas Agrícolas y Ganaderas
-
 - **Gestión centralizada** de campañas activas y cerradas.
 - **Cuaderno de Campo integrado** para anotaciones sobre clima, labores, rendimiento, problemas y seguimientos.
 - **Tarjetas resumen expansibles** por campaña.
 - **Métricas visuales**: Resumen de Lotes Cultivados, Categorías de Hacienda, Insumos/Granos y Registros asociados a cada campaña.
 
 ### 💰 Finanzas
-
-- **Gráficos de gastos y ventas** del mes
-- **Margen por perfil** (agricultura vs ganadería)
-- **Desglose por categoría** de gasto con barras visuales
-- Referencias de precios de insumos vigentes
-- Tabla editable de movimientos financieros
+- **Gráficos de gastos y ventas** del mes.
+- **Margen por perfil** (agricultura vs ganadería).
+- **Desglose por categoría** de gasto con barras visuales.
+- Referencias de precios de insumos vigentes.
+- Tabla editable de movimientos financieros.
 
 ### 🔄 Rotación de Pasturas
-
-- **Semáforo visual** de todos los lotes/potreros (🔴🟡🟢)
-- Estado de ocupación y días de descanso en tiempo real
-- Historial completo de eventos de pastura
-- Registro directo de eventos desde la web
+- **Semáforo visual** de todos los lotes/potreros (🔴🟡🟢).
+- Estado de ocupación y días de descanso en tiempo real.
+- Historial completo de eventos de pastura.
+- Registro directo de eventos desde la web.
 
 ### 🧮 Calculadora de Raciones
-
-- Formulador de mixer interactivo
-- Selección visual de tipo de dieta (Suplementación, Feedlot, Pastura)
-- Resultado con peso por insumo y totales para el mixer
+- Formulador de mixer interactivo.
+- Selección visual de tipo de dieta (Suplementación, Feedlot, Pastura).
+- Resultado con peso por insumo y totales para el mixer.
 
 ### 📊 Precios de Mercado
-
-- Tabla con todos los precios del día (granos, hacienda, dólar)
-- Histórico de precios por cultivo
-- Referencias cruzadas entre fuentes
+- Tabla con todos los precios del día (granos, hacienda, dólar).
+- Histórico de precios por cultivo.
+- Referencias cruzadas entre fuentes.
 
 ## Exportación PDF
 

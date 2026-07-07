@@ -100,7 +100,9 @@ const procesarColaReintentosVision = async ({ sendMessage }) => {
           lines.push(`* **Superficie**: ${fmtNum(parsed.hectareas_reales) || "—"} ha reales`);
           lines.push(`* **Insumo**: ${parsed.producto_insumo || "—"}`);
 
-          const dosisUnidad = parsed.tipo_labor === 'SIEMBRA' ? 'sem/ha' : parsed.tipo_labor === 'PULVERIZACION' ? 'l/ha' : 'tn/ha';
+          const insumoLower = String(parsed.producto_insumo || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+          const isSemillaDensidad = insumoLower.includes("maiz") || insumoLower.includes("girasol");
+          const dosisUnidad = parsed.tipo_labor === 'SIEMBRA' ? (isSemillaDensidad ? 'sem/ha' : 'kg/ha') : parsed.tipo_labor === 'PULVERIZACION' ? 'l/ha' : 'tn/ha';
           lines.push(`* **Dosis Promedio**: ${fmtNum(parsed.dosis_promedio) || "—"} ${dosisUnidad}`);
 
           if (parsed.rendimiento_total_t != null) {

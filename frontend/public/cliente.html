@@ -14,7 +14,10 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
     <link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.css" />
     <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="/assets/chart.js"></script>
+    <!-- Driver.js — Tour guiado -->
+    <link rel="stylesheet" href="/assets/driver.css" />
+    <script src="/assets/driver.min.js"></script>
     <style>
       :root {
         --bg-main: #f4f7f6;
@@ -76,6 +79,12 @@
       }
       ::-webkit-scrollbar-thumb:hover {
         background: #94a3b8;
+      }
+
+      /* Disable interaction of map elements during picking mode to allow clicks to reach the map */
+      .map-picking-mode .leaflet-marker-pane *,
+      .map-picking-mode .leaflet-overlay-pane path {
+        pointer-events: none !important;
       }
 
       /* Layout Structure */
@@ -835,7 +844,7 @@
       }
 
       /* Interactive hero section for tabs */
-      .tab-hero {
+      .card.tab-hero {
         background: linear-gradient(135deg, #0b1320 0%, #040810 100%) !important;
         color: #ffffff !important;
         border: none !important;
@@ -1107,6 +1116,7 @@
       .tab-link[data-tab="trazabilidad"]::before { content: '💉'; }
       .tab-link[data-tab="telemetria"]::before { content: '🚜'; }
       .tab-link[data-tab="finanzas"]::before { content: '📄'; }
+      .tab-link[data-tab="reportes"]::before { content: '📊'; }
       .tab-link[data-tab="equipo"]::before { content: '👥'; }
       .tab-link[data-tab="comandos"]::before { content: '⚙️'; }
 
@@ -1920,6 +1930,218 @@
         0%, 100% { opacity: 0.6; }
         50% { opacity: 1; }
       }
+
+      /* ===== SISTEMA DE AYUDA CONTEXTUAL ===== */
+
+      /* Botón flotante de ayuda en header */
+      .btn-help {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 14px;
+        background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+        color: white;
+        border: none;
+        border-radius: 10px;
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+        font-family: inherit;
+        transition: all 0.2s ease;
+        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+      }
+      .btn-help:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 16px rgba(99, 102, 241, 0.4);
+        background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%);
+      }
+
+      /* Tooltips contextuales */
+      .help-tip {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+        cursor: help;
+        vertical-align: middle;
+        margin-left: 6px;
+        flex-shrink: 0;
+        position: relative;
+        transition: transform 0.2s ease;
+        user-select: none;
+      }
+      .help-tip:hover { transform: scale(1.15); }
+      .help-tip::after {
+        content: attr(data-tip);
+        position: absolute;
+        bottom: calc(100% + 8px);
+        left: 50%;
+        transform: translateX(-50%);
+        background: #1e293b;
+        color: #f8fafc;
+        padding: 8px 12px;
+        border-radius: 8px;
+        font-size: 12px;
+        font-weight: 500;
+        line-height: 1.5;
+        white-space: normal;
+        width: 220px;
+        text-align: left;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.2s;
+        z-index: 9999;
+        box-shadow: 0 8px 20px rgba(0,0,0,0.25);
+        font-family: 'Plus Jakarta Sans', sans-serif;
+      }
+      .help-tip::before {
+        content: '';
+        position: absolute;
+        bottom: calc(100% + 2px);
+        left: 50%;
+        transform: translateX(-50%);
+        border: 5px solid transparent;
+        border-top-color: #1e293b;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.2s;
+        z-index: 9999;
+      }
+      .help-tip:hover::after,
+      .help-tip:hover::before { opacity: 1; }
+
+      /* Botón inline de ejemplo WhatsApp */
+      .btn-wa-example {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 4px 10px;
+        background: #ecfdf5;
+        color: #065f46;
+        border: 1px solid #a7f3d0;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 700;
+        cursor: pointer;
+        font-family: inherit;
+        transition: all 0.15s;
+        white-space: nowrap;
+      }
+      .btn-wa-example:hover {
+        background: #d1fae5;
+        border-color: #6ee7b7;
+      }
+
+      /* Help Drawer */
+      #helpDrawer {
+        position: fixed;
+        top: 0;
+        right: 0;
+        width: min(480px, 100vw);
+        height: 100vh;
+        border: none;
+        border-left: 1px solid #e2e8f0;
+        border-radius: 0;
+        padding: 0;
+        margin: 0 0 0 auto;
+        box-shadow: -8px 0 40px rgba(15,23,42,0.12);
+        background: #ffffff;
+        overflow-y: auto;
+        z-index: 1000;
+      }
+      #helpDrawer::backdrop {
+        background: rgba(15, 23, 42, 0.35);
+        backdrop-filter: blur(4px);
+      }
+      .help-drawer-header {
+        position: sticky;
+        top: 0;
+        background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+        color: white;
+        padding: 24px 20px 20px;
+        z-index: 10;
+      }
+      .help-drawer-header h2 {
+        margin: 0 0 4px;
+        font-family: 'Outfit', sans-serif;
+        font-size: 20px;
+        font-weight: 800;
+      }
+      .help-drawer-header p {
+        margin: 0;
+        font-size: 13px;
+        opacity: 0.85;
+      }
+      .help-drawer-close {
+        position: absolute;
+        top: 16px;
+        right: 16px;
+        background: rgba(255,255,255,0.15);
+        border: none;
+        color: white;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        font-size: 16px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.15s;
+      }
+      .help-drawer-close:hover { background: rgba(255,255,255,0.25); }
+      .help-drawer-body {
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .help-section-card {
+        border: 1px solid #f1f5f9;
+        border-radius: 12px;
+        padding: 14px 16px;
+        cursor: default;
+        transition: border-color 0.15s, box-shadow 0.15s;
+        background: #fafafa;
+      }
+      .help-section-card:hover {
+        border-color: #c7d2fe;
+        box-shadow: 0 2px 8px rgba(99,102,241,0.08);
+        background: #f8f7ff;
+      }
+      .help-section-card .hsc-title {
+        font-weight: 800;
+        font-size: 14px;
+        color: #1e293b;
+        margin-bottom: 4px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .help-section-card .hsc-desc {
+        font-size: 12px;
+        color: #64748b;
+        line-height: 1.6;
+      }
+      .help-section-card .hsc-wa {
+        margin-top: 8px;
+        font-size: 11px;
+        color: #065f46;
+        background: #f0fdf4;
+        border: 1px solid #bbf7d0;
+        border-radius: 6px;
+        padding: 6px 10px;
+        font-family: monospace;
+      }
+      .help-section-group-title {
+        font-size: 10px;
+        font-weight: 800;
+        color: #94a3b8;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        padding: 12px 4px 4px;
+      }
+
     </style>
   </head>
   <body>
@@ -1994,6 +2216,11 @@
             <small>Gastos, ventas y alertas</small>
           </button>
 
+          <button class="tab-link" data-tab="reportes" type="button">
+            <span class="title-text">Reportes</span>
+            <small>Generar informes</small>
+          </button>
+
           <div class="nav-section-title">👥 Colaboración</div>
           <button class="tab-link" data-tab="equipo" type="button">
             <span class="title-text">Equipo de Campo</span>
@@ -2012,6 +2239,10 @@
             Sincronizado vía WhatsApp.<br />
             Línea directa activa.
           </p>
+          <button class="btn-help" type="button" onclick="iniciarTourGuiado()" style="width:100%; margin-top: 12px; justify-content: center; font-size: 12px; padding: 8px 10px;" title="Recorrer todas las funciones del panel">
+            🎯 Tour guiado
+          </button>
+          <a href="/manual.html" target="_blank" style="display:block; margin-top:8px; text-align:center; font-size:11px; color:#64748b; text-decoration:none; font-weight:600;">📖 Ver Manual Completo</a>
         </div>
       </aside>
 
@@ -2059,8 +2290,9 @@
               <h3 style="margin: 0; font-family: 'Outfit', sans-serif; font-size: 16px; font-weight: 800; color: #0f172a;">Filtros de Control Global</h3>
             </div>
             <div style="margin-left: auto; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-              <span class="badge success" id="filterStatusBadge" style="text-transform: none; font-size: 11px;">Todo el establecimiento</span>
-              <button id="btnClearFilters" class="btn-secondary" style="padding: 6px 12px; font-size: 11px; height: 30px; border-radius: 8px;" type="button">Limpiar Filtros</button>
+               <button class="btn-help-bubble" onclick="abrirHelpDrawer('#help-card-filtros')" type="button" style="background:#f1f5f9; color:#475569; border: 1px solid #cbd5e1; font-size:11px; padding:6px 10px; height: 30px; border-radius: 8px;">🔍 Ayuda</button>
+               <span class="badge success" id="filterStatusBadge" style="text-transform: none; font-size: 11px;">Todo el establecimiento</span>
+               <button id="btnClearFilters" class="btn-secondary" style="padding: 6px 12px; font-size: 11px; height: 30px; border-radius: 8px;" type="button">Limpiar Filtros</button>
             </div>
           </div>
           <div style="display: flex; flex-wrap: wrap; gap: 16px;">
@@ -2340,9 +2572,12 @@
                   <h2>Calendario Operativo Unificado</h2>
                   <p class="card-subtitle">Visualización unificada de labores, siembras, alertas sanitarias y tareas planificadas.</p>
                 </div>
-                <button class="btn-primary" id="btnCalendarAddTask" type="button" style="height: 38px; padding: 0 20px;">
-                  ➕ Planificar Tarea
-                </button>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                  <button class="btn-help-bubble" onclick="abrirHelpDrawer('#help-card-calendario')" type="button" style="background:#f1f5f9; color:#475569; border: 1px solid #cbd5e1; font-size:11px; padding:6px 10px; height: 38px;">📅 Ayuda</button>
+                  <button class="btn-primary" id="btnCalendarAddTask" type="button" style="height: 38px; padding: 0 20px;">
+                    ➕ Planificar Tarea
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -2440,7 +2675,10 @@
                     <h3>📅 Gestión de Campañas</h3>
                     <p class="card-subtitle" style="margin-bottom: 0;">Cuaderno de campo y organización de tus ciclos productivos.</p>
                   </div>
-                  <button type="button" class="btn-primary" onclick="abrirModalCampana()" style="padding: 10px 20px; font-size: 14px; font-weight: 800; background-color: #f59e0b; border-color: #f59e0b; box-shadow: 0 4px 6px rgba(245, 158, 11, 0.2);">+ Nueva Campaña</button>
+                  <div style="display: flex; gap: 8px; align-items: center;">
+                    <button class="btn-help-bubble" onclick="abrirHelpDrawer('#help-card-campanas')" type="button" style="background:#f1f5f9; color:#475569; border: 1px solid #cbd5e1; font-size:11px; padding:6px 10px;">📅 Ayuda</button>
+                    <button type="button" class="btn-primary" onclick="abrirModalCampana()" style="padding: 10px 20px; font-size: 14px; font-weight: 800; background-color: #f59e0b; border-color: #f59e0b; box-shadow: 0 4px 6px rgba(245, 158, 11, 0.2);">+ Nueva Campaña</button>
+                  </div>
                 </div>
                 
                 <div id="campanasContainer" style="margin-top: 24px; display: grid; grid-template-columns: 1fr; gap: 16px;">
@@ -2470,6 +2708,7 @@
                     <p class="card-subtitle">Categorías de hacienda y estimaciones de existencias físicas en stock.</p>
                   </div>
                   <div style="display: flex; gap: 8px; align-items: center;">
+                    <button class="btn-help-bubble" onclick="abrirHelpDrawer('#help-card-ganaderia')" type="button" style="background:#f1f5f9; color:#475569; border: 1px solid #cbd5e1; font-size:11px; padding:6px 10px;">🐄 Ayuda</button>
                     <button class="btn-primary" onclick="window.abrirModalGanaderiaPerfil()" type="button" style="font-size: 11px; padding: 6px 10px;">+ Agregar</button>
                     <button class="btn-help-bubble" onclick="abrirGloboAyuda('ganaderia')" type="button">💡 Ejemplo WhatsApp</button>
                   </div>
@@ -2502,6 +2741,7 @@
                     <p class="card-subtitle">Estado de rebrote, descanso sugerido y carga ganadera actual.</p>
                   </div>
                   <div style="display: flex; gap: 8px; align-items: center;">
+                    <button class="btn-help-bubble" onclick="abrirHelpDrawer('#help-card-ganaderia')" type="button" style="background:#f1f5f9; color:#475569; border: 1px solid #cbd5e1; font-size:11px; padding:6px 10px;">🌿 Ayuda</button>
                     <button class="btn-primary" onclick="window.abrirModalEventoPastura()" type="button" style="font-size: 11px; padding: 6px 10px;">+ Registrar Evento</button>
                     <span class="badge success">Lectura Rápida</span>
                     <button class="btn-help-bubble" onclick="abrirGloboAyuda('pasturas')" type="button">💡 Ejemplo WhatsApp</button>
@@ -2607,7 +2847,10 @@
                     <h3>🌱 Registrar Siembra</h3>
                     <p class="card-subtitle">Cargá una nueva siembra para vincularla a un lote existente.</p>
                   </div>
-                  <span class="badge success" style="background-color: #e6f4ea; color: #137333;">Nuevo Registro</span>
+                  <div style="display: flex; gap: 8px; align-items: center;">
+                    <button class="btn-help-bubble" onclick="abrirHelpDrawer('#help-card-agricultura')" type="button" style="background:#f1f5f9; color:#475569; border: 1px solid #cbd5e1; font-size:11px; padding:6px 10px;">🌾 Ayuda</button>
+                    <span class="badge success" style="background-color: #e6f4ea; color: #137333;">Nuevo Registro</span>
+                  </div>
                 </div>
                 <div style="display: flex; flex-direction: column; gap: 14px;">
                   <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
@@ -2642,7 +2885,7 @@
                       <input type="text" id="agr-siembra-hibrido" placeholder="Ej: DK72-10" style="width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px;">
                     </div>
                     <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
-                      <label for="agr-siembra-densidad" style="font-weight: 700; font-size: 12px; color: #475569;">Densidad (sem/ha)</label>
+                      <label id="agr-siembra-densidad-label" for="agr-siembra-densidad" style="font-weight: 700; font-size: 12px; color: #475569;">Densidad (kg/ha)</label>
                       <input type="number" id="agr-siembra-densidad" placeholder="Ej: 78000" style="width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px;">
                     </div>
                   </div>
@@ -2657,7 +2900,10 @@
                     <h3>🚜 Registrar Labor</h3>
                     <p class="card-subtitle">Registrá pulverización, fertilización, cosecha, rolo u otra labor.</p>
                   </div>
-                  <span class="badge warning" style="background-color: #fef3c7; color: #d97706;">Nuevo Registro</span>
+                  <div style="display: flex; gap: 8px; align-items: center;">
+                    <button class="btn-help-bubble" onclick="abrirHelpDrawer('#help-card-registrar-labor')" type="button" style="background:#f1f5f9; color:#475569; border: 1px solid #cbd5e1; font-size:11px; padding:6px 10px;">🚜 Ayuda</button>
+                    <span class="badge warning" style="background-color: #fef3c7; color: #d97706;">Nuevo Registro</span>
+                  </div>
                 </div>
                 <div style="display: flex; flex-direction: column; gap: 14px;">
                   <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
@@ -2720,7 +2966,10 @@
                   <h3>🌾 Cultivos y Pasturas Activas</h3>
                   <p class="card-subtitle">Detalle de hectáreas cultivadas, variedades sembradas, origen de semilla y fecha de siembra.</p>
                 </div>
-                <button class="btn-help-bubble" onclick="abrirGloboAyuda('agricultura')" type="button">💡 Ejemplo WhatsApp</button>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                  <button class="btn-help-bubble" onclick="abrirHelpDrawer('#help-card-cultivos-pasturas-activas')" type="button" style="background:#f1f5f9; color:#475569; border: 1px solid #cbd5e1; font-size:11px; padding:6px 10px;">🌾 Ayuda</button>
+                  <button class="btn-help-bubble" onclick="abrirGloboAyuda('agricultura')" type="button">💡 Ejemplo WhatsApp</button>
+                </div>
               </div>
               <div class="table-wrapper">
                 <table id="tableCultivos">
@@ -2836,16 +3085,26 @@
               
               <!-- Mapa Interactivo de Catastro -->
               <div class="card" style="width: 100%; display: flex; flex-direction: column; min-height: 600px; height: 680px; position: relative;">
-                <h3>🗺️ Catastro Satelital Interactivo</h3>
-                <p class="card-subtitle" style="margin-bottom: 16px;">
-                  Hacé clic en el mapa para ubicar lotes o arrastrá los marcadores para actualizar su posición. También podés hacer doble-clic para crear un lote nuevo.
-                </p>
+                <div class="card-header-group" style="margin-bottom: 16px;">
+                  <div>
+                    <h3>🗺️ Catastro Satelital Interactivo</h3>
+                    <p class="card-subtitle">Hacé clic en el mapa para ubicar lotes o arrastrá los marcadores para actualizar su posición. También podés hacer doble-clic para crear un lote nuevo.</p>
+                  </div>
+                  <button class="btn-help-bubble" onclick="abrirHelpDrawer('#help-card-catastro-satelital')" type="button" style="background:#f1f5f9; color:#475569; border: 1px solid #cbd5e1; font-size:11px; padding:6px 10px;">🗺️ Ayuda</button>
+                </div>
                 <div id="catastroMap" style="flex-grow: 1; border-radius: 12px; z-index: 1; min-height: 480px;"></div>
 
               </div>
 
               <!-- Listados y Controles de Gestión -->
               <div class="card" style="width: 100%; display: flex; flex-direction: column; min-height: 500px; height: auto;">
+                <div class="card-header-group" style="margin-bottom: 16px;">
+                  <div>
+                    <h3>📋 Listados y Controles de Gestión</h3>
+                    <p class="card-subtitle">Administrá tus firmas, establecimientos y parcelas.</p>
+                  </div>
+                  <button class="btn-help-bubble" onclick="abrirHelpDrawer('#help-card-controles-gestion')" type="button" style="background:#f1f5f9; color:#475569; border: 1px solid #cbd5e1; font-size:11px; padding:6px 10px;">📋 Ayuda</button>
+                </div>
                 <!-- Mini Tab Navigation for the Admin Panel -->
                 <div style="display: flex; gap: 8px; border-bottom: 2px solid #f1f5f9; padding-bottom: 12px; margin-bottom: 16px;">
                   <button type="button" class="btn-secondary" id="btnCatTabFirmas" style="flex: 1; padding: 8px 4px; font-size: 12px;">🏢 Firmas</button>
@@ -2961,7 +3220,10 @@
                     <h3>📝 Registro de Movimiento</h3>
                     <p class="card-subtitle">Elegí el dominio y cargá un movimiento manual al ledger.</p>
                   </div>
-                  <button class="btn-help-bubble" onclick="abrirGloboAyuda('movimientos')" type="button">💡 Ejemplo WhatsApp</button>
+                  <div style="display: flex; gap: 8px; align-items: center;">
+                    <button class="btn-help-bubble" onclick="abrirHelpDrawer('#help-card-registro-movimiento')" type="button" style="background:#f1f5f9; color:#475569; border: 1px solid #cbd5e1; font-size:11px; padding:6px 10px;">📝 Ayuda</button>
+                    <button class="btn-help-bubble" onclick="abrirGloboAyuda('movimientos')" type="button">💡 Ejemplo WhatsApp</button>
+                  </div>
                 </div>
                 
                 <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px;">
@@ -3020,11 +3282,14 @@
                   <h3>📦 Balances de Stock Consolidados</h3>
                   <p class="card-subtitle">Saldos de inventario actuales calculados en base a movimientos confirmados.</p>
                 </div>
-                <div class="table-search-bar" style="display: flex; gap: 8px;">
-                  <select id="filterSaldosCampana" style="padding: 6px 12px; font-size: 13px; border-radius: 8px; border: 1px solid #cbd5e1;">
-                    <option value="">Todas las Campañas</option>
-                  </select>
-                  <input id="searchSaldos" class="table-search-input" placeholder="Filtrar saldos..." type="text" style="flex: 1;" />
+                <div style="display: flex; gap: 8px; align-items: center;">
+                  <button class="btn-help-bubble" onclick="abrirHelpDrawer('#help-card-balances-stock')" type="button" style="background:#f1f5f9; color:#475569; border: 1px solid #cbd5e1; font-size:11px; padding:6px 10px;">📦 Ayuda</button>
+                  <div class="table-search-bar" style="display: flex; gap: 8px;">
+                    <select id="filterSaldosCampana" style="padding: 6px 12px; font-size: 13px; border-radius: 8px; border: 1px solid #cbd5e1;">
+                      <option value="">Todas las Campañas</option>
+                    </select>
+                    <input id="searchSaldos" class="table-search-input" placeholder="Filtrar saldos..." type="text" style="flex: 1;" />
+                  </div>
                 </div>
               </div>
               <div class="table-wrapper">
@@ -3099,6 +3364,7 @@
                   <div class="table-search-bar" style="align-items: center; gap: 8px;">
                     <input id="searchAnimales" class="table-search-input" placeholder="Buscar caravana..." type="text" style="flex: 1;" />
                     <button id="btnExportarFicha" class="btn-secondary" type="button" style="padding: 10px 14px; font-size: 12px; font-weight: 700; height: 40px; margin-top: 0; white-space: nowrap;">📄 Exportar PDF</button>
+                    <button class="btn-help-bubble" onclick="abrirHelpDrawer('#help-card-trazabilidad')" type="button" style="background:#f1f5f9; color:#475569; border: 1px solid #cbd5e1;">💉 Ayuda</button>
                     <button class="btn-help-bubble" onclick="abrirGloboAyuda('caravanas')" type="button">💡 WhatsApp</button>
                   </div>
                 </div>
@@ -3130,6 +3396,7 @@
                   <div class="table-search-bar" style="align-items: center; gap: 8px;">
                     <input id="searchEventos" class="table-search-input" placeholder="Buscar eventos..." type="text" style="flex: 1;" />
                     <button id="btnExportarSanidad" class="btn-secondary" type="button" style="padding: 10px 14px; font-size: 12px; font-weight: 700; height: 40px; margin-top: 0; white-space: nowrap;">🩺 Exportar Clínico</button>
+                    <button class="btn-help-bubble" onclick="abrirHelpDrawer('#help-card-trazabilidad')" type="button" style="background:#f1f5f9; color:#475569; border: 1px solid #cbd5e1;">💉 Ayuda</button>
                     <button class="btn-help-bubble" onclick="abrirGloboAyuda('eventos')" type="button">💡 WhatsApp</button>
                   </div>
                 </div>
@@ -3214,6 +3481,7 @@
                   </div>
                   <div class="table-search-bar" style="display: flex; gap: 8px; align-items: center;">
                     <input id="searchGastos" class="table-search-input" placeholder="Buscar gastos..." type="text" style="flex: 1; margin-bottom: 0;" />
+                    <button class="btn-help-bubble" onclick="abrirHelpDrawer('#help-card-finanzas')" type="button" style="background:#f1f5f9; color:#475569; border: 1px solid #cbd5e1;">💵 Ayuda</button>
                     <button class="btn-help-bubble" onclick="abrirGloboAyuda('gastos')" type="button">💡 WhatsApp</button>
                   </div>
                 </div>
@@ -3240,6 +3508,7 @@
                   </div>
                   <div class="table-search-bar" style="display: flex; gap: 8px; align-items: center;">
                     <input id="searchVentas" class="table-search-input" placeholder="Buscar ventas..." type="text" style="flex: 1; margin-bottom: 0;" />
+                    <button class="btn-help-bubble" onclick="abrirHelpDrawer('#help-card-finanzas')" type="button" style="background:#f1f5f9; color:#475569; border: 1px solid #cbd5e1;">💵 Ayuda</button>
                     <button class="btn-help-bubble" onclick="abrirGloboAyuda('ventas')" type="button">💡 WhatsApp</button>
                   </div>
                 </div>
@@ -3444,8 +3713,266 @@
             </div>
           </section>
 
+          <!-- TAB: REPORTES -->
+          <section class="tab-panel" data-panel="reportes" id="tour-reportes">
+            <div class="layout-split">
+              <div class="card" style="width: 100%;">
+                <div class="card-header-group" style="margin-bottom: 16px;">
+                  <div>
+                    <h3>📊 Reportes y Exportaciones</h3>
+                    <p class="card-subtitle">Generá reportes en PDF y planillas de tus datos cargados.</p>
+                  </div>
+                  <button class="btn-help-bubble" onclick="abrirHelpDrawer('#help-card-reportes')" type="button" style="background:#f1f5f9; color:#475569; border: 1px solid #cbd5e1; font-size:11px; padding:6px 10px;">📊 Ayuda</button>
+                </div>
+                <div class="mini-grid">
+                  <div class="mini-card" onclick="exportarCaravanasPDF()" style="cursor: pointer;">
+                    <div class="mini-title">Reporte de Trazabilidad</div>
+                    <div class="mini-meta">Descargar listado de caravanas y peso.</div>
+                  </div>
+                  <div class="mini-card" onclick="exportarClinicoPDF()" style="cursor: pointer;">
+                    <div class="mini-title">Reporte Clínico</div>
+                    <div class="mini-meta">Descargar historial de tratamientos.</div>
+                  </div>
+                  <div class="mini-card" onclick="exportarAgriculturaPDF()" style="cursor: pointer;">
+                    <div class="mini-title">Reporte de Agricultura</div>
+                    <div class="mini-meta">Planilla de lotes, siembras y rindes.</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
         </div>
       </main>
+
+      <!-- ===== HELP DRAWER ===== -->
+      <dialog id="helpDrawer" aria-label="Panel de Ayuda">
+        <div class="help-drawer-header">
+          <button class="help-drawer-close" onclick="document.getElementById('helpDrawer').close()" aria-label="Cerrar">✕</button>
+          <h2>❓ Centro de Ayuda</h2>
+          <p>Aprendé a usar cada función de AgroHabilis</p>
+          <button class="btn-help" style="margin-top:14px; width:100%; justify-content:center; background:rgba(255,255,255,0.2); box-shadow:none;" onclick="document.getElementById('helpDrawer').close(); iniciarTourGuiado();">
+            🎯 Iniciar Tour Interactivo
+          </button>
+        </div>
+        <div class="help-drawer-body">
+
+          <div class="help-section-group-title">📊 Panel Principal</div>
+
+          <div class="help-section-card" id="help-card-resumen">
+            <div class="hsc-title">🏠 Resumen General</div>
+            <div class="hsc-desc">Tu pantalla de inicio o dashboard consolidado de AgroHabilis.
+            <br><b>Qué muestra:</b> El tipo de cambio (dólar oficial, MEP, blue) en tiempo real, un resumen rápido de la hacienda declarada (cabezas totales y por categoría), el estado de los cultivos y pasturas activas, el pronóstico del clima local y alertas vigentes de precios de granos.
+            <br><b>Cómo usarlo:</b> Utilizalo como tu centro de control diario. Podés hacer consultas libres al asistente de Inteligencia Artificial (IA) en la barra de consulta inferior sobre cualquiera de tus datos.</div>
+          </div>
+
+          <div class="help-section-card" id="help-card-filtros">
+            <div class="hsc-title">🔍 Filtros de Control Global</div>
+            <div class="hsc-desc">Filtros dinámicos situados en la parte superior para segmentar la información.
+            <br><b>Qué permite hacer:</b> Filtrar toda la información de la web (tablas, mapas, gráficos y resúmenes) por Firma (razón social), Campo (establecimiento), Lote, Provincia o Localidad.
+            <br><b>Cómo usarlo:</b> Seleccioná una o varias opciones en la barra de filtros y hacé click en "Aplicar". Automáticamente todos los paneles de Ganadería, Agricultura, Finanzas e Inventarios se actualizarán para mostrar únicamente los datos que coincidan con tu selección.</div>
+          </div>
+
+          <div class="help-section-card" id="help-card-catastro-satelital">
+            <div class="hsc-title">🛰️ Catastro Satelital Interactivo</div>
+            <div class="hsc-desc">Mapa satelital dinámico que geolocaliza tus establecimientos.
+            <br><b>Qué muestra:</b> Los límites poligonales de tus lotes y campos dibujados sobre fotos satelitales, además de marcadores con iconos interactivos de hacienda (ganado) y agricultura (cultivos).
+            <br><b>Cómo hacer para que aparezcan tus campos y lotes:</b>
+            <ul>
+              <li><b>Coordenadas GPS:</b> Al crear o editar un Campo o Lote en el formulario, ingresá su latitud y longitud manualmente o usá el botón "Elegir en el mapa" para marcar el punto haciendo click.</li>
+              <li><b>Dibujar Polígono (GeoJSON):</b> Al presionar "Elegir en el mapa" podés usar las herramientas de dibujo para trazar el contorno real de tu lote. Al guardar, el lote aparecerá delimitado y coloreado en el mapa satelital.</li>
+            </ul></div>
+          </div>
+
+          <div class="help-section-card" id="help-card-controles-gestion">
+            <div class="hsc-title">📋 Listados y Controles de Gestión</div>
+            <div class="hsc-desc">El centro administrativo de la estructura física y legal de tus tierras.
+            <br><b>Qué muestra:</b> Tablas editables con el listado completo de tus Firmas (razones sociales), Campos (establecimientos) y Lotes/Corrales/Feedlots con sus hectáreas y datos asociados.
+            <br><b>Cómo agregar y gestionar:</b>
+            <ul>
+              <li><b>Firmas:</b> Hacé click en "+ Nueva Firma" e ingresá su nombre. Sirve para agrupar campos bajo distintas sociedades.</li>
+              <li><b>Campos:</b> Hacé click en "+ Nuevo Campo" para dar de alta un establecimiento físico. Vinculalo a una Firma, definí la provincia/ciudad y sus coordenadas.</li>
+              <li><b>Lotes / Corrales / Feedlots:</b> Hacé click en "+ Nuevo Lote", asignale un nombre, superficie en hectáreas, coordenadas, y vinculalo a un Campo y su tipo de uso (Agrícola, Ganadero, Mixto).</li>
+            </ul></div>
+          </div>
+
+          <div class="help-section-card" id="help-card-estructura">
+            <div class="hsc-title">🗺️ Estructura de Campo</div>
+            <div class="hsc-desc">Definición de la organización jerárquica de tu empresa agropecuaria.
+            <br><b>Qué muestra:</b> El esquema organizativo de Firmas, Campos y Lotes.
+            <br><b>Cómo usarlo:</b> Permite estructurar la base de datos de tu campo. Al cargarlos, podrás asociar eventos, siembras, hacienda y finanzas a lotes específicos para una trazabilidad perfecta.</div>
+            <div class="hsc-wa">💬 Ejemplo WhatsApp: "nuevo lote Norte 50 ha" o "crear campo Avellaneda en Tandil"</div>
+          </div>
+
+          <div class="help-section-group-title">🚜 Gestión Productiva</div>
+
+          <div class="help-section-card" id="help-card-campanas">
+            <div class="hsc-title">📅 Gestión de Campañas</div>
+            <div class="hsc-desc">Esta sección te permite centralizar el ciclo productivo y organizar tus registros por temporadas de trabajo (ej: Campaña 24/25 o Campaña 2026).
+            <br><b>Qué muestra:</b> Tarjetas expansibles de cada campaña con indicadores en tiempo real de lotes cultivados, categorías de hacienda registradas, insumos o granos en stock, y cantidad de movimientos. También incluye un <i>Cuaderno de Campo</i> (Observaciones, Rendimientos, Clima) por cada campaña.
+            <br><b>Cómo agregar info:</b>
+            <ul>
+              <li>Hacé click en "+ Nueva Campaña", completá el nombre y guardá.</li>
+              <li>Al registrar movimientos de stock, siembras, o consultar márgenes, seleccioná la campaña correspondiente para vincular los datos.</li>
+              <li>Podés escribir comentarios, rendimientos y notas climáticas directamente en el Cuaderno de Campo de cada tarjeta de campaña y guardarlos con el botón "Guardar Cambios".</li>
+            </ul></div>
+          </div>
+
+          <div class="help-section-card" id="help-card-ganaderia">
+            <div class="hsc-title">🐄 Ganadería y Pasturas</div>
+            <div class="hsc-desc">Control integral del rodeo físico y estado forrajero.
+            <br><b>Qué muestra:</b> Tabla de existencias de hacienda (categoría, lote, cabezas, peso promedio, raza y estado sanitario), cálculo automático de la Carga Animal por hectárea, y eventos de rotación de potreros.
+            <br><b>Cómo usarlo:</b>
+            <ul>
+              <li><b>Cargar Hacienda:</b> Hacé click en "+ Agregar" en el bloque de Ganadería, completá la especie (vacuno, porcino, ovino, etc.), categoría, lote donde se encuentra y cantidad de cabezas.</li>
+              <li><b>Registrar Evento de Pastura:</b> Usá el formulario de Pasturas para asentar ingresos/retiros de animales, inicios de descanso o rebrote de lotes.</li>
+            </ul></div>
+            <div class="hsc-wa">💬 Ejemplo WhatsApp: "hacienda 150 novillos angus lote norte 380 kg" o "pastura lote bajo inicio descanso"</div>
+          </div>
+
+          <div class="help-section-card" id="help-card-agricultura">
+            <div class="hsc-title">🌾 Agricultura y Semillas</div>
+            <div class="hsc-desc">Módulo para planificar e implantar tus cultivos anuales o perennes.
+            <br><b>Qué muestra:</b> El registro consolidado de siembras vinculadas a cada lote, variedades sembradas, dosis de semilla y fechas de implantación.
+            <br><b>Cómo usarlo:</b>
+            <ul>
+              <li><b>Registrar Siembra:</b> Hacé click en "+ Registrar Siembra" en la barra superior o completá el formulario con el lote, cultivo, variedad, densidad y fecha de siembra.</li>
+              <li><b>Control de Insumos:</b> Vinculá los lotes de semilla y fertilizante aplicados para calcular los costos reales por hectárea de cada cultivo.</li>
+            </ul></div>
+            <div class="hsc-wa">💬 Ejemplo WhatsApp: "siembra maiz DK72-10 lote sur 78000 plantas" o "sembre trigo en lote 4"</div>
+          </div>
+
+          <div class="help-section-card" id="help-card-registrar-labor">
+            <div class="hsc-title">🚜 Registrar Labor de Campo</div>
+            <div class="hsc-desc">Permite asentar los trabajos físicos realizados sobre la tierra o el cultivo.
+            <br><b>Qué muestra:</b> Un formulario de registro de labores de campo.
+            <br><b>Cómo usarlo:</b>
+            <ul>
+              <li>Seleccioná el <b>Lote / Campo</b> donde se ejecutó la tarea.</li>
+              <li>Elegí el <b>Tipo de Labor</b> (Pulverización, Fertilización, Cosecha, Rolo, Siembra).</li>
+              <li>Si es una pulverización o fertilización, cargá los insumos y la dosis aplicada.</li>
+              <li>Ingresá la fecha, la plaga u observaciones adicionales y guardá la labor.</li>
+            </ul></div>
+            <div class="hsc-wa">💬 Ejemplo WhatsApp: "labor fumigacion lote norte con glifosato 3 lt/ha" o "registra fertilizacion urea 150 kg en lote 3"</div>
+          </div>
+
+          <div class="help-section-card" id="help-card-cultivos-pasturas-activas">
+            <div class="hsc-title">🌾 Cultivos y Pasturas Activas</div>
+            <div class="hsc-desc">Inventario detallado de la superficie sembrada de tu establecimiento.
+            <br><b>Qué muestra:</b> Una grilla con la superficie total, variedad, fecha de siembra, densidad y rendimiento esperado de cada lote de producción.
+            <br><b>Cómo usarlo:</b> Permite supervisar el estado fisiológico de los lotes y estimar rindes globales de tu cosecha por cultivo y campaña. Se actualiza automáticamente al registrar siembras.</div>
+          </div>
+
+          <div class="help-section-card" id="help-card-clima">
+            <div class="hsc-title">🌤️ Clima y Pronóstico</div>
+            <div class="hsc-desc">Monitoreo agrometeorológico local para planificar tus labores.
+            <br><b>Qué muestra:</b> Pronóstico detallado hora por hora para los próximos 5 días, acumulado de lluvias para la semana, y un semáforo de <b>ventana de pulverización</b> basado en viento, temperatura y humedad.
+            <br><b>Cómo usarlo:</b> Consultá el panel antes de programar aplicaciones agrícolas. El color verde te indicará las horas exactas con condiciones ideales para evitar la deriva o la evaporación de fitosanitarios.</div>
+            <div class="hsc-wa">💬 Ejemplo WhatsApp: "pronostico de lluvia para tandil esta semana" o "¿como viene el clima?"</div>
+          </div>
+
+          <div class="help-section-card" id="help-card-calendario">
+            <div class="hsc-title">📅 Calendario Operativo Unificado</div>
+            <div class="hsc-desc">Este módulo te permite planificar, programar y realizar un seguimiento visual de todas las actividades agrícolas, ganaderas, climáticas y de telemetría de tu establecimiento.
+            <br><b>Para qué sirve:</b> Centraliza tareas, siembras y labores planificadas en una vista de almanaque mensual, facilitando la coordinación de los trabajos de campo y previniendo olvidos o superposiciones.
+            <br><b>Cómo usarlo:</b>
+            <ul>
+              <li><b>Planificar Tarea:</b> Hacé click en el botón "+ Planificar Tarea". Completá el título de la tarea, su descripción, seleccioná una categoría (Agricultura, Ganadería, Clima, etc.), elegí las fechas de inicio/fin y asociala a un lote/corral si corresponde.</li>
+              <li><b>Ver detalles:</b> Hacé click en cualquier evento del calendario para abrir sus detalles completos y, si lo deseás, eliminar la actividad si ya fue completada o cancelada.</li>
+              <li><b>Filtros de Categoría:</b> Usá el panel izquierdo para ver y filtrar las tareas por tipo de actividad.</li>
+            </ul></div>
+            <div class="hsc-wa">💬 Ejemplo WhatsApp: "tarea siembra maiz lote norte lunes" o "tarea vacunacion terneros el 25 de junio"</div>
+          </div>
+
+          <div class="help-section-card" id="help-card-registro-movimiento">
+            <div class="hsc-title">📝 Registro de Movimiento</div>
+            <div class="hsc-desc">Este bloque permite cargar registros o transacciones manuales de entrada/salida (movimientos) que afectan los saldos de tu campo.
+            <br><b>Qué muestra:</b> Un formulario dinámico que se adapta al tipo de recurso (Dominio) seleccionado para ingresar los datos.
+            <br><b>Cómo usarlo:</b>
+            <ul>
+              <li>Seleccioná el <b>Dominio</b> (Ganado, Cultivo, Granos en silos, o Insumo/Feed).</li>
+              <li>Elegí el <b>Lote/Corral</b> y la <b>Campaña</b> correspondiente.</li>
+              <li>Definí el tipo de <b>Ajuste</b>: "Valor absoluto" (sobreescribe la cantidad total) o "Ajuste +/-" (suma o resta una cantidad de unidades al saldo existente).</li>
+              <li>Completá los campos de categoría, cantidad o rendimiento y hacé click en "Guardar Registro".</li>
+            </ul></div>
+            <div class="hsc-wa">💬 Ejemplo WhatsApp: "ingreso 200 tn soja lote sur campaña 24/25" o "consumo 50 bolsas semilla lote norte"</div>
+          </div>
+
+          <div class="help-section-card" id="help-card-balances-stock">
+            <div class="hsc-title">📦 Balances de Stock Consolidados</div>
+            <div class="hsc-desc">Muestra la planilla unificada de inventarios vigentes y acumulados de tu establecimiento.
+            <br><b>Qué muestra:</b> El saldo neto actual de cada recurso (soja, novillos, urea, etc.) por lote, categorizados por dominio (grano, ganado, insumo, cultivo) y campaña.
+            <br><b>Cómo usarlo:</b>
+            <ul>
+              <li><b>Filtrar por Campaña:</b> Seleccioná una campaña específica en el menú desplegable para aislar los saldos de esa temporada.</li>
+              <li><b>Búsqueda Rápida:</b> Escribí en el cuadro de búsqueda para filtrar la tabla por lote, cultivo o insumo al instante.</li>
+              <li><b>Llevar el control de saldos:</b> Utilizá este balance para auditar las existencias reales físicas y coordinar la venta de granos o la compra de insumos.</li>
+            </ul></div>
+          </div>
+
+          <div class="help-section-card" id="help-card-trazabilidad">
+            <div class="hsc-title">💉 Trazabilidad Animal</div>
+            <div class="hsc-desc">Control sanitario y clínico individual de tus animales.
+            <br><b>Qué muestra:</b> El historial completo por caravana (peso, raza, estado clínico) y alertas críticas de <b>Período de Carencia (SENASA)</b> para medicamentos que requieren retiro previo a la faena.
+            <br><b>Cómo usarlo:</b>
+            <ul>
+              <li><b>Cargar Animal:</b> Hacé click en "+ Agregar" para registrar una caravana con su peso, categoría, raza y estado.</li>
+              <li><b>Registrar Tratamiento:</b> Hacé click en "Tratamiento Veterinario" para asentar un fármaco aplicado. AgroHabilis calculará los días de retiro obligatorios de forma automática según la sustancia.</li>
+            </ul></div>
+            <div class="hsc-wa">💬 Ejemplo WhatsApp: "caravana AR-105 tratamiento ivermectina por sarna" o "peso caravana 4022 de 350 kg"</div>
+          </div>
+
+          <div class="help-section-card" id="help-card-telemetria">
+            <div class="hsc-title">🚜 Telemetría de Maquinaria</div>
+            <div class="hsc-desc">Conexión de maquinaria de precisión en tiempo real.
+            <br><b>Qué muestra:</b> El mapa de pasadas de tractores o cosechadoras, consumo de combustible, velocidad y telemetría recolectada de tus computadoras de a bordo.
+            <br><b>Cómo usarlo:</b> Vinculá tus cuentas de John Deere Operations Center o Leaf Agriculture desde los ajustes. Podés enviar una foto de la pantalla del monitor del tractor por WhatsApp y el bot interpretará automáticamente el lote, la velocidad y la labor realizada.</div>
+          </div>
+
+          <div class="help-section-group-title">💰 Administración</div>
+
+          <div class="help-section-card" id="help-card-finanzas">
+            <div class="hsc-title">📄 Finanzas y Operación</div>
+            <div class="hsc-desc">Control de caja y rentabilidad de tu negocio agropecuario.
+            <br><b>Qué muestra:</b> Gráficos de ingresos vs egresos, margen neto por perfil (ganadero vs agrícola), y desgloses de gastos por categoría (semillas, fertilizantes, fletes, etc.).
+            <br><b>Cómo usarlo:</b>
+            <ul>
+              <li><b>Registrar Gasto/Venta:</b> Hacé click en "+ Gasto" o "+ Venta" para cargar montos, conceptos y categorías.</li>
+              <li><b>Alertas de Precios de Granos:</b> Configurá objetivos de precios. Cuando el mercado disponible supere tu valor objetivo, recibirás un aviso automático por WhatsApp.</li>
+            </ul></div>
+            <div class="hsc-wa">💬 Ejemplo WhatsApp: "gaste 500000 en urea" o "alerta soja 350000"</div>
+          </div>
+
+          <div class="help-section-card" id="help-card-reportes">
+            <div class="hsc-title">📊 Reportes y Exportación</div>
+            <div class="hsc-desc">Generación de documentación oficial y resúmenes gerenciales.
+            <br><b>Qué muestra:</b> Un panel con botones de exportación rápida en formato PDF.
+            <br><b>Cómo usarlo:</b> Hacé click en el reporte deseado (Planilla de Manga para el veterinario, Historial Sanitario, o Reporte Financiero de agricultura y ganadería) para descargar un documento PDF profesional listo para imprimir o enviar por mail.</div>
+          </div>
+
+          <div class="help-section-group-title">👥 Colaboración y Configuración</div>
+
+          <div class="help-section-card" id="help-card-equipo">
+            <div class="hsc-title">👥 Equipo de Campo</div>
+            <div class="hsc-desc">Colaboración multiusuario en tu establecimiento.
+            <br><b>Qué muestra:</b> El listado de usuarios autorizados para interactuar con tus datos.
+            <br><b>Cómo usarlo:</b> Hacé click en "+ Agregar Miembro" para invitar al veterinario, el encargado de campo, o tus socios. Al cargar su número de celular, ellos podrán reportar lluvias, siembras o tratamientos sanitarios por WhatsApp que se guardarán en tu misma cuenta.</div>
+          </div>
+
+          <div class="help-section-card" id="help-card-config">
+            <div class="hsc-title">⚙️ Editar Info</div>
+            <div class="hsc-desc">Configuración y personalización del sistema.
+            <br><b>Qué muestra:</b> Datos de perfil del usuario, geolocalización de la base de operaciones, y el listado de comandos rápidos de WhatsApp.
+            <br><b>Cómo usarlo:</b> Editá tu información básica o cambiá tu plan actual (Gratis, Básico, Pro, Pro Max) de forma directa.</div>
+          </div>
+
+          <div style="margin-top: 20px; padding: 16px; background: #f8fafc; border-radius: 12px; text-align: center;">
+            <p style="font-size: 12px; color: #64748b; margin-bottom: 12px;">¿Necesitás más detalles sobre alguna función?</p>
+            <a href="/manual.html" target="_blank" class="btn-help" style="display:inline-flex; text-decoration:none;">📖 Ver Manual Completo</a>
+          </div>
+
+        </div>
+      </dialog>
     </div>
 
     <!-- WhatsApp Help Bubble Modal -->
@@ -3763,7 +4290,7 @@
         <div style="display: flex; flex-direction: column; gap: 8px;">
           <div style="display: flex; align-items: center; justify-content: space-between;">
             <label style="font-weight: 700; font-size: 12px; color: #475569;">📍 Ubicación GPS (opcional)</label>
-            <button type="button" onclick="window.activarModoMapaNuevo('campo')" style="padding: 5px 12px; font-size: 11px; font-weight: 700; border-radius: 8px; border: none; background: linear-gradient(135deg, #10b981, #059669); color: white; cursor: pointer; display: flex; align-items: center; gap: 5px; box-shadow: 0 2px 8px rgba(16,185,129,0.35);">
+            <button type="button" onclick="window.activarModoMapaEdicionCampo()" style="padding: 5px 12px; font-size: 11px; font-weight: 700; border-radius: 8px; border: none; background: linear-gradient(135deg, #10b981, #059669); color: white; cursor: pointer; display: flex; align-items: center; gap: 5px; box-shadow: 0 2px 8px rgba(16,185,129,0.35);">
               🗺️ Elegir en el mapa
             </button>
           </div>
@@ -5257,6 +5784,87 @@
         printWindow.document.close();
       }
 
+      // 5. Export Agriculture Report to beautiful print/PDF layout
+      function exportarAgriculturaPDF() {
+        const data = uiState.lastData?.cultivos || [];
+        if (!data.length) return alert("No hay datos de cultivos o siembras para exportar.");
+
+        const printWindow = window.open("", "_blank");
+        const rowsHtml = data.map(c => {
+          const variedad = c.variedad || "—";
+          const densidad = c.densidad != null ? num(c.densidad) + " pl/m" : "—";
+          const fecha = c.fecha_siembra ? fmt(c.fecha_siembra) : "—";
+          const rinde = c.rinde_esperado != null ? num(c.rinde_esperado) + " tn/ha" : "—";
+          const campoHtml = c.cliente ? `<br><small style="color: #64748b;">${esc(c.cliente)}</small>` : "";
+          return `
+            <tr>
+              <td><b>${esc(c.lote_nombre || "Lote")}</b>${campoHtml}</td>
+              <td><b>${esc(c.cultivo)}</b></td>
+              <td>${esc(variedad)}</td>
+              <td style="text-align: right; font-weight: 600;">${c.hectareas != null ? num(c.hectareas) + ' ha' : '—'}</td>
+              <td>${esc(fecha)}</td>
+              <td style="text-align: right;">${esc(densidad)}</td>
+              <td style="text-align: right; font-weight: 700; color: #10b981;">${esc(rinde)}</td>
+            </tr>
+          `;
+        }).join("");
+
+        printWindow.document.write(`
+          <html>
+            <head>
+              <title>Reporte de Agricultura y Siembras - AgroHabilis</title>
+              <style>
+                body { font-family: 'Helvetica Neue', Arial, sans-serif; color: #1e293b; padding: 40px; line-height: 1.5; }
+                .header { border-bottom: 2px solid #10b981; padding-bottom: 20px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: flex-end; }
+                h1 { margin: 0; font-size: 24px; color: #0b1320; }
+                table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                th, td { border: 1px solid #e2e8f0; padding: 12px 14px; text-align: left; font-size: 13px; }
+                th { background-color: #f8fafc; font-weight: bold; color: #475569; }
+                tr:nth-child(even) { background-color: #f8fafc; }
+                .footer { margin-top: 50px; font-size: 11px; color: #64748b; text-align: center; border-top: 1px dashed #cbd5e1; padding-top: 20px; }
+                @media print { body { padding: 0; } }
+              </style>
+            </head>
+            <body>
+              <div class="header">
+                <div>
+                  <h1>🚜 AGROHABILIS · PLANILLA DE AGRICULTURA</h1>
+                  <p style="margin: 5px 0 0 0; font-size: 13px; color: #64748b;">Reporte Consolidado de Lotes, Siembras y Estimaciones de Cosecha</p>
+                </div>
+                <div style="text-align: right; font-size: 12px; color: #475569;">
+                  Fecha de Generación: <b>${new Date().toLocaleDateString('es-AR')}</b>
+                </div>
+              </div>
+              
+              <table>
+                <thead>
+                  <tr>
+                    <th>Lote / Establecimiento</th>
+                    <th>Cultivo</th>
+                    <th>Variedad/Híbrido</th>
+                    <th style="text-align: right;">Superficie</th>
+                    <th>Fecha Siembra</th>
+                    <th style="text-align: right;">Densidad</th>
+                    <th style="text-align: right;">Rinde Esp.</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${rowsHtml}
+                </tbody>
+              </table>
+
+              <div class="footer">
+                Documento Oficial de Planificación AgroHabilis - Generado de forma digital e inalterable.
+              </div>
+              <script>
+                window.onload = function() { window.print(); }
+              <\/script>
+            </body>
+          </html>
+        `);
+        printWindow.document.close();
+      }
+
       function renderTipoCambio(rows) {
         const strip = $("tipoCambioStrip");
         if (!strip) return;
@@ -5423,9 +6031,10 @@
           lotesArr.forEach(l => {
             const opt = document.createElement('option');
             opt.value = l.id;
+            const campoText = l.cliente ? ` (${l.cliente})` : '';
             const cultivoText = l.cultivo ? ` — ${l.cultivo}` : '';
             const haText = l.hectareas ? ` (${l.hectareas} ha)` : '';
-            opt.textContent = `${l.nombre || 'Sin nombre'}${cultivoText}${haText}`;
+            opt.textContent = `${l.nombre || 'Sin nombre'}${campoText}${cultivoText}${haText}`;
             sel.appendChild(opt);
           });
           if (currentVal) sel.value = currentVal;
@@ -5435,6 +6044,18 @@
       // Guardar Siembra via API (updates the ubicacion with cultivo data)
       (function() {
         document.addEventListener('DOMContentLoaded', () => {
+          document.getElementById('agr-siembra-cultivo')?.addEventListener('input', (e) => {
+            const crop = e.target.value.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            const label = document.getElementById('agr-siembra-densidad-label');
+            if (label) {
+              if (crop === 'maiz' || crop === 'girasol') {
+                label.textContent = 'Densidad (sem/ha)';
+              } else {
+                label.textContent = 'Densidad (kg/ha)';
+              }
+            }
+          });
+
           document.getElementById('btnGuardarSiembra')?.addEventListener('click', async () => {
             const loteId = document.getElementById('agr-siembra-lote')?.value;
             const fecha = document.getElementById('agr-siembra-fecha')?.value;
@@ -6031,7 +6652,10 @@
         if (select) {
           const lotes = uiState.lastData?.lotes || [];
           select.innerHTML = '<option value="">Ninguno</option>' + 
-            lotes.map(l => `<option value="${l.id}">${esc(l.lote_nombre)}</option>`).join("");
+            lotes.map(l => {
+              const campoText = l.cliente ? ` (${l.cliente})` : '';
+              return `<option value="${l.id}">${esc(l.lote_nombre || l.nombre)}${esc(campoText)}</option>`;
+            }).join("");
         }
 
         const todayStr = new Date().toISOString().split('T')[0];
@@ -6201,6 +6825,7 @@
         `;
 
         dibujarZonasUI();
+        cargarCultivosActivos();
 
         $("btnAddZona")?.addEventListener("click", () => {
           const prov = $("addZonaProvincia")?.value?.trim();
@@ -6216,6 +6841,76 @@
           dibujarZonasUI();
         });
       }
+
+      async function cargarCultivosActivos() {
+        const listContainer = $("cultivosActivosList");
+        if (!listContainer) return;
+        try {
+          const res = await fetch("/api/registros/usuario_cultivos");
+          const d = await res.json();
+          if (!d.ok) throw new Error(d.error);
+          
+          const list = d.data || [];
+          if (list.length === 0) {
+            listContainer.innerHTML = `<div style="color: var(--text-muted); padding: 8px; background: rgba(0,0,0,0.02); border-radius: 6px; text-align: center;">No tenés cultivos activos. Cargá uno para tenerlo en tu catálogo.</div>`;
+          } else {
+            listContainer.innerHTML = list.map(uc => `
+              <div style="display: flex; align-items: center; justify-content: space-between; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px 12px; margin-bottom: 4px;">
+                <span>🌾 <b>${esc(uc.cultivo)}</b> (${esc(uc.campania || "Campaña S/D")})</span>
+                <button type="button" style="background: none; border: none; color: #ef4444; cursor: pointer; font-size: 14px; padding: 2px 6px;" onclick="eliminarCultivoActivo(${uc.id})">✕</button>
+              </div>
+            `).join("");
+          }
+        } catch (err) {
+          listContainer.innerHTML = `<div style="color: #ef4444; padding: 4px;">Error al cargar cultivos: ${esc(err.message)}</div>`;
+        }
+
+        // Also populate addCultivoCampania select from cache
+        const addC = $("addCultivoCampania");
+        if (addC) {
+          const list = window.campanasCache || [];
+          addC.innerHTML = list.map((c) => `<option value="${esc(c.nombre)}">${esc(c.nombre)}</option>`).join("");
+        }
+      }
+
+      window.agregarCultivoActivo = async function() {
+        const nombreInput = $("addCultivoNombre");
+        const campSelect = $("addCultivoCampania");
+        if (!nombreInput || !campSelect) return;
+        
+        const cultivo = nombreInput.value.trim();
+        const campania = campSelect.value;
+        if (!cultivo) return alert("Por favor, ingresá el nombre del cultivo.");
+
+        try {
+          const res = await fetch("/api/registros/usuario_cultivos", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ cultivo, campania })
+          });
+          const d = await res.json();
+          if (!d.ok) throw new Error(d.error);
+          
+          nombreInput.value = "";
+          await cargarCultivosActivos();
+        } catch (err) {
+          alert("Error al agregar cultivo: " + err.message);
+        }
+      };
+
+      window.eliminarCultivoActivo = async function(id) {
+        if (!confirm("¿Estás seguro de que querés eliminar este cultivo del catálogo activo?")) return;
+        try {
+          const res = await fetch(`/api/registros/usuario_cultivos/${id}`, {
+            method: "DELETE"
+          });
+          const d = await res.json();
+          if (!d.ok) throw new Error(d.error);
+          await cargarCultivosActivos();
+        } catch (err) {
+          alert("Error al eliminar cultivo: " + err.message);
+        }
+      };
 
       function dibujarZonasUI() {
         const container = $("zonasContainer");
@@ -6389,7 +7084,8 @@
                                   <option value="null">Sin ubicación / General</option>` +
             lotesLote.map(l => {
               const cod = l.codigo ? `[${l.codigo}] ` : '';
-              return `<option value="${l.id}">${cod}${esc(l.nombre)} [${esc((l.tipo || 'lote').toUpperCase())}]</option>`;
+              const campoText = l.cliente ? ` (${l.cliente})` : '';
+              return `<option value="${l.id}">${cod}${esc(l.nombre)}${esc(campoText)} [${esc((l.tipo || 'lote').toUpperCase())}]</option>`;
             }).join("");
           
           if (currentValLote === "null" || lotesLote.some(l => String(l.id) === currentValLote)) {
@@ -6701,6 +7397,53 @@
         if (ins && $("invInsumCant")) $("invInsumCant").placeholder = eff === "delta" ? "Δ cantidad" : "cantidad";
       }
 
+      window.campanasCache = [];
+
+      function actualizarCampanasSelectores(campanas) {
+        const list = campanas || [];
+        window.campanasCache = list;
+
+        // 1. invSelCamp
+        const selC = $("invSelCamp");
+        if (selC) {
+          const prev = selC.value;
+          selC.innerHTML = `<option value="">Sin campaña</option>` + list.map((c) => `<option value="${c.id}">${esc(c.nombre || "campaña " + c.id)}</option>`).join("");
+          if (prev) selC.value = prev;
+        }
+
+        // 2. filterCatastroCampana
+        const filterC = $("filterCatastroCampana");
+        if (filterC) {
+          const prev = filterC.value;
+          filterC.innerHTML = `<option value="">Todas las Campañas</option>` + list.map((c) => `<option value="${c.id}">${esc(c.nombre || "campaña " + c.id)}</option>`).join("");
+          if (prev) filterC.value = prev;
+        }
+
+        // 3. filterSaldosCampana
+        const filterS = $("filterSaldosCampana");
+        if (filterS) {
+          const prev = filterS.value;
+          filterS.innerHTML = `<option value="">Todas las Campañas</option>` + list.map((c) => `<option value="${c.nombre || "campaña " + c.id}">${esc(c.nombre || "campaña " + c.id)}</option>`).join("");
+          if (prev) filterS.value = prev;
+        }
+
+        // 4. agr-siembra-campania
+        const agrC = document.getElementById("agr-siembra-campania");
+        if (agrC) {
+          const prev = agrC.value;
+          agrC.innerHTML = list.map((c) => `<option value="${esc(c.nombre)}">${esc(c.nombre)}</option>`).join("");
+          if (prev && list.some(c => c.nombre === prev)) agrC.value = prev;
+        }
+
+        // 5. addCultivoCampania
+        const addC = document.getElementById("addCultivoCampania");
+        if (addC) {
+          const prev = addC.value;
+          addC.innerHTML = list.map((c) => `<option value="${esc(c.nombre)}">${esc(c.nombre)}</option>`).join("");
+          if (prev && list.some(c => c.nombre === prev)) addC.value = prev;
+        }
+      }
+
       async function cargarInventarioPanel() {
         if (!$("invSaldosBody")) return;
         $("invMsg").textContent = "";
@@ -6720,28 +7463,9 @@
           }).join("");
           if (prev) sel.value = prev;
         }
-        const selC = $("invSelCamp");
-        if (selC && rcD.ok) {
-          const prev = selC.value;
-          selC.innerHTML = `<option value="">Sin campaña</option>` + (rcD.campanas || []).map((c) => `<option value="${c.id}">${esc(c.nombre || "campaña " + c.id)}</option>`).join("");
-          if (prev) selC.value = prev;
-        }
-
-        const filterC = $("filterCatastroCampana");
-        if (filterC && rcD.ok) {
-          const prev = filterC.value;
-          filterC.innerHTML = `<option value="">Todas las Campañas</option>` + (rcD.campanas || []).map((c) => `<option value="${c.id}">${esc(c.nombre || "campaña " + c.id)}</option>`).join("");
-          if (prev) filterC.value = prev;
-        }
-
-        const filterS = $("filterSaldosCampana");
-        if (filterS && rcD.ok) {
-          const prev = filterS.value;
-          filterS.innerHTML = `<option value="">Todas las Campañas</option>` + (rcD.campanas || []).map((c) => `<option value="${c.nombre || "campaña " + c.id}">${esc(c.nombre || "campaña " + c.id)}</option>`).join("");
-          if (prev) filterS.value = prev;
-        }
 
         if (rcD.ok) {
+          actualizarCampanasSelectores(rcD.campanas);
           renderCampanasTab(rcD.campanas || [], rsD.saldos || [], rmD.movimientos || []);
         }
 
@@ -6803,15 +7527,7 @@
       }
 
       async function crearCampanaCliente() {
-        const nombre = $("invCampNombre")?.value?.trim();
-        $("invMsg").textContent = "";
-        if (!nombre) return ($("invMsg").textContent = "El nombre de la campaña es obligatorio.");
-        const d = await (await fetch("/api/inventario/campanas", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nombre }) })).json();
-        if (!d.ok) return ($("invMsg").textContent = d.error || "Error al crear campaña.");
-        $("invCampNombre").value = "";
-        await cargarInventarioPanel();
-        await cargar();
-        $("invMsg").textContent = `Campaña "${nombre}" creada con éxito.`;
+        abrirModalCampana();
       }
 
       async function registrarInvCliente() {
@@ -7350,6 +8066,8 @@
       let mapModeNuevoTipo = null; // 'lote' or 'campo' when in nuevo mode
       let mapModeEdicion = false;  // true if picking location for EDITING an existing lote
       let mapModeEdicionData = null; // stores form data while modal is closed for map picking
+      let mapModeEdicionCampo = false;  // true if picking location for EDITING/CREATING a campo
+      let mapModeEdicionCampoData = null; // stores campo form data while modal is closed for map picking
 
       function activarModoMapa(ubicacionId, mensaje) {
         mapModeActive = true;
@@ -7359,7 +8077,10 @@
         const textEl = document.getElementById('catastroMapModeText');
         if (overlay) overlay.classList.remove('hide');
         if (textEl) textEl.textContent = mensaje || '📌 Hacé clic en el mapa para posicionar el lote.';
-        if (catastroMap) catastroMap.getContainer().style.cursor = 'crosshair';
+        if (catastroMap) {
+          catastroMap.getContainer().style.cursor = 'crosshair';
+          catastroMap.getContainer().classList.add('map-picking-mode');
+        }
       }
 
       window.activarModoMapaNuevo = function(tipo) {
@@ -7396,8 +8117,9 @@
         if (textEl) textEl.textContent = `📍 Hacé clic en el mapa para ubicar el nuevo ${label}.`;
         if (catastroMap) {
           catastroMap.getContainer().style.cursor = 'crosshair';
+          catastroMap.getContainer().classList.add('map-picking-mode');
           // Scroll smoothly to the map container so the user sees the instruction banner
-          document.getElementById("catastroMapWrapper")?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          document.getElementById("catastroMap")?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
       };
 
@@ -7410,11 +8132,19 @@
           nombre: document.getElementById('loteFormNombre')?.value || '',
           hectareas: document.getElementById('loteFormHectareas')?.value || '',
           tipo: document.getElementById('loteFormTipo')?.value || 'lote',
+          uso: document.getElementById('loteFormUso')?.value || 'agricola',
           campoId: document.getElementById('loteFormCampoId')?.value || '',
           firma: document.getElementById('loteFormFirmaSelect')?.value || '',
+          parentId: document.getElementById('loteFormParentId')?.value || '',
+          hacienda_tipo: document.getElementById('loteFormHaciendaCategoria')?.value || '',
+          cantidad: document.getElementById('loteFormHaciendaCantidad')?.value || '',
+          semilla_tipo: document.getElementById('loteFormAgriCultivo')?.value || '',
+          variedad: document.getElementById('loteFormAgriVariedad')?.value || '',
+          cantidad_agri: document.getElementById('loteFormAgriCantidad')?.value || '',
           notas: document.getElementById('loteFormNotas')?.value || '',
           provincia: document.getElementById('loteFormProvincia')?.value || '',
           partido: document.getElementById('loteFormPartido')?.value || '',
+          geojson: document.getElementById('loteEditModal')?.dataset.geojson || ''
         };
 
         // If map isn't initialized yet, switch to catastro tab first
@@ -7441,7 +8171,49 @@
         if (textEl) textEl.textContent = '📍 Hacé clic en el mapa para actualizar la ubicación del lote.';
         if (catastroMap) {
           catastroMap.getContainer().style.cursor = 'crosshair';
-          document.getElementById('catastroMapWrapper')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          catastroMap.getContainer().classList.add('map-picking-mode');
+          document.getElementById('catastroMap')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      };
+
+      // Elegir en el mapa cuando se está editando o creando un campo desde el formulario
+      window.activarModoMapaEdicionCampo = function() {
+        const campoId = document.getElementById('campoFormId')?.value || '';
+        const formData = {
+          id: campoId,
+          nombre: document.getElementById('campoFormNombre')?.value || '',
+          firma_id: document.getElementById('campoFormFirma')?.value || '',
+          ciudad: document.getElementById('campoFormCiudad')?.value || '',
+          provincia: document.getElementById('campoFormProvincia')?.value || '',
+        };
+
+        // If map isn't initialized yet, switch to catastro tab first
+        if (!catastroMap) {
+          const catastroTab = document.querySelector('[data-tab="catastro"]');
+          if (catastroTab) catastroTab.click();
+          setTimeout(() => window.activarModoMapaEdicionCampo(), 350);
+          return;
+        }
+
+        // Close modal so user can see the map
+        const modal = document.getElementById('campoEditModal');
+        if (modal && modal.open) modal.close();
+
+        mapModeActive = true;
+        mapModeEdicionCampo = true;
+        mapModeEdicionCampoData = formData;
+        mapModeNuevo = false;
+        mapModeEdicion = false;
+        mapModeLoteId = null;
+
+        const overlay = document.getElementById('catastroMapModeOverlay');
+        const textEl = document.getElementById('catastroMapModeText');
+        if (overlay) overlay.classList.remove('hide');
+        if (textEl) textEl.textContent = '📍 Hacé clic en el mapa para actualizar la ubicación del campo.';
+        if (catastroMap) {
+          catastroMap.getContainer().style.cursor = 'crosshair';
+          catastroMap.getContainer().classList.add('map-picking-mode');
+          document.getElementById('catastroMap')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
       };
 
@@ -7452,9 +8224,14 @@
         mapModeNuevoTipo = null;
         mapModeEdicion = false;
         mapModeEdicionData = null;
+        mapModeEdicionCampo = false;
+        mapModeEdicionCampoData = null;
         const overlay = document.getElementById('catastroMapModeOverlay');
         if (overlay) overlay.classList.add('hide');
-        if (catastroMap) catastroMap.getContainer().style.cursor = '';
+        if (catastroMap) {
+          catastroMap.getContainer().style.cursor = '';
+          catastroMap.getContainer().classList.remove('map-picking-mode');
+        }
       }
 
       window.actualizarCoordPreview = function() {
@@ -7974,49 +8751,6 @@
 
             // Save reference to marker
             catMapMarkers[l.id] = { marker, layer: mapLayer };
-
-            // Handle marker drag end to update coordinates
-            marker.on("dragend", async (e) => {
-              const newPos = marker.getLatLng();
-              if (confirm(`¿Mover "${l.nombre}" a [${newPos.lat.toFixed(6)}, ${newPos.lng.toFixed(6)}]?`)) {
-                const deltaLat = newPos.lat - lotLat;
-                const deltaLng = newPos.lng - lotLng;
-
-                let updatedGeoJSON = null;
-                if (l.geojson) {
-                  try {
-                    const geojsonData = typeof l.geojson === 'string' ? JSON.parse(l.geojson) : JSON.parse(JSON.stringify(l.geojson));
-                    if (geojsonData.geometry && geojsonData.geometry.coordinates) {
-                      const shiftCoords = (coords) => {
-                        if (Array.isArray(coords[0])) {
-                          coords.forEach(c => shiftCoords(c));
-                        } else {
-                          coords[0] += deltaLng;
-                          coords[1] += deltaLat;
-                        }
-                      };
-                      shiftCoords(geojsonData.geometry.coordinates);
-                      updatedGeoJSON = geojsonData;
-                    }
-                  } catch (err) {
-                    console.error("Error shifting geojson coordinates:", err);
-                  }
-                }
-
-                await actualizarUbicacionLote(l.id, newPos.lat, newPos.lng, updatedGeoJSON);
-              } else {
-                marker.setLatLng([lotLat, lotLng]);
-                loadCatastroData();
-              }
-            });
-
-            // Keep layer in sync visually during dragging
-            marker.on("drag", (e) => {
-              const currentPos = marker.getLatLng();
-              if (mapLayer && typeof mapLayer.setLatLng === 'function') {
-                mapLayer.setLatLng(currentPos);
-              }
-            });
           }
         });
 
@@ -8033,32 +8767,48 @@
             
             // Re-open the modal with stored form data + new coords
             const prefill = {
+              id: formData.id,
               lat: clickedLat,
               lng: clickedLng,
               tipo: formData.tipo,
               nombre: formData.nombre,
               hectareas: formData.hectareas,
+              uso: formData.uso,
               campo_id: formData.campoId,
               firma: formData.firma,
+              parent_id: formData.parentId,
+              hacienda_tipo: formData.hacienda_tipo,
+              cantidad: formData.cantidad,
+              semilla_tipo: formData.semilla_tipo,
+              variedad: formData.variedad,
+              cantidad_agri: formData.cantidad_agri,
+              notas: formData.notas,
               provincia: formData.provincia,
               partido: formData.partido,
+              geojson: formData.geojson
             };
 
-            if (formData.id) {
-              // Editing existing lote: re-open with its ID but override lat/lng
-              window.abrirModalLoteCatastro(Number(formData.id));
-              // After modal opens, inject the new coords
-              setTimeout(() => {
-                document.getElementById('loteFormLat').value = clickedLat;
-                document.getElementById('loteFormLng').value = clickedLng;
-                window.actualizarCoordPreview?.();
-                // Restore form fields that might have been overwritten
-                if (formData.notas) document.getElementById('loteFormNotas').value = formData.notas;
-              }, 100);
-            } else {
-              // New lote that was being edited before map pick
-              window.abrirModalLoteCatastro(prefill);
-            }
+            window.abrirModalLoteCatastro(prefill);
+          } else if (mapModeEdicionCampo && mapModeEdicionCampoData) {
+            // Editing existing campo — re-open modal with updated coords
+            const formData = mapModeEdicionCampoData;
+            desactivarModoMapa();
+            
+            const prefill = {
+              lat: clickedLat,
+              lng: clickedLng
+            };
+            
+            const idToPass = formData.id ? Number(formData.id) : null;
+            window.abrirModalCampo(idToPass, prefill);
+            
+            // Restore other inputs that might have been lost
+            setTimeout(() => {
+              if (formData.nombre) document.getElementById('campoFormNombre').value = formData.nombre;
+              if (formData.firma_id) document.getElementById('campoFormFirma').value = formData.firma_id;
+              if (formData.ciudad) document.getElementById('campoFormCiudad').value = formData.ciudad;
+              if (formData.provincia) document.getElementById('campoFormProvincia').value = formData.provincia;
+            }, 100);
           } else if (mapModeNuevo) {
             const tipoNuevo = mapModeNuevoTipo || 'lote';
             desactivarModoMapa();
@@ -8872,14 +9622,20 @@ window.abrirModalLoteCatastro = function(idOrObj = null) {
     marcador_hacienda: "Marcador de Hacienda", marcador_agricultura: "Marcador de Agricultura"
   };
   const tipoTitle = tipoTitles[tipoVal] || "Elemento";
-  document.getElementById("loteModalTitle").textContent = lote ? `Editar ${tipoTitle}` : `Nuevo ${tipoTitle}`;
+  document.getElementById("loteModalTitle").textContent = (lote || prefill.id) ? `Editar ${tipoTitle}` : `Nuevo ${tipoTitle}`;
   
-  document.getElementById("loteFormId").value = lote ? lote.id : "";
+  document.getElementById("loteFormId").value = lote ? lote.id : (prefill.id || "");
   document.getElementById("loteFormNombre").value = lote ? lote.nombre : (prefill.nombre || "");
   document.getElementById("loteFormHectareas").value = lote ? lote.hectareas : (prefill.hectareas != null ? prefill.hectareas : "");
   
-  document.getElementById("loteFormCampoId").value = lote ? (lote.campo_id || "") : (prefill.campo_id || "");
+  if (document.getElementById("loteFormUso")) {
+    document.getElementById("loteFormUso").value = lote ? (lote.uso || "agricola") : (prefill.uso || "agricola");
+  }
+  document.getElementById("loteFormCampoId").value = lote ? (lote.campo_id || "") : (prefill.campo_id || prefill.campoId || "");
   document.getElementById("loteFormFirmaSelect").value = lote ? (lote.firma || "") : (prefill.firma || "");
+  if (document.getElementById("loteFormParentId")) {
+    document.getElementById("loteFormParentId").value = lote ? (lote.parent_id || "") : (prefill.parent_id || prefill.parentId || "");
+  }
   
   const latVal = lote ? lote.lat : (prefill.lat != null ? prefill.lat : "");
   const lngVal = lote ? lote.lng : (prefill.lng != null ? prefill.lng : "");
@@ -8903,12 +9659,12 @@ window.abrirModalLoteCatastro = function(idOrObj = null) {
   }
   const props = geojsonData?.properties || {};
 
-  document.getElementById("loteFormHaciendaCategoria").value = props.hacienda_tipo || "novillos";
-  document.getElementById("loteFormHaciendaCantidad").value = props.cantidad != null ? props.cantidad : "";
-  document.getElementById("loteFormAgriCultivo").value = props.semilla_tipo || "maiz";
-  document.getElementById("loteFormAgriVariedad").value = props.variedad || "";
-  document.getElementById("loteFormAgriCantidad").value = props.cantidad_agri || "";
-  document.getElementById("loteFormNotas").value = props.observaciones || "";
+  document.getElementById("loteFormHaciendaCategoria").value = props.hacienda_tipo || prefill.hacienda_tipo || "novillos";
+  document.getElementById("loteFormHaciendaCantidad").value = props.cantidad != null ? props.cantidad : (prefill.cantidad != null ? prefill.cantidad : "");
+  document.getElementById("loteFormAgriCultivo").value = props.semilla_tipo || prefill.semilla_tipo || "maiz";
+  document.getElementById("loteFormAgriVariedad").value = props.variedad || prefill.variedad || "";
+  document.getElementById("loteFormAgriCantidad").value = props.cantidad_agri || prefill.cantidad_agri || "";
+  document.getElementById("loteFormNotas").value = props.observaciones || prefill.observaciones || prefill.notas || "";
 
   modal.dataset.geojson = geojson ? (typeof geojson === 'string' ? geojson : JSON.stringify(geojson)) : "";
   
@@ -9229,6 +9985,197 @@ window.guardarArrendamiento = async function(e) {
         tr.style.display = "none";
       }
     });
+  });
+
+
+  // ==========================================
+  // SISTEMA DE AYUDA CONTEXTUAL — AgroHabilis
+  // ==========================================
+
+  function abrirHelpDrawer(seccionSelector) {
+    const drawer = document.getElementById('helpDrawer');
+    if (drawer) {
+      drawer.showModal();
+      if (seccionSelector) {
+        setTimeout(() => {
+          const el = typeof seccionSelector === 'string' ? drawer.querySelector(seccionSelector) : null;
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            el.style.outline = '2px dashed #6366f1';
+            el.style.outlineOffset = '4px';
+            setTimeout(() => { el.style.outline = 'none'; }, 2000);
+          }
+        }, 150);
+      }
+    }
+  }
+
+  function iniciarTourGuiado() {
+    let driverFn = null;
+    if (typeof window.driver === 'function') {
+      driverFn = window.driver;
+    } else if (window.driver && typeof window.driver.driver === 'function') {
+      driverFn = window.driver.driver;
+    } else if (window.driver && window.driver.js && typeof window.driver.js.driver === 'function') {
+      driverFn = window.driver.js.driver;
+    }
+
+    if (!driverFn) {
+      alert('El tour interactivo no pudo iniciar porque la librería Driver.js no está disponible.');
+      return;
+    }
+    // Navegar al primer tab antes de iniciar
+    document.querySelector('.tab-link[data-tab="resumen"]')?.click();
+
+    const driverObj = driverFn({
+      animate: true,
+      showProgress: true,
+      progressText: 'Paso {{current}} de {{total}}',
+      nextBtnText: 'Siguiente →',
+      prevBtnText: '← Anterior',
+      doneBtnText: '✓ ¡Listo!',
+      overlayOpacity: 0.65,
+      popoverClass: 'driverjs-theme',
+      onDestroyStarted: () => {
+        localStorage.setItem('agrohabilis_tour_done', '1');
+        driverObj.destroy();
+      },
+      steps: [
+        {
+          element: '#btnAyuda',
+          popover: {
+            title: '❓ Centro de Ayuda',
+            description: 'Este botón abre el panel de ayuda completo con la descripción de cada función y ejemplos de uso por WhatsApp. ¡Empecemos el recorrido!',
+            side: 'bottom',
+            align: 'end'
+          }
+        },
+        {
+          element: '.tab-link[data-tab="resumen"]',
+          popover: {
+            title: '🏠 Resumen General',
+            description: 'Tu punto de partida. Muestra tipo de cambio, hacienda activa, cultivos, clima y alertas de precio de granos en un solo vistazo.',
+            side: 'right'
+          }
+        },
+        {
+          element: '#globalFilterBar',
+          popover: {
+            title: '🔍 Filtros Globales',
+            description: 'Filtrá toda la información por Firma, Establecimiento, Provincia, Localidad o Lote. Todos los paneles se actualizan al instante.',
+            side: 'bottom'
+          },
+          onHighlightStarted: () => {
+            const bar = document.getElementById('globalFilterBar');
+            if (bar) bar.classList.remove('hide');
+          }
+        },
+        {
+          element: '.tab-link[data-tab="catastro"]',
+          popover: {
+            title: '🗺️ Estructura de Campo',
+            description: 'Creá y administrá tu jerarquía: Firmas → Campos → Lotes. Los lotes se posicionan en el mapa satelital con coordenadas GPS.',
+            side: 'right'
+          },
+          onHighlightStarted: () => document.querySelector('.tab-link[data-tab="catastro"]')?.click()
+        },
+        {
+          element: '.tab-link[data-tab="hacienda_pasturas"]',
+          popover: {
+            title: '🐄 Ganadería y Pasturas',
+            description: 'Registrá recuentos de hacienda por categoría, lote y peso promedio. Controlá el estado de pasturas y calculá carga animal.',
+            side: 'right'
+          },
+          onHighlightStarted: () => document.querySelector('.tab-link[data-tab="hacienda_pasturas"]')?.click()
+        },
+        {
+          element: '.tab-link[data-tab="agricultura_semillas"]',
+          popover: {
+            title: '🌾 Agricultura y Semillas',
+            description: 'Vinculá siembras a tus lotes: cultivo, variedad, densidad y campaña. También podés registrar labores de campo como fumigaciones y fertilizaciones.',
+            side: 'right'
+          },
+          onHighlightStarted: () => document.querySelector('.tab-link[data-tab="agricultura_semillas"]')?.click()
+        },
+        {
+          element: '.tab-link[data-tab="clima"]',
+          popover: {
+            title: '🌤️ Clima y Pronóstico',
+            description: 'Pronóstico hora por hora con semáforo de ventana de pulverización. Muy útil para planificar aplicaciones y tareas sensibles al clima.',
+            side: 'right'
+          },
+          onHighlightStarted: () => document.querySelector('.tab-link[data-tab="clima"]')?.click()
+        },
+        {
+          element: '.tab-link[data-tab="calendario"]',
+          popover: {
+            title: '📅 Calendario Operativo',
+            description: 'Planificá labores y actividades en un calendario visual. Asigná cada tarea a un lote, categoría y rango de fechas.',
+            side: 'right'
+          },
+          onHighlightStarted: () => document.querySelector('.tab-link[data-tab="calendario"]')?.click()
+        },
+        {
+          element: '.tab-link[data-tab="trazabilidad"]',
+          popover: {
+            title: '💉 Trazabilidad Animal',
+            description: 'Seguimiento individual de animales por caravana: peso, categoría, estado clínico e historial de tratamientos sanitarios.',
+            side: 'right'
+          },
+          onHighlightStarted: () => document.querySelector('.tab-link[data-tab="trazabilidad"]')?.click()
+        },
+        {
+          element: '.tab-link[data-tab="finanzas"]',
+          popover: {
+            title: '📄 Finanzas y Operación',
+            description: 'Registrá gastos y ventas. Configurá alertas de precios de mercado: cuando el precio de un grano supere tu objetivo, recibís un aviso por WhatsApp.',
+            side: 'right'
+          },
+          onHighlightStarted: () => document.querySelector('.tab-link[data-tab="finanzas"]')?.click()
+        },
+        {
+          element: '.tab-link[data-tab="reportes"]',
+          popover: {
+            title: '📊 Reportes',
+            description: 'Exportá planillas PDF de trazabilidad, historial clínico y agricultura con un solo click. Ideales para auditorías o presentar al veterinario.',
+            side: 'right'
+          },
+          onHighlightStarted: () => document.querySelector('.tab-link[data-tab="reportes"]')?.click()
+        },
+        {
+          element: '.tab-link[data-tab="equipo"]',
+          popover: {
+            title: '👥 Equipo de Campo',
+            description: 'Sumá a tus empleados o encargados. Ellos podrán registrar datos directamente por WhatsApp sobre tus mismos lotes.',
+            side: 'right'
+          },
+          onHighlightStarted: () => document.querySelector('.tab-link[data-tab="equipo"]')?.click()
+        },
+        {
+          element: '#btnAyuda',
+          popover: {
+            title: '✅ ¡Tour completado!',
+            description: 'Ya conocés todas las secciones de AgroHabilis. Podés volver a este tour cuando quieras desde el botón ❓ Ayuda. ¡Buena producción!',
+            side: 'bottom',
+            align: 'end'
+          },
+          onHighlightStarted: () => document.querySelector('.tab-link[data-tab="resumen"]')?.click()
+        }
+      ]
+    });
+
+    driverObj.drive();
+  }
+
+  // Auto-lanzar tour la primera vez que el usuario entra
+  document.addEventListener('DOMContentLoaded', () => {
+    const tourDone = localStorage.getItem('agrohabilis_tour_done');
+    if (!tourDone) {
+      // Esperar a que el dashboard cargue los datos antes de lanzar el tour
+      setTimeout(() => {
+        iniciarTourGuiado();
+      }, 2500);
+    }
   });
 
 </script>
