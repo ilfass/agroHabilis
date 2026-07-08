@@ -8533,17 +8533,67 @@
             
             layer.remove();
 
-            const prefill = {
-              lat: Number(lat.toFixed(6)),
-              lng: Number(lng.toFixed(6)),
-              hectareas: area > 0 ? Number(area.toFixed(2)) : null,
-              geojson: geojson
-            };
-            // If the drawn shape is a point marker, pre-select tipo marcador_hacienda
-            if (isMarker) {
-              prefill.tipo = 'marcador_hacienda';
+            if (mapModeActive && mapModeEdicion && mapModeEdicionData) {
+              const formData = mapModeEdicionData;
+              desactivarModoMapa();
+              const prefill = {
+                id: formData.id,
+                lat: Number(lat.toFixed(6)),
+                lng: Number(lng.toFixed(6)),
+                tipo: formData.tipo,
+                nombre: formData.nombre,
+                hectareas: area > 0 ? Number(area.toFixed(2)) : (formData.hectareas || null),
+                uso: formData.uso,
+                campo_id: formData.campoId,
+                firma: formData.firma,
+                parent_id: formData.parentId,
+                hacienda_tipo: formData.hacienda_tipo,
+                cantidad: formData.cantidad,
+                semilla_tipo: formData.semilla_tipo,
+                variedad: formData.variedad,
+                cantidad_agri: formData.cantidad_agri,
+                notas: formData.notas,
+                provincia: formData.provincia,
+                partido: formData.partido,
+                geojson: geojson
+              };
+              window.abrirModalLoteCatastro(prefill);
+            } else if (mapModeActive && mapModeEdicionCampo && mapModeEdicionCampoData) {
+              const formData = mapModeEdicionCampoData;
+              desactivarModoMapa();
+              const idToPass = formData.id ? Number(formData.id) : null;
+              window.abrirModalCampo(idToPass, { lat: Number(lat.toFixed(6)), lng: Number(lng.toFixed(6)) });
+              setTimeout(() => {
+                if (formData.nombre) document.getElementById('campoFormNombre').value = formData.nombre;
+                if (formData.firma_id) document.getElementById('campoFormFirma').value = formData.firma_id;
+                if (formData.ciudad) document.getElementById('campoFormCiudad').value = formData.ciudad;
+                if (formData.provincia) document.getElementById('campoFormProvincia').value = formData.provincia;
+              }, 100);
+            } else {
+              const isCampoNuevo = mapModeActive && mapModeNuevo && mapModeNuevoTipo === 'campo';
+              const isNuevoTipo = mapModeActive && mapModeNuevo ? mapModeNuevoTipo : null;
+              
+              desactivarModoMapa();
+              
+              const prefill = {
+                lat: Number(lat.toFixed(6)),
+                lng: Number(lng.toFixed(6)),
+                hectareas: area > 0 ? Number(area.toFixed(2)) : null,
+                geojson: geojson
+              };
+              if (isMarker) {
+                prefill.tipo = 'marcador_hacienda';
+              }
+              
+              if (isCampoNuevo) {
+                window.abrirModalCampo(null, { lat: prefill.lat, lng: prefill.lng });
+              } else {
+                if (isNuevoTipo) {
+                  prefill.tipo = isNuevoTipo;
+                }
+                window.abrirModalLoteCatastro(prefill);
+              }
             }
-            window.abrirModalLoteCatastro(prefill);
           });
         }
 
@@ -8757,6 +8807,9 @@
 
         // Map Click handler — works for both reposition (existing lot) and new lot creation modes
         catastroMap.on("click", async (e) => {
+          if (catastroMap.pm && catastroMap.pm.globalDrawModeEnabled()) {
+            return;
+          }
           if (!mapModeActive) return;
           const clickedLat = Number(e.latlng.lat.toFixed(6));
           const clickedLng = Number(e.latlng.lng.toFixed(6));
