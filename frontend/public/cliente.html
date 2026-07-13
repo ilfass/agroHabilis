@@ -1117,6 +1117,7 @@
       .tab-link[data-tab="telemetria"]::before { content: '🚜'; }
       .tab-link[data-tab="finanzas"]::before { content: '📄'; }
       .tab-link[data-tab="reportes"]::before { content: '📊'; }
+      .tab-link[data-tab="reportes-diarios"]::before { content: '📝'; }
       .tab-link[data-tab="equipo"]::before { content: '👥'; }
       .tab-link[data-tab="comandos"]::before { content: '⚙️'; }
 
@@ -2219,6 +2220,11 @@
           <button class="tab-link" data-tab="reportes" type="button">
             <span class="title-text">Reportes</span>
             <small>Generar informes</small>
+          </button>
+
+          <button class="tab-link" data-tab="reportes-diarios" type="button">
+            <span class="title-text">Reportes Diarios (WA)</span>
+            <small>Novedades mejoradas con IA</small>
           </button>
 
           <div class="nav-section-title">👥 Colaboración</div>
@@ -3742,6 +3748,25 @@
             </div>
           </section>
 
+          <section class="tab-panel" data-panel="reportes-diarios">
+            <div class="layout-split">
+              <div class="card" style="width: 100%;">
+                <div class="card-header-group" style="margin-bottom: 20px;">
+                  <div>
+                    <h3>📝 Reportes Diarios de WhatsApp</h3>
+                    <p class="card-subtitle">Reportes de novedades e informes de campo procesados con IA.</p>
+                  </div>
+                  <button type="button" class="btn-primary" onclick="cargarReportesDiarios()" style="padding: 6px 12px; font-size:12px;">🔄 Actualizar</button>
+                </div>
+                
+                <div id="reportesDiariosList" style="display: flex; flex-direction: column; gap: 20px;">
+                  <!-- Dynamically populated daily reports -->
+                  <div style="text-align: center; padding: 40px; color: #64748b;">Cargando reportes...</div>
+                </div>
+              </div>
+            </div>
+          </section>
+
         </div>
       </main>
 
@@ -4040,6 +4065,13 @@
             </select>
           </div>
         </div>
+        <div>
+          <label style="display: block; font-size: 12px; font-weight: 700; color: #64748b; margin-bottom: 6px;">COMPARTIR CON / ASIGNAR A</label>
+          <select id="calTaskAssigned" class="form-input" style="margin-bottom:0; width: 100%;">
+            <option value="">Nadie / Todo el equipo</option>
+            <!-- Populated dynamically -->
+          </select>
+        </div>
         <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 12px;">
           <button type="button" class="btn-secondary" onclick="document.getElementById('calendarTaskModal').close()" style="padding: 8px 16px; border-radius: 8px; border: 1px solid #cbd5e1; background: transparent; cursor: pointer;">Cancelar</button>
           <button type="submit" class="btn-primary" style="padding: 8px 20px; border-radius: 8px;">Guardar Tarea</button>
@@ -4069,6 +4101,10 @@
         <div id="calDetailLoteGroup">
           <strong style="color: #64748b; font-size: 11px; text-transform: uppercase; display: block; margin-bottom: 2px;">Lote Asociado</strong>
           <div id="calDetailLote" style="font-weight: 600;">-</div>
+        </div>
+        <div id="calDetailAssignedGroup">
+          <strong style="color: #64748b; font-size: 11px; text-transform: uppercase; display: block; margin-bottom: 2px;">Asignado / Compartido con</strong>
+          <div id="calDetailAssigned" style="font-weight: 600;">-</div>
         </div>
       </div>
       <div style="display: flex; justify-content: flex-end; gap: 12px;">
@@ -4986,7 +5022,7 @@
           }
         }
         
-        activeMap = L.map('lotesMap').setView([lat, lng], 14);
+        activeMap = L.map('lotesMap', { zoomAnimation: false, fadeAnimation: false }).setView([lat, lng], 14);
         
         // Capa satelital de ESRI
         const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
@@ -6643,7 +6679,7 @@
         }
       }
 
-      function abrirCalendarAddTaskModal() {
+      async function abrirCalendarAddTaskModal() {
         const modal = $("calendarTaskModal");
         if (!modal) return;
 
@@ -6657,6 +6693,25 @@
               const campoText = l.cliente ? ` (${l.cliente})` : '';
               return `<option value="${l.id}">${esc(l.lote_nombre || l.nombre)}${esc(campoText)}</option>`;
             }).join("");
+        }
+
+        const selectAssigned = $("calTaskAssigned");
+        if (selectAssigned) {
+          selectAssigned.innerHTML = '<option value="">Cargando miembros...</option>';
+          try {
+            const r = await fetch("/api/dashboard/cliente/telefonos");
+            const d = await r.json();
+            if (d.ok && d.telefonos) {
+              const activeMembers = d.telefonos.filter(t => t.activo && t.aceptado);
+              selectAssigned.innerHTML = '<option value="">Nadie / Todo el equipo</option>' + 
+                activeMembers.map(t => `<option value="${t.id}">${esc(t.nombre_contacto)} (${esc(t.rol)})</option>`).join("");
+            } else {
+              selectAssigned.innerHTML = '<option value="">Nadie / Todo el equipo</option>';
+            }
+          } catch (err) {
+            console.error("Error cargando equipo para el calendario:", err);
+            selectAssigned.innerHTML = '<option value="">Nadie / Todo el equipo</option>';
+          }
         }
 
         const todayStr = new Date().toISOString().split('T')[0];
@@ -6673,12 +6728,13 @@
         const fecha_fin = $("calTaskEndDate").value;
         const categoria = $("calTaskCategory").value;
         const ubicacion_id = $("calTaskLote").value;
+        const assigned_telefono_id = $("calTaskAssigned").value;
 
         try {
           const r = await fetch("/api/dashboard/cliente/calendario", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ titulo, descripcion, fecha_inicio, fecha_fin, categoria, ubicacion_id })
+            body: JSON.stringify({ titulo, descripcion, fecha_inicio, fecha_fin, categoria, ubicacion_id, assigned_telefono_id })
           });
           const res = await r.json();
           if (res.ok) {
@@ -6714,6 +6770,13 @@
           $("calDetailLote").textContent = event.lote_nombre;
         } else {
           $("calDetailLoteGroup").style.display = "none";
+        }
+
+        if (event.assigned_nombre) {
+          $("calDetailAssignedGroup").style.display = "block";
+          $("calDetailAssigned").textContent = event.assigned_nombre;
+        } else {
+          $("calDetailAssignedGroup").style.display = "none";
         }
 
         const catBadge = $("calDetailCategory");
@@ -8069,6 +8132,7 @@
       let mapModeEdicionData = null; // stores form data while modal is closed for map picking
       let mapModeEdicionCampo = false;  // true if picking location for EDITING/CREATING a campo
       let mapModeEdicionCampoData = null; // stores campo form data while modal is closed for map picking
+      let mapIsDrawing = false;     // true if drawing a polygon/marker/etc on catastroMap
 
       function activarModoMapa(ubicacionId, mensaje) {
         mapModeActive = true;
@@ -8227,6 +8291,7 @@
         mapModeEdicionData = null;
         mapModeEdicionCampo = false;
         mapModeEdicionCampoData = null;
+        mapIsDrawing = false;
         const overlay = document.getElementById('catastroMapModeOverlay');
         if (overlay) overlay.classList.add('hide');
         if (catastroMap) {
@@ -8460,7 +8525,7 @@
         }
 
         // Disable double click zoom so dblclick event handler works correctly without zoom interference
-        catastroMap = L.map('catastroMap', { doubleClickZoom: false }).setView([lat, lng], 14);
+        catastroMap = L.map('catastroMap', { doubleClickZoom: false, zoomAnimation: false, fadeAnimation: false }).setView([lat, lng], 14);
         catMapMarkers = {};
 
         // Satellite base layer
@@ -8505,6 +8570,13 @@
             templineStyle: { color: '#10b981', weight: 2 },
             hintlineStyle: { color: '#10b981', dashArray: '5,5' },
             pathOptions: { color: '#10b981', fillColor: '#10b981', fillOpacity: 0.15, weight: 3 }
+          });
+
+          catastroMap.on('pm:drawstart', () => {
+            mapIsDrawing = true;
+          });
+          catastroMap.on('pm:drawend', () => {
+            mapIsDrawing = false;
           });
 
           catastroMap.on('pm:create', (e) => {
@@ -8807,6 +8879,9 @@
 
         // Map Click handler — works for both reposition (existing lot) and new lot creation modes
         catastroMap.on("click", async (e) => {
+          if (mapIsDrawing) {
+            return;
+          }
           if (catastroMap.pm && catastroMap.pm.globalDrawModeEnabled()) {
             return;
           }
@@ -9317,7 +9392,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const url = id ? `/api/catastro/firmas/${id}` : "/api/catastro/firmas";
     await fetch(url, { method, headers: {"Content-Type": "application/json"}, body: JSON.stringify(body) });
     document.getElementById("firmaEditModal").close();
-    loadCatastroData();
+    await loadCatastroData();
+    await cargar?.();
   });
 
   document.getElementById("campoEditForm")?.addEventListener("submit", async (e) => {
@@ -9337,7 +9413,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const url = id ? `/api/catastro/campos/${id}` : "/api/catastro/campos";
     await fetch(url, { method, headers: {"Content-Type": "application/json"}, body: JSON.stringify(body) });
     document.getElementById("campoEditModal").close();
-    loadCatastroData();
+    await loadCatastroData();
+    await cargar?.();
   });
   
   // Update Lote Edit logic
@@ -9471,7 +9548,8 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
           }
           document.getElementById("loteEditModal").close();
-          loadCatastroData();
+          await loadCatastroData();
+          await cargar?.();
         } catch (err) {
           alert("Error de red: " + err.message);
         }
@@ -9734,19 +9812,22 @@ window.abrirModalLoteCatastro = function(idOrObj = null) {
 window.eliminarFirma = async function(id) {
   if(confirm("¿Seguro que deseas eliminar esta firma?")) {
     await fetch(`/api/catastro/firmas/${id}`, { method: "DELETE" });
-    loadCatastroData();
+    await loadCatastroData();
+    await cargar?.();
   }
 };
 window.eliminarCampo = async function(id) {
   if(confirm("¿Seguro que deseas eliminar este campo?")) {
     await fetch(`/api/catastro/campos/${id}`, { method: "DELETE" });
-    loadCatastroData();
+    await loadCatastroData();
+    await cargar?.();
   }
 };
 window.eliminarLoteCatastro = async function(id) {
   if(confirm("¿Seguro que deseas eliminar este lote?")) {
     await fetch(`/api/catastro/lotes/${id}`, { method: "DELETE" });
-    loadCatastroData();
+    await loadCatastroData();
+    await cargar?.();
   }
 };
 
@@ -9757,6 +9838,8 @@ document.addEventListener("DOMContentLoaded", () => {
     t.addEventListener("click", () => {
       if (t.dataset.tab === "catastro") {
         loadCatastroData();
+      } else if (t.dataset.tab === "reportes-diarios") {
+        cargarReportesDiarios();
       }
     });
   });
@@ -10231,6 +10314,106 @@ window.guardarArrendamiento = async function(e) {
       }, 2500);
     }
   });
+
+  async function cargarReportesDiarios() {
+    const container = document.getElementById("reportesDiariosList");
+    if (!container) return;
+    container.innerHTML = '<div style="text-align: center; padding: 40px; color: #64748b;">Cargando reportes...</div>';
+    try {
+      const r = await fetch("/api/dashboard/cliente/reportes");
+      const d = await r.json();
+      if (!d.ok) {
+        container.innerHTML = `<div style="text-align: center; padding: 40px; color: #ef4444; font-weight: 700;">Error: ${esc(d.error || "No se pudieron cargar los reportes")}</div>`;
+        return;
+      }
+      if (!d.reportes || d.reportes.length === 0) {
+        container.innerHTML = `
+          <div style="text-align: center; padding: 60px 40px; color: #64748b; background: #f8fafc; border-radius: 12px; border: 2px dashed #e2e8f0;">
+            <span style="font-size: 40px; display: block; margin-bottom: 12px;">📝</span>
+            <b style="font-size: 15px; color: #0f172a; display: block; margin-bottom: 4px;">Sin reportes diarios registrados</b>
+            <span style="font-size: 13px;">Cuando envíes un audio o texto por WhatsApp que empiece con "Reporte" o "Parte diario", tu asistente lo procesará y aparecerá aquí formateado como informe.</span>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = d.reportes.map(rep => {
+        const fechaStr = new Date(rep.creado_en).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+        
+        let bodyHtml = esc(rep.texto_mejorado)
+          .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+          .replace(/\*(.*?)\*/g, '<em>$1</em>')
+          .replace(/\n\n/g, '<br><br>')
+          .replace(/\n-\s*(.*?)/g, '<br>• $1');
+
+        return `
+          <div class="card" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 12px; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+              <span style="font-weight: 800; font-size: 13px; color: #1e293b; background: #e2e8f0; padding: 4px 10px; border-radius: 6px;">📅 ${fechaStr}</span>
+              <div style="display: flex; gap: 8px;">
+                <button type="button" class="btn-secondary" onclick="copiarReporteAlPortapapeles(${rep.id})" style="padding: 6px 12px; font-size: 12px; border-radius: 6px; border: 1px solid #cbd5e1; background: white; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">📋 Copiar Informe</button>
+                <button type="button" class="btn-secondary" onclick="descargarReporteInforme(${rep.id})" style="padding: 6px 12px; font-size: 12px; border-radius: 6px; border: 1px solid #cbd5e1; background: white; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">📥 Descargar TXT</button>
+                <button type="button" class="btn-danger" onclick="eliminarReporteDiario(${rep.id})" style="padding: 6px 12px; font-size: 12px; border-radius: 6px; background-color: #ef4444; border-color: #ef4444; color: white; cursor: pointer; border: none;">Borrar</button>
+              </div>
+            </div>
+            
+            <div class="grid-2col" style="gap: 24px; align-items: stretch;">
+              <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; display: flex; flex-direction: column;">
+                <strong style="font-size: 11px; text-transform: uppercase; color: #64748b; display: block; margin-bottom: 8px;">Mensaje Original / Audio Transcrito</strong>
+                <p style="font-size: 13px; color: #334155; line-height: 1.6; margin: 0; white-space: pre-wrap;">${esc(rep.texto_original)}</p>
+              </div>
+              
+              <div style="background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 16px; border-left: 4px solid var(--color-success); display: flex; flex-direction: column; justify-content: space-between;">
+                <div>
+                  <strong style="font-size: 11px; text-transform: uppercase; color: var(--color-success); display: block; margin-bottom: 8px;">✨ Informe Mejorado con IA</strong>
+                  <div id="improved_text_${rep.id}" style="font-size: 13px; color: #0f172a; line-height: 1.6; margin: 0;">${bodyHtml}</div>
+                  <div id="raw_improved_text_${rep.id}" style="display:none;">${esc(rep.texto_mejorado)}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join("");
+    } catch (err) {
+      container.innerHTML = `<div style="text-align: center; padding: 40px; color: #ef4444; font-weight: 700;">Error de red: ${esc(err.message)}</div>`;
+    }
+  }
+
+  window.copiarReporteAlPortapapeles = function(id) {
+    const rawEl = document.getElementById(`raw_improved_text_${id}`);
+    if (!rawEl) return;
+    navigator.clipboard.writeText(rawEl.textContent).then(() => {
+      alert("✅ Informe copiado al portapapeles con éxito.");
+    }).catch(err => {
+      alert("Error al copiar: " + err.message);
+    });
+  };
+
+  window.descargarReporteInforme = function(id) {
+    const rawEl = document.getElementById(`raw_improved_text_${id}`);
+    if (!rawEl) return;
+    const blob = new Blob([rawEl.textContent], { type: "text/plain;charset=utf-8" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `reporte_diario_${id}.txt`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+  };
+
+  window.eliminarReporteDiario = async function(id) {
+    if (!confirm("¿Seguro que deseas borrar este reporte?")) return;
+    try {
+      const r = await fetch(`/api/dashboard/cliente/reportes/${id}`, { method: "DELETE" });
+      const d = await r.json();
+      if (d.ok) {
+        cargarReportesDiarios();
+      } else {
+        alert("Error al borrar: " + d.error);
+      }
+    } catch (err) {
+      alert("Error de conexión: " + err.message);
+    }
+  };
 
 </script>
 </body>

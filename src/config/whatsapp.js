@@ -762,6 +762,73 @@ const procesarMensajeEntranteWhatsapp = async (msg) => {
     const comandoAlias = resolverComandoAlias(comando);
     const planCtx = await obtenerContextoPlanPorWhatsapp(msg.from, numeroReal);
 
+    // Interceptor para Reportes Diarios (Texto o Audio)
+    const normalizedText = String(consulta || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+    const esReporte = normalizedText.startsWith("reporte") || 
+                     normalizedText.startsWith("parte diario") || 
+                     normalizedText.startsWith("novedades del campo") || 
+                     normalizedText.includes("reporte diario");
+    
+    if (esReporte) {
+      const usuarioId = planCtx.usuario?.id;
+      if (usuarioId) {
+        // Strip out the bracketed audio label if present to make the original text clean
+        let textoOriginal = consulta.replace(/^\[Audio transcrito:\s*/i, "").replace(/\]$/, "").trim();
+        
+        // Use Gemini to improve/format the report
+        let textoMejorado = "";
+        try {
+          const { generarConPromptLibre } = require("../services/gemini");
+          const out = await generarConPromptLibre({
+            system: "Sos un redactor profesional agropecuario. Tu tarea es estructurar y formalizar las novedades del campo reportadas por el productor o encargado de forma clara, técnica y en formato de 'informe de novedades diario'. Organizalo con secciones/viñetas usando markdown. Mantené todos los datos reales (lotes, animales, cantidades, observaciones, fechas) tal como se reportan, sin omitir ni inventar nada.",
+            user: `Reporte original:\n"${textoOriginal}"`
+          });
+          textoMejorado = String(out?.texto || "").trim();
+        } catch (eGemini) {
+          console.error("[WhatsApp Reporte] Error al mejorar con IA:", eGemini.message);
+          // Fallback to original text if AI fails
+          textoMejorado = `### Reporte de Novedades Diario\n\n${textoOriginal}`;
+        }
+
+        // Save to database
+        await query(`
+          INSERT INTO reportes_diarios (usuario_id, texto_original, texto_mejorado)
+          VALUES ($1, $2, $3)
+        `, [usuarioId, textoOriginal, textoMejorado]);
+
+        const confirmacionMsg = `📝 *¡Listo! Registré tu reporte diario en el Panel Web.* 🚜\n\n` +
+                                `El reporte fue procesado y mejorado con IA para que puedas visualizarlo, compartirlo o descargarlo como informe desde la pestaña *Reportes Diarios*.\n\n` +
+                                `*Novedades estructuradas:*\n${textoMejorado.slice(0, 400)}${textoMejorado.length > 400 ? '...' : ''}`;
+        
+        try {
+          await guardarConsulta({
+            usuarioId,
+            whatsapp: waCapturaNorm,
+            pregunta: `[Reporte diario registrado: ${textoOriginal.slice(0, 100)}]`,
+            respuesta: confirmacionMsg,
+            tokensUsados: null,
+            iaSinContexto: false,
+            iaProvider: "gemini_reportes",
+            iaProviderTrace: [{ type: "reporte_diario", success: true }]
+          });
+        } catch (eGuardar) {
+          console.error("[WhatsApp Reporte] Error al registrar en historial_consultas:", eGuardar.message);
+        }
+
+        const msgReplyRaw = msg.reply.bind(msg);
+        const finalMsg = formatearRespuestaAmigable(confirmacionMsg);
+        capturaInteraccion.registrarFireAndForget({
+          whatsappNorm: waCapturaNorm,
+          usuarioId: planCtx.usuario?.id ?? null,
+          direccion: "out",
+          cuerpo: finalMsg,
+          ruta: "reporte_diario_out",
+        });
+        await msgReplyRaw(finalMsg);
+        return; // Interceptado exitosamente
+      }
+    }
+
     // Guardrail conversacional ante Prompt Injection / Jailbreaks
     if (evaluarPromptInjection(consulta)) {
       const warningJailbreak = 

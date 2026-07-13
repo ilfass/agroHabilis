@@ -2269,9 +2269,10 @@ app.get("/api/dashboard/cliente/calendario", async (req, res) => {
     ] = await Promise.all([
       // 1. Manuales
       query(
-        `SELECT e.id, e.titulo, e.descripcion, e.fecha_inicio, e.fecha_fin, e.categoria, e.ubicacion_id, l.nombre AS lote_nombre, 'manual' AS origen
+        `SELECT e.id, e.titulo, e.descripcion, e.fecha_inicio, e.fecha_fin, e.categoria, e.ubicacion_id, l.nombre AS lote_nombre, 'manual' AS origen, e.assigned_telefono_id, t.nombre_contacto AS assigned_nombre
          FROM eventos_calendario e
          LEFT JOIN ubicaciones l ON l.id = e.ubicacion_id
+         LEFT JOIN telefonos_autorizados t ON t.id = e.assigned_telefono_id
          WHERE e.usuario_id = $1`,
         [usuarioId]
       ),
@@ -2371,7 +2372,9 @@ app.get("/api/dashboard/cliente/calendario", async (req, res) => {
         categoria: r.categoria,
         ubicacion_id: r.ubicacion_id,
         lote_nombre: r.lote_nombre,
-        origen: r.origen
+        origen: r.origen,
+        assigned_telefono_id: r.assigned_telefono_id,
+        assigned_nombre: r.assigned_nombre
       });
     });
 
@@ -2479,7 +2482,7 @@ app.post("/api/dashboard/cliente/calendario", async (req, res) => {
     if (!usuarioId) {
       return res.status(401).json({ ok: false, error: "No autorizado" });
     }
-    const { titulo, descripcion, fecha_inicio, fecha_fin, categoria, ubicacion_id } = req.body;
+    const { titulo, descripcion, fecha_inicio, fecha_fin, categoria, ubicacion_id, assigned_telefono_id } = req.body;
     if (!titulo) {
       return res.status(400).json({ ok: false, error: "Título obligatorio" });
     }
@@ -2488,10 +2491,10 @@ app.post("/api/dashboard/cliente/calendario", async (req, res) => {
     }
 
     const resInsert = await query(
-      `INSERT INTO eventos_calendario (usuario_id, titulo, descripcion, fecha_inicio, fecha_fin, categoria, ubicacion_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO eventos_calendario (usuario_id, titulo, descripcion, fecha_inicio, fecha_fin, categoria, ubicacion_id, assigned_telefono_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING id`,
-      [usuarioId, titulo, descripcion || null, fecha_inicio, fecha_fin || null, categoria || 'admin', ubicacion_id || null]
+      [usuarioId, titulo, descripcion || null, fecha_inicio, fecha_fin || null, categoria || 'admin', ubicacion_id || null, assigned_telefono_id ? Number(assigned_telefono_id) : null]
     );
 
     return res.json({ ok: true, id: resInsert.rows[0].id });
@@ -2518,6 +2521,46 @@ app.delete("/api/dashboard/cliente/calendario/:id", async (req, res) => {
     return res.status(500).json({ ok: false, error: error.message });
   }
 });
+
+// --- REPORTES DIARIOS ---
+app.get("/api/dashboard/cliente/reportes", async (req, res) => {
+  try {
+    const usuarioId = req.clienteSession?.user?.id;
+    if (!usuarioId) {
+      return res.status(401).json({ ok: false, error: "No autorizado" });
+    }
+    const r = await query(
+      `SELECT id, texto_original, texto_mejorado, creado_en 
+       FROM reportes_diarios 
+       WHERE usuario_id = $1 
+       ORDER BY creado_en DESC`,
+      [usuarioId]
+    );
+    return res.json({ ok: true, reportes: r.rows });
+  } catch (error) {
+    console.error("Fallo GET /api/dashboard/cliente/reportes:", error.message);
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+app.delete("/api/dashboard/cliente/reportes/:id", async (req, res) => {
+  try {
+    const usuarioId = req.clienteSession?.user?.id;
+    if (!usuarioId) {
+      return res.status(401).json({ ok: false, error: "No autorizado" });
+    }
+    const { id } = req.params;
+    await query(
+      `DELETE FROM reportes_diarios WHERE id = $1 AND usuario_id = $2`,
+      [id, usuarioId]
+    );
+    return res.json({ ok: true });
+  } catch (error) {
+    console.error("Fallo DELETE /api/dashboard/cliente/reportes/:id:", error.message);
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
 
 app.post("/api/dashboard/cliente/telemetria/conectar", async (req, res) => {
   try {
