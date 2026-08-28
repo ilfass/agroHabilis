@@ -11,3 +11,8 @@ wa-qr.log
 exports/interacciones/*.md
 backups/*
 !backups/.gitkeep
+
+# Videos de QA (archivos binarios pesados)
+docs/operacion/*.webm
+docs/operacion/*.mp4
+scratch/
