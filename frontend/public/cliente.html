@@ -845,10 +845,29 @@
 
       /* Interactive hero section for tabs */
       .card.tab-hero {
-        background: linear-gradient(135deg, #0b1320 0%, #040810 100%) !important;
+        background: linear-gradient(135deg,
+          #0d2d1f 0%,
+          #0f3d2a 40%,
+          #0b2d20 100%
+        ) !important;
         color: #ffffff !important;
-        border: none !important;
-        box-shadow: var(--shadow-lg) !important;
+        border: 1px solid rgba(16, 185, 129, 0.25) !important;
+        box-shadow:
+          var(--shadow-lg),
+          inset 0 1px 0 rgba(255,255,255,0.06) !important;
+        position: relative;
+        overflow: hidden;
+      }
+
+      /* Shimmer pattern sobre el tab-hero */
+      .card.tab-hero::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background:
+          radial-gradient(ellipse at 80% 50%, rgba(16,185,129,0.12) 0%, transparent 65%),
+          radial-gradient(ellipse at 10% 80%, rgba(5,150,105,0.08) 0%, transparent 55%);
+        pointer-events: none;
       }
 
       .tab-hero::before {
@@ -869,8 +888,14 @@
       }
 
       .tab-hero .card-subtitle, .tab-hero p {
-        color: #cbd5e1 !important;
+        color: rgba(209, 250, 229, 0.85) !important;
       }
+
+      /* card-header-group nunca debe tomar fondo heredado */
+      .card-header-group {
+        background: transparent;
+      }
+
 
       .mobile-toggle-btn {
         display: none;
@@ -2215,6 +2240,11 @@
           <button class="tab-link" data-tab="finanzas" type="button">
             <span class="title-text">Finanzas y Operación</span>
             <small>Gastos, ventas y alertas</small>
+          </button>
+
+          <button class="tab-link" data-tab="siembra-asociada" type="button">
+            <span class="title-text">🤝 Siembra Asociada</span>
+            <small>Negocios de Participación</small>
           </button>
 
           <button class="tab-link" data-tab="reportes" type="button">
@@ -3756,12 +3786,45 @@
                     <h3>📝 Reportes Diarios de WhatsApp</h3>
                     <p class="card-subtitle">Reportes de novedades e informes de campo procesados con IA.</p>
                   </div>
-                  <button type="button" class="btn-primary" onclick="cargarReportesDiarios()" style="padding: 6px 12px; font-size:12px;">🔄 Actualizar</button>
+                  <div style="display: flex; gap: 8px;">
+                    <button class="btn-help-bubble" onclick="abrirHelpDrawer('#help-card-reportes-diarios')" type="button" style="background:#f1f5f9; color:#475569; border: 1px solid #cbd5e1; font-size:11px; padding:6px 10px;">📝 Ayuda</button>
+                    <button type="button" class="btn-primary" onclick="cargarReportesDiarios()" style="padding: 6px 12px; font-size:12px;">🔄 Actualizar</button>
+                  </div>
                 </div>
                 
                 <div id="reportesDiariosList" style="display: flex; flex-direction: column; gap: 20px;">
                   <!-- Dynamically populated daily reports -->
                   <div style="text-align: center; padding: 40px; color: #64748b;">Cargando reportes...</div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="tab-panel" data-panel="siembra-asociada">
+            <div class="layout-split">
+              <div class="card" style="width: 100%;">
+                <div class="card-header-group" style="margin-bottom: 20px;">
+                  <div>
+                    <h3>🤝 Proyectos de Siembra Asociada</h3>
+                    <p class="card-subtitle">Gestioná negocios de participación, aportes y liquidaciones.</p>
+                  </div>
+                  <button type="button" class="btn-primary" onclick="abrirModalNuevoProyectoAsociado()" style="padding: 6px 12px; font-size:12px;">+ Nuevo Proyecto</button>
+                </div>
+                
+                <div id="invitacionesPendientesContainer" style="margin-bottom: 24px; display: none;">
+                  <div style="background: linear-gradient(135deg, #fffbe3 0%, #fef3c7 100%); border: 1px solid #f59e0b; border-radius: 12px; padding: 16px; color: #92400e;">
+                    <h4 style="margin: 0 0 12px 0; display: flex; align-items: center; gap: 8px;">
+                      📩 Invitaciones Pendientes a Proyectos
+                    </h4>
+                    <div id="listaInvitacionesPendientes" style="display: flex; flex-direction: column; gap: 10px;">
+                      <!-- Se llena dinámicamente -->
+                    </div>
+                  </div>
+                </div>
+
+                <div id="listaProyectosAsociados" class="mini-grid">
+                  <!-- Dynamically populated -->
+                  <div style="text-align: center; padding: 40px; color: #64748b; grid-column: 1 / -1;">Cargando proyectos...</div>
                 </div>
               </div>
             </div>
@@ -3975,6 +4038,14 @@
             <br><b>Cómo usarlo:</b> Hacé click en el reporte deseado (Planilla de Manga para el veterinario, Historial Sanitario, o Reporte Financiero de agricultura y ganadería) para descargar un documento PDF profesional listo para imprimir o enviar por mail.</div>
           </div>
 
+          <div class="help-section-card" id="help-card-reportes-diarios">
+            <div class="hsc-title">📝 Reportes Diarios de WhatsApp</div>
+            <div class="hsc-desc">Registro automático de novedades e informes de campo.
+            <br><b>Qué muestra:</b> Un feed con los informes que registraste a través del asistente de WhatsApp.
+            <br><b>Cómo usarlo:</b> Enviá un audio o texto a WhatsApp indicando tus novedades. La IA las procesará, estructurará y guardará aquí para que tengas un registro ordenado del estado del campo.</div>
+            <div class="hsc-wa">💬 Ejemplo WhatsApp: "en el reporte de hoy anotá que la camioneta pinchó rueda" o "quiero hacer el informe diario: llovió 30mm y el trigo viene bien"</div>
+          </div>
+
           <div class="help-section-group-title">👥 Colaboración y Configuración</div>
 
           <div class="help-section-card" id="help-card-equipo">
@@ -4075,6 +4146,227 @@
         <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 12px;">
           <button type="button" class="btn-secondary" onclick="document.getElementById('calendarTaskModal').close()" style="padding: 8px 16px; border-radius: 8px; border: 1px solid #cbd5e1; background: transparent; cursor: pointer;">Cancelar</button>
           <button type="submit" class="btn-primary" style="padding: 8px 20px; border-radius: 8px;">Guardar Tarea</button>
+        </div>
+      </form>
+    </dialog>
+
+    <!-- Modales Siembra Asociada -->
+    <dialog id="modalNuevoProyectoAsociado" style="border: none; border-radius: 20px; padding: 0; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); width: 100%; max-width: 540px; background: white; color: #0f172a; overflow: hidden; transition: all 0.3s ease;">
+      <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 24px; color: white;">
+        <h3 style="margin: 0; font-family: 'Outfit', sans-serif; font-weight: 800; font-size: 22px; display: flex; align-items: center; gap: 8px;">
+          <span style="background: rgba(255,255,255,0.2); padding: 6px 10px; border-radius: 12px; font-size: 18px;">🤝</span>
+          Nuevo Proyecto Asociado
+        </h3>
+        <p style="margin: 6px 0 0 0; font-size: 13px; color: #d1fae5; font-weight: 500;">Configurá las reglas y parámetros de tu próxima campaña colaborativa.</p>
+      </div>
+
+      <form id="formNuevoProyectoAsociado" style="padding: 24px; display: flex; flex-direction: column; gap: 20px; max-height: 70vh; overflow-y: auto;">
+        
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px;">
+          <h4 style="margin: 0 0 16px 0; font-size: 14px; color: #334155; display: flex; align-items: center; gap: 6px;">
+            <span style="font-size: 16px;">📋</span> Datos Principales
+          </h4>
+          
+          <div style="margin-bottom: 16px;">
+            <label style="display: block; font-size: 11px; font-weight: 800; color: #64748b; margin-bottom: 6px; letter-spacing: 0.5px;">NOMBRE DEL PROYECTO *</label>
+            <input type="text" id="sa_nombre" class="form-input" required placeholder="Ej: Trigo 2026 La Elena" style="width: 100%; box-sizing: border-box; border-radius: 8px; border: 1px solid #cbd5e1; padding: 10px; font-size: 14px; outline: none; transition: border-color 0.2s;" onfocus="this.style.borderColor='#10b981'" onblur="this.style.borderColor='#cbd5e1'" />
+          </div>
+          
+          <div class="grid-2col" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+            <div>
+              <label style="display: block; font-size: 11px; font-weight: 800; color: #64748b; margin-bottom: 6px; letter-spacing: 0.5px;">CAMPAÑA *</label>
+              <select id="sa_campana_id" class="form-input" required style="width: 100%; box-sizing: border-box; border-radius: 8px; border: 1px solid #cbd5e1; padding: 10px; font-size: 14px; outline: none; transition: border-color 0.2s;" onfocus="this.style.borderColor='#10b981'" onblur="this.style.borderColor='#cbd5e1'"></select>
+            </div>
+            <div>
+              <label style="display: block; font-size: 11px; font-weight: 800; color: #64748b; margin-bottom: 6px; letter-spacing: 0.5px;">LOTE / CAMPO</label>
+              <select id="sa_lote_id" class="form-input" style="width: 100%; box-sizing: border-box; border-radius: 8px; border: 1px solid #cbd5e1; padding: 10px; font-size: 14px; outline: none; transition: border-color 0.2s;" onfocus="this.style.borderColor='#10b981'" onblur="this.style.borderColor='#cbd5e1'"></select>
+            </div>
+          </div>
+        </div>
+
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px;">
+          <h4 style="margin: 0 0 16px 0; font-size: 14px; color: #334155; display: flex; align-items: center; gap: 6px;">
+            <span style="font-size: 16px;">⚖️</span> Reglas del Contrato
+          </h4>
+          
+          <div class="grid-2col" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+            <div>
+              <label style="display: block; font-size: 11px; font-weight: 800; color: #64748b; margin-bottom: 6px; letter-spacing: 0.5px;">REGISTRO ARCA</label>
+              <select id="sa_arca_type" class="form-input" style="width: 100%; box-sizing: border-box; border-radius: 8px; border: 1px solid #cbd5e1; padding: 10px; font-size: 14px; outline: none;">
+                <option value="titular_unico">Titular Único</option>
+                <option value="ute">Unión Transitoria (UTE)</option>
+                <option value="contrato_aparceria">Contrato de Aparcería</option>
+              </select>
+            </div>
+            <div>
+              <label style="display: block; font-size: 11px; font-weight: 800; color: #64748b; margin-bottom: 6px; letter-spacing: 0.5px;">MONEDA VALUACIÓN</label>
+              <select id="sa_valuation_currency" class="form-input" style="width: 100%; box-sizing: border-box; border-radius: 8px; border: 1px solid #cbd5e1; padding: 10px; font-size: 14px; outline: none;">
+                <option value="USD">Dólares (USD)</option>
+                <option value="ARS">Pesos (ARS)</option>
+                <option value="VALOR_PRODUCTO">Valor Producto (Quintales)</option>
+              </select>
+            </div>
+          </div>
+
+          <label style="display: block; font-size: 11px; font-weight: 800; color: #64748b; margin-bottom: 6px; letter-spacing: 0.5px;">PAGO A DUEÑO DE LA TIERRA</label>
+          <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 12px; margin-bottom: 16px;">
+            <select id="sa_landowner_model" class="form-input" style="width: 100%; box-sizing: border-box; border-radius: 8px; border: 1px solid #cbd5e1; padding: 10px; font-size: 14px; outline: none;">
+              <option value="porcentaje_rinde">% del Rinde</option>
+              <option value="quintales_fijos">Quintales Fijos / Ha</option>
+              <option value="mixto">Mixto (Socio Inversor)</option>
+            </select>
+            <input type="number" id="sa_landowner_value" class="form-input" placeholder="Valor" style="width: 100%; box-sizing: border-box; border-radius: 8px; border: 1px solid #cbd5e1; padding: 10px; font-size: 14px; outline: none;" />
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+            <div>
+              <label style="display: block; font-size: 11px; font-weight: 800; color: #64748b; margin-bottom: 6px; letter-spacing: 0.5px;">BASE DE DISTRIBUCIÓN</label>
+              <select id="sa_distribution_basis" class="form-input" style="width: 100%; box-sizing: border-box; border-radius: 8px; border: 1px solid #cbd5e1; padding: 10px; font-size: 14px; outline: none;">
+                <option value="ingreso_bruto">Ingreso Bruto</option>
+                <option value="margen_neto">Margen Neto</option>
+              </select>
+            </div>
+            <div>
+              <label style="display: block; font-size: 11px; font-weight: 800; color: #64748b; margin-bottom: 6px; letter-spacing: 0.5px;">LIQUIDACIÓN FINAL</label>
+              <select id="sa_liquidation_type" class="form-input" style="width: 100%; box-sizing: border-box; border-radius: 8px; border: 1px solid #cbd5e1; padding: 10px; font-size: 14px; outline: none;">
+                <option value="fisica_granos">Física (Kilos)</option>
+                <option value="monetaria">Monetaria (Dinero)</option>
+              </select>
+            </div>
+          </div>
+
+          <label style="display: block; font-size: 11px; font-weight: 800; color: #64748b; margin-bottom: 6px; letter-spacing: 0.5px;">GASTOS DE COMERCIALIZACIÓN</label>
+          <select id="sa_commercialization_expenses" class="form-input" style="width: 100%; box-sizing: border-box; border-radius: 8px; border: 1px solid #cbd5e1; padding: 10px; font-size: 14px; outline: none;">
+            <option value="pozo_comun">Pozo Común (descuento global)</option>
+            <option value="proporcional_socio">Proporcional al % del socio</option>
+            <option value="socio_especifico">Lo asume un socio específico</option>
+          </select>
+        </div>
+        
+        <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 8px; border-top: 1px solid #e2e8f0; padding-top: 20px;">
+          <button type="button" class="btn-secondary" onclick="document.getElementById('modalNuevoProyectoAsociado').close()" style="padding: 10px 20px; border-radius: 10px; border: 1px solid #cbd5e1; background: transparent; cursor: pointer; font-weight: 600; color: #475569; transition: all 0.2s;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='transparent'">Cancelar</button>
+          <button type="submit" class="btn-primary" style="padding: 10px 24px; border-radius: 10px; background: #10b981; color: white; border: none; font-weight: 700; cursor: pointer; box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.3); transition: all 0.2s;" onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 6px 8px -1px rgba(16, 185, 129, 0.4)'" onmouseout="this.style.transform='none'; this.style.boxShadow='0 4px 6px -1px rgba(16, 185, 129, 0.3)'">Crear Proyecto</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="modalDetalleProyectoAsociado" style="border: none; border-radius: 16px; padding: 24px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); width: 100%; max-width: 800px; background: white; color: #0f172a;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px;">
+        <div>
+          <h3 id="sa_det_title" style="margin-top: 0; font-family: 'Outfit', sans-serif; font-weight: 800; font-size: 22px; margin-bottom: 4px;">Proyecto</h3>
+          <span id="sa_det_status" class="badge">Activo</span>
+        </div>
+        <button class="btn-secondary" onclick="document.getElementById('modalDetalleProyectoAsociado').close()" style="border:none; background:transparent; font-size:20px; cursor:pointer;">✕</button>
+      </div>
+
+      <!-- Tabs internally for the project -->
+      <div style="display: flex; gap: 12px; margin-bottom: 20px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">
+        <button class="btn-help-bubble" onclick="saShowTab('socios')" style="font-weight:700;">👥 Socios y Reglas</button>
+        <button class="btn-help-bubble" onclick="saShowTab('aportes')" style="font-weight:700;">🧾 Aportes</button>
+        <button class="btn-help-bubble" onclick="saShowTab('liquidacion')" style="font-weight:700;">💰 Liquidación Final</button>
+      </div>
+
+      <div id="sa_tab_socios">
+        <h4 style="margin: 0 0 12px 0;">Socios Participantes</h4>
+        <div class="table-wrapper" style="margin-bottom: 20px;">
+          <table>
+            <thead><tr><th>Socio</th><th>Rol</th><th>Participación (%)</th></tr></thead>
+            <tbody id="sa_table_socios"></tbody>
+          </table>
+        </div>
+        <div id="sa_admin_invite_area" style="display:none;">
+          <h4 style="margin: 0 0 12px 0;">+ Invitar Socio (Admin)</h4>
+          <div style="display: flex; gap: 12px;">
+            <select id="sa_inv_usuario" class="form-input" style="flex: 1;"></select>
+            <select id="sa_inv_rol" class="form-input" style="flex: 1;">
+              <option value="inversor">Inversor</option>
+              <option value="contratista">Contratista</option>
+              <option value="dueno_tierra">Dueño de Tierra</option>
+            </select>
+            <input type="number" id="sa_inv_pct" class="form-input" placeholder="%" style="width: 80px;" />
+            <button class="btn-primary" onclick="saInvitarSocio()">Agregar</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="sa_tab_aportes" style="display:none;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <h4 style="margin: 0;">Registro de Aportes</h4>
+          <button class="btn-primary" onclick="saAbrirModalNuevoAporte()" style="padding: 6px 12px; font-size:12px;">+ Cargar Aporte</button>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>Fecha</th><th>Socio</th><th>Concepto</th><th>Monto</th><th>Estado</th><th>Acciones</th></tr></thead>
+            <tbody id="sa_table_aportes"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="sa_tab_liquidacion" style="display:none;">
+        <h4 style="margin: 0 0 12px 0;">Cosecha y Cierre</h4>
+        <div id="sa_form_cosecha" style="background:#f8fafc; padding:16px; border-radius:12px; margin-bottom:20px; display:none;">
+          <div class="grid-2col" style="gap:12px;">
+            <div>
+              <label style="font-size:12px; font-weight:700;">Toneladas Totales</label>
+              <input type="number" id="sa_res_tn" class="form-input">
+            </div>
+            <div>
+              <label style="font-size:12px; font-weight:700;">Precio de Venta (USD/TN)</label>
+              <input type="number" id="sa_res_precio" class="form-input">
+            </div>
+            <div>
+              <label style="font-size:12px; font-weight:700;">Gastos Comerciales Totales (USD)</label>
+              <input type="number" id="sa_res_gastos" class="form-input">
+            </div>
+            <div style="display:flex; align-items:flex-end;">
+              <button class="btn-primary" onclick="saEjecutarLiquidacion()" style="width:100%; height:40px;">Ejecutar Liquidación</button>
+            </div>
+          </div>
+        </div>
+
+        <h4 style="margin: 0 0 12px 0;">Saldos Finales</h4>
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>Socio</th><th>Aportado (USD)</th><th>Ingreso Bruto</th><th>Gastos</th><th>Resultado Neto (USD)</th><th>A Cobrar (Tn)</th></tr></thead>
+            <tbody id="sa_table_saldos">
+              <tr><td colspan="6" style="text-align:center;">El proyecto aún no ha sido liquidado.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog id="modalNuevoAporte" style="border: none; border-radius: 16px; padding: 24px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); width: 100%; max-width: 400px; background: white; color: #0f172a;">
+      <h3 style="margin-top: 0; font-family: 'Outfit', sans-serif; font-weight: 800; font-size: 18px; margin-bottom: 16px;">Cargar Aporte</h3>
+      <form id="formNuevoAporte" class="flex-column-gap-16">
+        <div>
+          <label style="display: block; font-size: 12px; font-weight: 700; color: #64748b; margin-bottom: 6px;">CONCEPTO / DESCRIPCIÓN</label>
+          <input type="text" id="sa_ap_desc" class="form-input" required placeholder="Ej: Semilla Maiz DK72-10" style="margin-bottom:0;" />
+        </div>
+        <div class="grid-2col" style="gap:16px;">
+          <div>
+            <label style="display: block; font-size: 12px; font-weight: 700; color: #64748b; margin-bottom: 6px;">MONTO</label>
+            <input type="number" id="sa_ap_monto" class="form-input" required style="margin-bottom:0;" />
+          </div>
+          <div>
+            <label style="display: block; font-size: 12px; font-weight: 700; color: #64748b; margin-bottom: 6px;">MONEDA</label>
+            <select id="sa_ap_moneda" class="form-input" required style="margin-bottom:0;">
+              <option value="USD">USD</option>
+              <option value="ARS">ARS</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label style="display: block; font-size: 12px; font-weight: 700; color: #64748b; margin-bottom: 6px;">TIPO DE APORTE</label>
+          <select id="sa_ap_tipo" class="form-input" required style="margin-bottom:0;">
+            <option value="insumos">Insumos (Semilla, Químicos)</option>
+            <option value="labor">Labor de Maquinaria</option>
+            <option value="dinero_efectivo">Efectivo / Transferencia</option>
+          </select>
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 12px;">
+          <button type="button" class="btn-secondary" onclick="document.getElementById('modalNuevoAporte').close()" style="padding: 8px 16px; border-radius: 8px; border: 1px solid #cbd5e1; background: transparent; cursor: pointer;">Cancelar</button>
+          <button type="submit" class="btn-primary" style="padding: 8px 20px; border-radius: 8px;">Guardar Aporte</button>
         </div>
       </form>
     </dialog>
@@ -9840,6 +10132,8 @@ document.addEventListener("DOMContentLoaded", () => {
         loadCatastroData();
       } else if (t.dataset.tab === "reportes-diarios") {
         cargarReportesDiarios();
+      } else if (t.dataset.tab === "siembra-asociada") {
+        cargarProyectosAsociados();
       }
     });
   });
@@ -10416,5 +10710,6 @@ window.guardarArrendamiento = async function(e) {
   };
 
 </script>
+<script src="/js/siembra_asociada.js"></script>
 </body>
 </html>

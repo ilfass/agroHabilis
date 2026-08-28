@@ -14,11 +14,11 @@ const transcribirAudioGroq = async (audioBuffer, filename = "audio.ogg") => {
 
   const form = new FormData();
   form.append("file", audioBuffer, {
-    filename,
+    filename: filename || "audio.ogg",
     contentType: "audio/ogg",
   });
-  form.append("model", process.env.GROQ_WHISPER_MODEL || "whisper-large-v3");
-  form.append("language", "es"); // Forzar español para mejor precisión en agro
+  form.append("model", process.env.GROQ_WHISPER_MODEL?.trim() || "whisper-large-v3-turbo");
+  form.append("language", "es");
 
   try {
     const { data } = await axios.post(
@@ -32,7 +32,7 @@ const transcribirAudioGroq = async (audioBuffer, filename = "audio.ogg") => {
         timeout: 20000,
       }
     );
-    return data.text;
+    return (data.text || "").trim();
   } catch (error) {
     const msg = error.response?.data?.error?.message || error.message;
     console.error("[Voice] Error en Groq Whisper:", msg);
@@ -40,21 +40,23 @@ const transcribirAudioGroq = async (audioBuffer, filename = "audio.ogg") => {
   }
 };
 
-const transcribirAudioGemini = async (audioBuffer, mimeType) => {
-  const apiKey = process.env.GEMINI_API_KEY?.trim();
+const transcribirAudioGemini = async (audioBuffer, mimeType = "audio/ogg") => {
+  const apiKey = process.env.GEMINI_API_KEY?.trim() || process.env.GEMINI_API_KEY_FALLBACK?.trim();
   if (!apiKey) throw new Error("GEMINI_API_KEY no configurada");
 
+  const cleanMime = String(mimeType || "audio/ogg").split(";")[0].trim().toLowerCase() || "audio/ogg";
   const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
+  const modelName = process.env.GEMINI_MODEL?.trim() || "gemini-1.5-flash";
+  const model = genAI.getGenerativeModel({ model: modelName });
 
   const parts = [
     {
       inlineData: {
         data: audioBuffer.toString("base64"),
-        mimeType
+        mimeType: cleanMime
       }
     },
-    { text: "Transcribí este audio de un productor agropecuario. Si hay términos técnicos del campo, asegúrate de escribirlos correctamente. Solo devolvé el texto de la transcripción." }
+    { text: "Transcribí este audio de un productor agropecuario. Si hay términos técnicos del campo, asegúrate de escribirlos correctamente. Solo devolvé el texto de la transcripción en español." }
   ];
 
   try {
@@ -76,9 +78,8 @@ const transcribirAudioGemini = async (audioBuffer, mimeType) => {
  * @param {Buffer} audioBuffer
  * @param {string} mimeType
  */
-const transcribirAudio = async (audioBuffer, mimeType) => {
-  // Intentar Groq primero si hay API Key
-  if (process.env.GROQ_API_KEY) {
+const transcribirAudio = async (audioBuffer, mimeType = "audio/ogg") => {
+  if (process.env.GROQ_API_KEY?.trim()) {
     try {
       return await transcribirAudioGroq(audioBuffer);
     } catch (err) {
@@ -86,7 +87,6 @@ const transcribirAudio = async (audioBuffer, mimeType) => {
     }
   }
 
-  // Fallback a Gemini
   return await transcribirAudioGemini(audioBuffer, mimeType);
 };
 

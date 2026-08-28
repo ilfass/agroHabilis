@@ -56,23 +56,44 @@ const runCheck = async () => {
     }
   } else if (whatsappState !== "listo") {
     console.warn(`[HealthMonitor] WHATSAPP FUERA DE LÍNEA: Estado: ${whatsappState}`);
-    if (state.lastStatus !== `wa_down_${whatsappState}` || ahora - state.lastAlertTime > COOLDOWN_MS) {
-      await enviarAlertaSistema({
-        titulo: `⚠️ ALERTA: Agente de WhatsApp desconectado (${whatsappState || "desconocido"})`,
-        mensaje: `El servidor de AgroHabilis está en línea pero el agente de WhatsApp no está conectado.\nEstado reportado: "${whatsappState || "desconocido"}"\n\nPor favor, ingrese al panel de administración para escanear el código QR si la sesión expiró.`,
-        ignorarCooldown: true,
+    
+    const GRACE_PERIOD_MS = 5 * 60 * 1000; // 5 minutos de tolerancia para reconexión automática
+    const unhealthySince = state.unhealthySince || ahora;
+    const timeUnhealthy = ahora - unhealthySince;
+
+    if (timeUnhealthy < GRACE_PERIOD_MS) {
+      console.log(`[HealthMonitor] WhatsApp no está listo, pero está dentro del período de tolerancia (${Math.round(timeUnhealthy / 1000)}s / ${GRACE_PERIOD_MS / 1000}s). No se envía alerta.`);
+      writeState({
+        ...state,
+        unhealthySince
       });
-      writeState({ lastAlertTime: ahora, lastStatus: `wa_down_${whatsappState}` });
+    } else {
+      const targetStatus = `wa_down_${whatsappState}`;
+      if (state.lastStatus !== targetStatus || ahora - state.lastAlertTime > COOLDOWN_MS) {
+        await enviarAlertaSistema({
+          titulo: `⚠️ ALERTA: Agente de WhatsApp desconectado (${whatsappState || "desconocido"})`,
+          mensaje: `El servidor de AgroHabilis está en línea pero el agente de WhatsApp no está conectado hace más de ${Math.round(GRACE_PERIOD_MS / 60000)} minutos.\nEstado reportado: "${whatsappState || "desconocido"}"\n\nPor favor, ingrese al panel de administración para escanear el código QR si la sesión expiró.`,
+          ignorarCooldown: true,
+        });
+        writeState({
+          lastAlertTime: ahora,
+          lastStatus: targetStatus,
+          unhealthySince,
+          alertSent: true
+        });
+      }
     }
   } else {
     console.log("[HealthMonitor] Todo OK. Servidor en línea y WhatsApp Conectado.");
     if (state.lastStatus !== "ok") {
-      // Notificar recuperación si antes estaba caído
-      await enviarAlertaSistema({
-        titulo: "✅ SERVICIO RECUPERADO: AgroHabilis y WhatsApp en línea",
-        mensaje: "El servidor de AgroHabilis y el agente de WhatsApp se han restablecido correctamente y vuelven a estar 100% operativos.",
-        ignorarCooldown: true,
-      });
+      // Solo notificar recuperación si efectivamente se había enviado una alerta
+      if (state.alertSent) {
+        await enviarAlertaSistema({
+          titulo: "✅ SERVICIO RECUPERADO: AgroHabilis y WhatsApp en línea",
+          mensaje: "El servidor de AgroHabilis y el agente de WhatsApp se han restablecido correctamente y vuelven a estar 100% operativos.",
+          ignorarCooldown: true,
+        });
+      }
       writeState({ lastAlertTime: ahora, lastStatus: "ok" });
     }
   }

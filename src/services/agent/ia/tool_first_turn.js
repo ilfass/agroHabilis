@@ -16,6 +16,7 @@
 const { listTools, invokeTool } = require("../tools");
 const { postOpenRouterChat, parseToolArgs, toOpenAiToolDefinitions } = require("./openrouter_chat");
 const { scoutMaxTurns, scoutMaxToolCalls, defaultOnUnlessOff } = require("../cursor_mode");
+const { obtenerReglasAprendidasActivas } = require("../auto_evaluador");
 
 const PREGUNTA_MARCADOR_BROADCAST =
   "[AgroHabilis — mensaje del equipo por WhatsApp; no ingresó una consulta del productor. Las respuestas siguientes suelen ser feedback a esta campaña (aunque antes haya ido un recordatorio corto, p. ej. solo un saludo con el nombre).]";
@@ -78,7 +79,7 @@ const formatearPerfil = (usuario) => {
  * System prompt para el modo tool-first.
  * Explica al LLM cuándo usar cada domain tool.
  */
-const buildSystemPrompt = ({ usuario, historialReciente }) => {
+const buildSystemPrompt = ({ usuario, historialReciente, reglasAprendidas = [] }) => {
   const perfil = formatearPerfil(usuario);
   const hist = formatearHistorial(historialReciente);
   return [
@@ -194,7 +195,24 @@ const buildSystemPrompt = ({ usuario, historialReciente }) => {
     "   el productor está en medio de un proceso de validación paso a paso. BAJO NINGUNA CIRCUNSTANCIA debes generar una respuesta afirmando",
     "   que los datos ya fueron guardados definitivamente con éxito en la base de datos si la herramienta indica que está pendiente.",
     "   Debes mantener intacto el flujo conversacional de la herramienta, presentando la información tal cual y pidiendo la confirmación correspondiente.",
-  ].join("\n");
+  ];
+
+  // ── Inyección dinámica de reglas aprendidas ──
+  if (Array.isArray(reglasAprendidas) && reglasAprendidas.length > 0) {
+    base.push("");
+    base.push("═══════════════════════════════════════");
+    base.push("REGLAS DINÁMICAS APRENDIDAS");
+    base.push("═══════════════════════════════════════");
+    for (const regla of reglasAprendidas) {
+      const cat = String(regla.categoria || "general").trim();
+      const texto = String(regla.regla_texto || "").trim();
+      if (texto) {
+        base.push(`- [${cat}] ${texto}`);
+      }
+    }
+  }
+
+  return base.join("\n");
 };
 
 /**
@@ -243,7 +261,15 @@ const ejecutarToolFirstTurn = async ({
     historialReciente: Array.isArray(historialReciente) ? historialReciente : [],
   };
 
-  const system = buildSystemPrompt({ usuario, historialReciente });
+  // Cargar reglas aprendidas activas para inyectar en el prompt
+  let reglasAprendidas = [];
+  try {
+    reglasAprendidas = await obtenerReglasAprendidasActivas();
+  } catch (e) {
+    console.warn("[agent] tool_first_turn: error cargando reglas aprendidas:", e.message);
+  }
+
+  const system = buildSystemPrompt({ usuario, historialReciente, reglasAprendidas });
   const tools = toOpenAiToolDefinitions(allTools);
   const maxTurns = scoutMaxTurns();
   const maxToolCalls = scoutMaxToolCalls();

@@ -128,7 +128,7 @@ const responderHaciendaSimple = async (
   if (categoriaHint) {
     const r = await query(
       `
-        SELECT categoria, precio_promedio, unidad, fecha
+        SELECT categoria, COALESCE(precio_promedio, (precio_min + precio_max)/2, precio_min, precio_max) AS precio_promedio, unidad, fecha
         FROM precios_hacienda
         WHERE fecha = $1::date
           AND LOWER(categoria) LIKE $2
@@ -141,7 +141,7 @@ const responderHaciendaSimple = async (
   } else {
     const r = await query(
       `
-        SELECT categoria, precio_promedio, unidad, fecha
+        SELECT categoria, COALESCE(precio_promedio, (precio_min + precio_max)/2, precio_min, precio_max) AS precio_promedio, unidad, fecha
         FROM precios_hacienda
         WHERE fecha = $1::date
         ORDER BY categoria
@@ -154,7 +154,7 @@ const responderHaciendaSimple = async (
   if (!rows.length) {
     const refHoyRows = await query(
       `
-        SELECT categoria, precio_promedio, unidad
+        SELECT categoria, COALESCE(precio_promedio, (precio_min + precio_max)/2, precio_min, precio_max) AS precio_promedio, unidad
         FROM precios_hacienda
         WHERE fecha = $1::date
         ORDER BY categoria
@@ -170,9 +170,9 @@ const responderHaciendaSimple = async (
     const tendenciaR = await query(
       `
         SELECT
-          AVG(h.precio_promedio)::numeric(10,2) AS hoy,
+          AVG(COALESCE(h.precio_promedio, (h.precio_min + h.precio_max)/2, h.precio_min, h.precio_max))::numeric(10,2) AS hoy,
           (
-            SELECT AVG(h2.precio_promedio)::numeric(10,2)
+            SELECT AVG(COALESCE(h2.precio_promedio, (h2.precio_min + h2.precio_max)/2, h2.precio_min, h2.precio_max))::numeric(10,2)
             FROM precios_hacienda h2
             WHERE h2.fecha >= $1::date - INTERVAL '7 days'
               AND h2.fecha < $1::date

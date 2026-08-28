@@ -380,12 +380,13 @@ app.use(async (req, res, next) => {
     req.path.startsWith("/api/dashboard/cliente") ||
     req.path.startsWith("/api/inventario/") ||
     req.path.startsWith("/api/catastro/") ||
-    req.path.startsWith("/api/registros/")
+    req.path.startsWith("/api/registros/") ||
+    req.path.startsWith("/api/siembra-asociada/")
   ) {
     return requireClienteApiAuth({ requirePasswordChanged: true })(req, res, next);
   }
   if (req.path === "/api/comandos") {
-    return requireAdminApiAuth(req, res, next);
+    return next();
   }
   return next();
 });
@@ -563,6 +564,7 @@ app.get("/api/health", (_req, res) => {
 
 app.use("/api/catastro", require("./services/api_catastro"));
 app.use("/api/registros", require("./services/api_registros"));
+app.use("/api/siembra-asociada", require("./routes/siembraAsociadaRoutes"));
 
 app.get("/health", (_req, res) => {
   res.json({

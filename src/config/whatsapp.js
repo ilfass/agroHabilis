@@ -3,6 +3,7 @@ const fs = require("fs").promises;
 const qrcode = require("qrcode-terminal");
 const QRCode = require("qrcode");
 const { Client, LocalAuth, WAState } = require("whatsapp-web.js");
+require("../patches/wwebjs-download-patch"); // Patch LID downloadMedia bug
 const { query } = require("./database");
 const {
   horasFeedbackBroadcastMasivo,
@@ -634,6 +635,122 @@ client.on("disconnected", async (reason) => {
   }, 5000);
 });
 
+const descargarMediaRobusto = async (clientInstance, msg) => {
+  if (!msg) return null;
+  const esAudioMsg = msg.type === "audio" || msg.type === "ptt";
+  if (esAudioMsg) {
+    msg.hasMedia = true;
+  }
+
+  if (!msg.hasMedia) return null;
+
+  const rawId = msg.id?.id || "";
+  const serializedId = msg.id?._serialized || "";
+
+  console.log(`[Media] Descargando adjunto tipo=${msg.type} rawId=${rawId} serId=${serializedId}...`);
+
+  // 1. Intentar con msg.downloadMedia() estándar de whatsapp-web.js
+  try {
+    const m = await msg.downloadMedia();
+    if (m && m.data) {
+      console.log(`[Media] Descarga exitosa con msg.downloadMedia() (${m.mimetype}, ${m.data.length} bytes b64)`);
+      return m;
+    }
+  } catch (e) {
+    console.warn(`[Media] msg.downloadMedia() falló:`, e.message);
+  }
+
+  // 2. Fallback avanzado por CDP/Store en Puppeteer
+  try {
+    console.log(`[Media] Iniciando fallback Puppeteer CDP para rawId=${rawId}`);
+
+    const res = await clientInstance.pupPage.evaluate(async (serId, rId, isAudio) => {
+      let m = null;
+      if (serId) {
+        try { m = window.Store.Msg.get(serId); } catch (_) {}
+      }
+      if (!m && window.Store.Msg && window.Store.Msg.models) {
+        m = window.Store.Msg.models.find((x) => x && x.id && (
+          x.id._serialized === serId ||
+          x.id.id === rId ||
+          (rId && x.id._serialized && x.id._serialized.includes(rId))
+        ));
+      }
+      // Fallback final: tomar la nota de voz más reciente en memoria si no se halló por ID
+      if (!m && isAudio && window.Store.Msg && window.Store.Msg.models) {
+        m = window.Store.Msg.models.filter((x) => x && (x.type === "ptt" || x.type === "audio")).pop();
+      }
+
+      if (!m) return null;
+
+      // Esperar a que el estado del medio sea RESOLVED o esté disponible
+      for (let i = 0; i < 25; i++) {
+        if (m.mediaData && (m.mediaData.mediaStage === "RESOLVED" || m.mediaData.opaqueData || m.mediaData.renderableUrl)) break;
+        try {
+          if (typeof m.downloadMedia === "function") {
+            await m.downloadMedia({ downloadEvenIfExpensive: true, rmrReason: 1 });
+          }
+        } catch (_) {}
+        await new Promise((resolve) => setTimeout(resolve, 250));
+      }
+
+      const mime = m.mimetype || m.mediaData?.mimetype || "audio/ogg";
+
+      // Método 1: m.mediaData.opaqueData
+      if (m.mediaData && m.mediaData.opaqueData) {
+        try {
+          if (typeof m.mediaData.opaqueData.base64 === "function") {
+            const b64 = m.mediaData.opaqueData.base64();
+            if (b64) return { data: b64, mimetype: mime, filename: m.filename, filesize: m.size, metodo: "opaqueData" };
+          }
+        } catch (_) {}
+      }
+
+      // Método 2: fetch al blobUrl / renderableUrl / clientUrl
+      const blobUrl = m.mediaData?.renderableUrl || m.mediaData?.clientUrl || m.clientUrl || m.deprecatedMms3Url;
+      if (blobUrl && typeof blobUrl === "string" && blobUrl.startsWith("blob:")) {
+        try {
+          const resp = await fetch(blobUrl);
+          const buf = await resp.arrayBuffer();
+          const b64 = await window.WWebJS.arrayBufferToBase64Async(buf);
+          if (b64) return { data: b64, mimetype: mime, filename: m.filename, filesize: m.size, metodo: "blobUrl" };
+        } catch (_) {}
+      }
+
+      // Método 3: DownloadManager fallback
+      try {
+        const mockQpl = { addAnnotations: () => mockQpl, addPoint: () => mockQpl };
+        const decrypted = await window.Store.DownloadManager.downloadAndMaybeDecrypt({
+          directPath: m.directPath || m.mediaData?.directPath,
+          encFilehash: m.encFilehash || m.mediaData?.encFilehash,
+          filehash: m.filehash || m.mediaData?.filehash,
+          mediaKey: m.mediaKey || m.mediaData?.mediaKey,
+          mediaKeyTimestamp: m.mediaKeyTimestamp || m.mediaData?.mediaKeyTimestamp,
+          type: m.type,
+          signal: new AbortController().signal,
+          downloadQpl: mockQpl,
+        });
+
+        const data = await window.WWebJS.arrayBufferToBase64Async(decrypted);
+        return { data, mimetype: mime, filename: m.filename, filesize: m.size, metodo: "downloadManager" };
+      } catch (decErr) {
+        return null;
+      }
+    }, serializedId, rawId, esAudioMsg);
+
+    if (res && res.data) {
+      console.log(`[Media] Descarga exitosa vía fallback Puppeteer (${res.metodo}, ${res.mimetype}, ${res.data.length} bytes b64)`);
+      const MessageMedia = require("whatsapp-web.js/src/structures/MessageMedia");
+      return new MessageMedia(res.mimetype || "audio/ogg", res.data, res.filename, res.filesize);
+    }
+  } catch (errFallback) {
+    console.error("[Media] Error en fallback de descarga:", errFallback.message);
+  }
+
+  console.warn(`[Media] No se pudo descargar el contenido media para msg id=${rawId}`);
+  return null;
+};
+
 const procesarMensajeEntranteWhatsapp = async (msg) => {
   try {
     if (msg.from?.includes("@g.us")) return;
@@ -646,9 +763,21 @@ const procesarMensajeEntranteWhatsapp = async (msg) => {
     let monitorExtractData = null;
     let remateExtractData = null;
 
-    if (msg.hasMedia) {
+    const esAudioMsg = msg.type === "audio" || msg.type === "ptt" || (msg.hasMedia && !msg.type);
+    if (msg.hasMedia || esAudioMsg) {
       try {
-        const media = await msg.downloadMedia();
+        const media = await descargarMediaRobusto(client, msg);
+        const isAudioMime = (media && media.mimetype && (
+          media.mimetype.startsWith("audio/") ||
+          media.mimetype.includes("ogg") ||
+          media.mimetype.includes("opus") ||
+          media.mimetype.includes("mpeg") ||
+          media.mimetype.includes("mp3") ||
+          media.mimetype.includes("wav") ||
+          media.mimetype.includes("m4a") ||
+          media.mimetype.includes("mp4")
+        )) || (esAudioMsg && media && media.data);
+
         if (media && (media.mimetype.startsWith("image/") || media.mimetype === "application/pdf")) {
           const buffer = Buffer.from(media.data, "base64");
           try {
@@ -725,16 +854,18 @@ const procesarMensajeEntranteWhatsapp = async (msg) => {
             `¡De esa forma te analizo y guardo todos los datos al instante! 🚜`;
           await msg.reply(formatearRespuestaAmigable(excelNotice));
           return;
-        } else if (media && media.mimetype.startsWith("audio/")) {
+        } else if (media && media.data && (isAudioMime || esAudioMsg)) {
+          const mimeType = media.mimetype || "audio/ogg";
           const buffer = Buffer.from(media.data, "base64");
           try {
-            const transcript = await transcribirAudio(buffer, media.mimetype);
-            if (transcript) {
+            const transcript = await transcribirAudio(buffer, mimeType);
+            const rawTranscript = typeof transcript === "string" ? transcript : (transcript?.texto || "");
+            if (rawTranscript && rawTranscript.trim()) {
               // Para mensajes de audio: el transcript ES el mensaje completo;
               // no debe mezclarse con el body vacío ni con el contexto de hilo previo
               // de registro para la clasificación de intención.
-              consulta = `[Audio transcrito: ${transcript}]`.trim();
-              console.log(`[Voice] Audio transcrito para ${msg.from}: ${transcript.slice(0, 50)}...`);
+              consulta = `[Audio transcrito: ${rawTranscript.trim()}]`.trim();
+              console.log(`[Voice] Audio transcrito para ${msg.from}: ${rawTranscript.substring(0, 50)}...`);
             } else {
               throw new Error("Transcripción vacía");
             }
@@ -762,70 +893,144 @@ const procesarMensajeEntranteWhatsapp = async (msg) => {
     const comandoAlias = resolverComandoAlias(comando);
     const planCtx = await obtenerContextoPlanPorWhatsapp(msg.from, numeroReal);
 
-    // Interceptor para Reportes Diarios (Texto o Audio)
-    const normalizedText = String(consulta || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
-    const esReporte = normalizedText.startsWith("reporte") || 
-                     normalizedText.startsWith("parte diario") || 
-                     normalizedText.startsWith("novedades del campo") || 
-                     normalizedText.includes("reporte diario");
-    
-    if (esReporte) {
-      const usuarioId = planCtx.usuario?.id;
-      if (usuarioId) {
-        // Strip out the bracketed audio label if present to make the original text clean
-        let textoOriginal = consulta.replace(/^\[Audio transcrito:\s*/i, "").replace(/\]$/, "").trim();
-        
-        // Use Gemini to improve/format the report
-        let textoMejorado = "";
+    // Interceptor para Reportes Diarios (Texto o Audio) — Clasificación IA
+    let textoLimpioParaEvaluar = consulta.replace(/^\[Audio transcrito:\s*/i, "").replace(/\]$/, "").trim();
+    const normalizedText = String(textoLimpioParaEvaluar || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+
+    // Pre-filtro amplio: solo invocamos IA si hay indicios de reporte
+    const indiciosReporte = /reporte|informe|parte\s*diario|novedades|novedad\s+del|como\s+anda|esta\s+todo\s+bien|sin\s+novedad|anotar|registr|quede\s+registrado/i.test(normalizedText);
+
+    if (indiciosReporte && planCtx.usuario?.id) {
+      const usuarioId = planCtx.usuario.id;
+      try {
+        // Obtener contexto conversacional reciente para enriquecer la clasificación
+        let contextoHilo = "";
         try {
-          const { generarConPromptLibre } = require("../services/gemini");
-          const out = await generarConPromptLibre({
-            system: "Sos un redactor profesional agropecuario. Tu tarea es estructurar y formalizar las novedades del campo reportadas por el productor o encargado de forma clara, técnica y en formato de 'informe de novedades diario'. Organizalo con secciones/viñetas usando markdown. Mantené todos los datos reales (lotes, animales, cantidades, observaciones, fechas) tal como se reportan, sin omitir ni inventar nada.",
-            user: `Reporte original:\n"${textoOriginal}"`
-          });
-          textoMejorado = String(out?.texto || "").trim();
-        } catch (eGemini) {
-          console.error("[WhatsApp Reporte] Error al mejorar con IA:", eGemini.message);
-          // Fallback to original text if AI fails
-          textoMejorado = `### Reporte de Novedades Diario\n\n${textoOriginal}`;
+          const histReciente = await query(`
+            SELECT pregunta, respuesta
+            FROM historial_consultas
+            WHERE usuario_id = $1
+              AND creado_en > NOW() - INTERVAL '2 hours'
+            ORDER BY creado_en DESC
+            LIMIT 6
+          `, [usuarioId]);
+          if (histReciente.rows.length > 0) {
+            const lineas = histReciente.rows.reverse().map(r => {
+              const pregLimpia = String(r.pregunta || "")
+                .replace(/^\[Audio transcrito:\s*/i, "")
+                .replace(/\]$/, "")
+                .trim();
+              const respLimpia = String(r.respuesta || "").substring(0, 150);
+              return `Usuario: ${pregLimpia.substring(0, 200)}\nAsistente: ${respLimpia}`;
+            }).filter(l => l.length > 20);
+            if (lineas.length > 0) {
+              contextoHilo = lineas.join("\n---\n");
+            }
+          }
+        } catch (eCtx) {
+          console.warn("[WhatsApp Reporte] Error al obtener hilo reciente:", eCtx.message);
         }
 
-        // Save to database
-        await query(`
-          INSERT INTO reportes_diarios (usuario_id, texto_original, texto_mejorado)
-          VALUES ($1, $2, $3)
-        `, [usuarioId, textoOriginal, textoMejorado]);
+        const { runProviderChain } = require("../services/gemini");
+        const classifSystem = [
+          "Sos un clasificador de intención para un sistema agropecuario argentino.",
+          "Tu UNICA tarea es determinar si el usuario quiere registrar un REPORTE/INFORME/PARTE DIARIO del campo.",
+          "Esto incluye frases como: 'reporte de hoy', 'informe diario', 'parte diario', 'las novedades son...', 'el campo está todo bien', 'quiero hacer el informe', 'registrar que no hay novedades', 'te cuento cómo anda el campo', etc.",
+          "NO es reporte: consultas de precios, clima, registros de stock/inventario, saludos, preguntas técnicas.",
+          "",
+          "Respondé SOLO un JSON válido:",
+          '{"es_reporte": true/false, "contenido_extraido": "texto con el contenido real del reporte (novedades, estado del campo, observaciones) extraído del mensaje y/o del contexto conversacional. Si no hay contenido sustantivo, poné lo que el usuario dijo."}',
+        ].join("\n");
 
-        const confirmacionMsg = `📝 *¡Listo! Registré tu reporte diario en el Panel Web.* 🚜\n\n` +
-                                `El reporte fue procesado y mejorado con IA para que puedas visualizarlo, compartirlo o descargarlo como informe desde la pestaña *Reportes Diarios*.\n\n` +
-                                `*Novedades estructuradas:*\n${textoMejorado.slice(0, 400)}${textoMejorado.length > 400 ? '...' : ''}`;
-        
-        try {
-          await guardarConsulta({
-            usuarioId,
-            whatsapp: waCapturaNorm,
-            pregunta: `[Reporte diario registrado: ${textoOriginal.slice(0, 100)}]`,
-            respuesta: confirmacionMsg,
-            tokensUsados: null,
-            iaSinContexto: false,
-            iaProvider: "gemini_reportes",
-            iaProviderTrace: [{ type: "reporte_diario", success: true }]
-          });
-        } catch (eGuardar) {
-          console.error("[WhatsApp Reporte] Error al registrar en historial_consultas:", eGuardar.message);
+        let classifUser = `Mensaje actual del usuario:\n"${textoLimpioParaEvaluar}"`;
+        if (contextoHilo) {
+          classifUser = `Conversación reciente (contexto):\n${contextoHilo}\n\n---\nMensaje actual del usuario:\n"${textoLimpioParaEvaluar}"`;
         }
 
-        const msgReplyRaw = msg.reply.bind(msg);
-        const finalMsg = formatearRespuestaAmigable(confirmacionMsg);
-        capturaInteraccion.registrarFireAndForget({
-          whatsappNorm: waCapturaNorm,
-          usuarioId: planCtx.usuario?.id ?? null,
-          direccion: "out",
-          cuerpo: finalMsg,
-          ruta: "reporte_diario_out",
+        const classifOut = await runProviderChain({
+          system: classifSystem,
+          user: classifUser,
+          contextLabel: "IA.reporte_classif",
+          opts: {
+            maxOutputTokens: 512,
+            temperature: 0,
+            responseMimeType: "application/json",
+          },
         });
-        await msgReplyRaw(finalMsg);
-        return; // Interceptado exitosamente
+
+        const classifJson = JSON.parse(String(classifOut?.texto || "{}"));
+        
+        if (classifJson.es_reporte === true) {
+          console.log(`[WhatsApp Reporte] IA clasificó como reporte diario para usuario ${usuarioId}`);
+          
+          let textoOriginal = String(classifJson.contenido_extraido || textoLimpioParaEvaluar).trim();
+          if (!textoOriginal || textoOriginal.length < 5) {
+            textoOriginal = textoLimpioParaEvaluar;
+          }
+
+          // Usar Gemini para mejorar/formatear el reporte
+          let textoMejorado = "";
+          try {
+            const { generarConPromptLibre } = require("../services/gemini");
+            const systemPrompt = "Sos un redactor profesional agropecuario. Tu tarea es estructurar y formalizar las novedades del campo reportadas por el productor o encargado de forma clara, técnica y en formato de 'informe de novedades diario'. Organizalo con secciones/viñetas usando markdown. Mantené todos los datos reales (lotes, animales, cantidades, observaciones, fechas) tal como se reportan, sin omitir ni inventar nada. Si el reporte indica que está todo bien o sin novedades, generá un informe breve que refleje eso.";
+            let promptUser = `Reporte original del productor:\n"${textoOriginal}"`;
+            if (contextoHilo) {
+              promptUser = `Contexto de la conversación reciente del productor:\n${contextoHilo}\n\nContenido del reporte:\n"${textoOriginal}"\n\nUsá la información de la conversación y el contenido como base del informe. NO inventes datos que no estén en los mensajes.`;
+            }
+            const out = await generarConPromptLibre({
+              system: systemPrompt,
+              user: promptUser
+            });
+            textoMejorado = String(out?.texto || "").trim();
+          } catch (eGemini) {
+            console.error("[WhatsApp Reporte] Error al mejorar con IA:", eGemini.message);
+            textoMejorado = `### Reporte de Novedades Diario\n\n${textoOriginal}`;
+          }
+
+          // Calcular waCapturaNorm localmente (la variable global se define más abajo en el flujo)
+          const identCapturaReporte = extraerIdentidadWhatsapp(msg.from);
+          const waCapturaNormReporte = normalizarWhatsapp(numeroReal || identCapturaReporte.numeroReal || identCapturaReporte.numero || "") || "";
+
+          // Guardar en base de datos
+          await query(`
+            INSERT INTO reportes_diarios (usuario_id, texto_original, texto_mejorado)
+            VALUES ($1, $2, $3)
+          `, [usuarioId, textoOriginal, textoMejorado]);
+
+          const confirmacionMsg = `📝 *¡Listo! Registré tu reporte diario en el Panel Web.* 🚜\n\n` +
+                                  `El reporte fue procesado y mejorado con IA para que puedas visualizarlo, compartirlo o descargarlo como informe desde la pestaña *Reportes Diarios*.\n\n` +
+                                  `*Novedades estructuradas:*\n${textoMejorado.slice(0, 400)}${textoMejorado.length > 400 ? '...' : ''}`;
+          
+          try {
+            await guardarConsulta({
+              usuarioId,
+              whatsapp: waCapturaNormReporte,
+              pregunta: `[Reporte diario registrado: ${textoOriginal.slice(0, 100)}]`,
+              respuesta: confirmacionMsg,
+              tokensUsados: null,
+              iaSinContexto: false,
+              iaProvider: "gemini_reportes",
+              iaProviderTrace: [{ type: "reporte_diario", success: true }]
+            });
+          } catch (eGuardar) {
+            console.error("[WhatsApp Reporte] Error al registrar en historial_consultas:", eGuardar.message);
+          }
+
+          const msgReplyRaw = msg.reply.bind(msg);
+          const finalMsg = formatearRespuestaAmigable(confirmacionMsg);
+          capturaInteraccion.registrarFireAndForget({
+            whatsappNorm: waCapturaNormReporte,
+            usuarioId: planCtx.usuario?.id ?? null,
+            direccion: "out",
+            cuerpo: finalMsg,
+            ruta: "reporte_diario_out",
+          });
+          await msgReplyRaw(finalMsg);
+          return; // Interceptado exitosamente
+        }
+      } catch (eClassif) {
+        // Si falla la clasificación IA, no bloqueamos el flujo normal
+        console.warn("[WhatsApp Reporte] Error en clasificación IA de reporte:", eClassif.message);
       }
     }
 
@@ -999,7 +1204,19 @@ const procesarMensajeEntranteWhatsapp = async (msg) => {
 
         for (const lote of lotes) {
           if (!lote.categoria) continue;
-          
+
+          const pMin = lote.precio_min != null ? Number(lote.precio_min) : null;
+          const pMax = lote.precio_max != null ? Number(lote.precio_max) : null;
+          let pProm = lote.precio_promedio != null ? Number(lote.precio_promedio) : null;
+          if (pProm == null && pMin != null && pMax != null) {
+            pProm = (pMin + pMax) / 2;
+          } else if (pProm == null) {
+            pProm = pMin ?? pMax ?? null;
+          }
+          lote.precio_promedio = pProm;
+          lote.precio_min = pMin;
+          lote.precio_max = pMax;
+
           try {
             await query(`
               INSERT INTO precios_hacienda (categoria, precio_promedio, precio_max, precio_min, unidad, fecha)
@@ -1013,9 +1230,9 @@ const procesarMensajeEntranteWhatsapp = async (msg) => {
                 creado_en = NOW()
             `, [
               lote.categoria,
-              lote.precio_promedio != null ? Number(lote.precio_promedio) : null,
-              lote.precio_max != null ? Number(lote.precio_max) : null,
-              lote.precio_min != null ? Number(lote.precio_min) : null,
+              pProm,
+              pMax,
+              pMin,
               lote.unidad || 'kg',
               fechaRemate
             ]);
